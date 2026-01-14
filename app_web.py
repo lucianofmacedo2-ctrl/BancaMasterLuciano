@@ -2,25 +2,26 @@ import streamlit as st
 import pandas as pd
 import gspread
 import json
+import re
 from google.oauth2.service_account import Credentials
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Banca Master Luciano", layout="wide")
 
-# --- FUNÇÃO: CONEXÃO COM GOOGLE SHEETS ---
+# --- FUNÇÃO: CONEXÃO COM GOOGLE SHEETS (VERSÃO ULTRA-LIMPA) ---
 def conectar_google_sheets():
     try:
-        # Puxa o conteúdo bruto do segredo
-        json_text = st.secrets["gcp_service_account"]["json_data"]
+        # Puxa o conteúdo bruto como string
+        raw_content = st.secrets["gcp_service_account"]["json_data"]
         
-        # REMOÇÃO DE ESCAPE: Corrige o erro "Invalid \escape" limpando barras duplicadas
-        # que o Streamlit ou editores de texto podem inserir automaticamente
-        json_text = json_text.replace('\\\\', '\\')
+        # Limpeza agressiva: Remove qualquer barra invertida duplicada antes de processar o JSON
+        # Isso resolve o erro "Invalid \escape" definitivamente
+        clean_json = raw_content.replace('\\\\', '\\')
         
-        # Converte a string limpa para um dicionário Python
-        creds_dict = json.loads(json_text)
+        # Converte para dicionário
+        creds_dict = json.loads(clean_json)
         
-        # Garante que as quebras de linha da chave privada sejam lidas corretamente pelo Google
+        # Garante que as quebras de linha da chave privada sejam as corretas para o Google
         if "private_key" in creds_dict:
             creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
@@ -28,13 +29,12 @@ def conectar_google_sheets():
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Abre a planilha pelo nome exato (deve ser 'banca_dados' com aba 'apostas')
         return client.open("banca_dados").worksheet("apostas")
     except Exception as e:
         st.error(f"Erro Crítico de Conexão: {e}")
         return None
 
-# --- CARREGAR DADOS DO CSV (PARA FILTROS DINÂMICOS) ---
+# --- CARREGAR DADOS DO CSV ---
 @st.cache_data
 def carregar_dados_csv():
     try:
@@ -60,7 +60,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- NAVEGAÇÃO LATERAL ---
+# --- NAVEGAÇÃO ---
 st.sidebar.title("🏆 BancaMaster")
 menu = st.sidebar.radio("Ir para:", ["🏠 Dashboard", "📝 Registrar Aposta"])
 
@@ -72,9 +72,9 @@ if menu == "🏠 Dashboard":
     col2.metric("ROI", "0%")
     col3.metric("Win Rate", "0%")
     col4.metric("Banca Atual", "R$ 0,00")
-    st.info("Os dados acima serão atualizados assim que você salvar a primeira aposta com sucesso.")
+    st.info("O Dashboard será atualizado assim que você salvar a primeira aposta.")
 
-# --- TELA: REGISTRAR APOSTA (FORMULÁRIO COMPLETO) ---
+# --- TELA: REGISTRAR APOSTA ---
 elif menu == "📝 Registrar Aposta":
     st.title("🖊️ Registrar Nova Entrada")
     
@@ -82,7 +82,6 @@ elif menu == "📝 Registrar Aposta":
         col1, col2 = st.columns(2)
         data = col1.date_input("Data da Aposta")
         
-        # Filtros automáticos baseados no seu arquivo CSV
         paises = sorted(df_csv['pais'].unique()) if not df_csv.empty else []
         pais = col2.selectbox("País", paises)
         
@@ -105,11 +104,10 @@ elif menu == "📝 Registrar Aposta":
             sheet = conectar_google_sheets()
             if sheet:
                 try:
-                    # Adiciona a nova linha na planilha do Google
                     sheet.append_row([
                         str(data), pais, liga, mandante, visitante, 
                         mercado, odd, stake, resultado
                     ])
                     st.success("✅ Aposta gravada com sucesso no Google Sheets!")
                 except Exception as e:
-                    st.error(f"Erro ao gravar dados: {e}")
+                    st.error(f"Erro ao gravar na planilha: {e}")
