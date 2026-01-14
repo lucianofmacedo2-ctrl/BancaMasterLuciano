@@ -6,32 +6,32 @@ from google.oauth2.service_account import Credentials
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Banca Master Luciano", layout="wide")
 
-# --- FUNÇÃO: CONEXÃO COM GOOGLE SHEETS (VERSÃO SEM JSON.LOADS) ---
+# --- FUNÇÃO: CONEXÃO COM GOOGLE SHEETS (VERSÃO MANUAL) ---
 def conectar_google_sheets():
     try:
-        # Puxamos os dados um por um dos Secrets para evitar erros de escape no JSON inteiro
-        # Certifique-se de que o seu Secret no Streamlit Cloud segue o formato abaixo
+        # Acessa os segredos um por um
         s = st.secrets["gcp_service_account"]
         
-        # Montamos o dicionário de credenciais manualmente
+        # Monta o dicionário de credenciais exatamente como o Google espera
         creds_dict = {
             "type": s["type"],
             "project_id": s["project_id"],
             "private_key_id": s["private_key_id"],
-            "private_key": s["private_key"].replace("\\n", "\n"), # Corrige as quebras de linha
+            "private_key": s["private_key"].strip(),
             "client_email": s["client_email"],
             "client_id": s["client_id"],
             "auth_uri": s["auth_uri"],
             "token_uri": s["token_uri"],
             "auth_provider_x509_cert_url": s["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": s["client_x509_cert_url"]
+            "client_x509_cert_url": s["client_x509_cert_url"],
+            "universe_domain": s["universe_domain"]
         }
         
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Abre a planilha pelo nome exato
+        # Nome da planilha e aba
         return client.open("banca_dados").worksheet("apostas")
     except Exception as e:
         st.error(f"Erro Crítico de Conexão: {e}")
@@ -49,7 +49,7 @@ def carregar_dados_csv():
 
 df_csv = carregar_dados_csv()
 
-# --- CSS: ALTO CONTRASTE ---
+# --- CSS: ESTILO ---
 st.markdown("""
     <style>
     div[data-testid="metric-container"] {
@@ -63,11 +63,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- NAVEGAÇÃO LATERAL ---
+# --- NAVEGAÇÃO ---
 st.sidebar.title("🏆 BancaMaster")
 menu = st.sidebar.radio("Ir para:", ["🏠 Dashboard", "📝 Registrar Aposta"])
 
-# --- TELA: DASHBOARD ---
 if menu == "🏠 Dashboard":
     st.title("📊 Dashboard de Performance")
     col1, col2, col3, col4 = st.columns(4)
@@ -75,16 +74,16 @@ if menu == "🏠 Dashboard":
     col2.metric("ROI", "0%")
     col3.metric("Win Rate", "0%")
     col4.metric("Banca Atual", "R$ 0,00")
-    st.info("Os dados serão atualizados após o primeiro registro de sucesso.")
+    st.info("O Dashboard será preenchido após o primeiro registro de sucesso.")
 
-# --- TELA: REGISTRAR APOSTA ---
 elif menu == "📝 Registrar Aposta":
-    st.title("🖊️ Registrar Nova Entrada")
+    st.title("🖊️ Nova Entrada")
     
     with st.form("form_aposta", clear_on_submit=True):
         col1, col2 = st.columns(2)
         data = col1.date_input("Data da Aposta")
         
+        # Carrega filtros do CSV
         paises = sorted(df_csv['pais'].unique()) if not df_csv.empty else []
         pais = col2.selectbox("País", paises)
         
