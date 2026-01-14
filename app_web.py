@@ -6,15 +6,35 @@ import matplotlib.pyplot as plt
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="BancaMaster Pro Web", layout="wide", initial_sidebar_state="expanded")
 
-# --- ESTILIZAÇÃO CUSTOMIZADA ---
+# --- AJUSTE DE CONTRASTE (CSS CUSTOMIZADO) ---
 st.markdown("""
     <style>
+    /* Fundo da página */
     .main { background-color: #0e1117; }
-    .stMetric { background-color: #1e2130; padding: 15px; border-radius: 10px; border: 1px solid #3498DB; }
+    
+    /* Customização dos Cards de Métrica para Alto Contraste */
+    [data-testid="stMetricValue"] {
+        color: #FFFFFF !important; /* Branco Puro para o valor principal */
+        font-size: 24px !important;
+        font-weight: bold !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #BDC3C7 !important; /* Cinza claro para o rótulo */
+        font-size: 14px !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    div[data-testid="metric-container"] {
+        background-color: #1c2431; /* Fundo levemente mais claro que o fundo da página */
+        border: 2px solid #3498db; /* Borda azul vibrante */
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE CÁLCULO (Lógica de Poisson) ---
+# --- FUNÇÕES DE CÁLCULO ---
 class Engine:
     @staticmethod
     def poisson(k, lamb):
@@ -46,39 +66,36 @@ def carregar_dados():
 
 df = carregar_dados()
 
-# --- MENU LATERAL (NAVEGAÇÃO) ---
+# --- MENU LATERAL ---
 st.sidebar.title("🏆 BancaMaster Pro")
 menu = st.sidebar.radio("Ir para:", ["🏠 Dashboard", "⚽ Análise Preditiva", "📝 Registrar Aposta"])
 
-# ---------------------------------------------------------
-# TELA: DASHBOARD
-# ---------------------------------------------------------
+# --- TELA: DASHBOARD ---
 if menu == "🏠 Dashboard":
     st.title("📊 Dashboard de Performance")
     
-    # Exemplo de Métricas (Aqui integraríamos com o seu banco de dados SQL ou CSV de apostas)
+    # Agora com alto contraste
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Lucro Total", "R$ 1.250,00", "+5.2%")
-    col2.metric("ROI", "12.5%", "+1.1%")
-    col3.metric("Win Rate", "68%", "-2%")
-    col4.metric("Banca Atual", "R$ 5.400,00")
+    with col1:
+        st.metric("Lucro Total", "R$ 1.250,00", "+5.2%")
+    with col2:
+        st.metric("ROI", "12.5%", "+1.1%")
+    with col3:
+        st.metric("Win Rate", "68%", "-2%")
+    with col4:
+        st.metric("Banca Atual", "R$ 5.400,00")
 
     st.divider()
     st.subheader("📈 Evolução do Patrimônio")
-    # Gráfico de exemplo - no futuro leremos do seu banco de dados
     chart_data = pd.DataFrame([100, 120, 110, 150, 180, 175, 210], columns=['Saldo'])
     st.line_chart(chart_data)
 
-# ---------------------------------------------------------
-# TELA: ANÁLISE PREDITIVA (O MOTOR QUE FIZEMOS)
-# ---------------------------------------------------------
+# --- TELA: ANÁLISE PREDITIVA ---
 elif menu == "⚽ Análise Preditiva":
     st.title("🤖 Inteligência Poisson")
-    
     if df.empty:
         st.error("Arquivo 'dados_25_26.csv' não encontrado.")
     else:
-        # Filtros de Seleção
         c1, c2 = st.columns(2)
         pais = c1.selectbox("País", sorted(df['pais'].unique()))
         liga = c2.selectbox("Liga", sorted(df[df['pais'] == pais]['divisao'].unique()))
@@ -95,7 +112,6 @@ elif menu == "⚽ Análise Preditiva":
             s_f = Engine.calcular_stats(df, fora, 'visitante')
             
             if s_c and s_f:
-                # Probabilidades
                 prob_c, prob_f, prob_e = 0, 0, 0
                 for gc in range(6):
                     for gf in range(6):
@@ -104,7 +120,6 @@ elif menu == "⚽ Análise Preditiva":
                         elif gf > gc: prob_f += p
                         else: prob_e += p
                 
-                # Exibição
                 st.markdown(f"#### 🏟️ {casa} vs {fora}")
                 m1, m2, m3 = st.columns(3)
                 m1.metric(f"Vitória {casa}", f"{prob_c*100:.1f}%")
@@ -119,9 +134,7 @@ elif menu == "⚽ Análise Preditiva":
                 e3.info(f"**Chutes**\n\n {s_c['chutes']+s_f['chutes']:.2f}")
                 e4.info(f"**Cartões**\n\n {s_c['cartoes']+s_f['cartoes']:.2f}")
 
-# ---------------------------------------------------------
-# TELA: REGISTRAR APOSTA
-# ---------------------------------------------------------
+# --- TELA: REGISTRAR APOSTA ---
 elif menu == "📝 Registrar Aposta":
     st.title("🖊️ Nova Entrada")
     with st.form("form_aposta"):
@@ -136,4 +149,4 @@ elif menu == "📝 Registrar Aposta":
         
         submit = st.form_submit_button("Salvar Aposta")
         if submit:
-            st.success("Aposta registrada com sucesso! (Nesta demo Web, os dados ainda não são gravados no SQLite)")
+            st.success("Aposta registrada! Próximo passo: Conectar ao Google Sheets.")
