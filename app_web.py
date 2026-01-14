@@ -2,26 +2,24 @@ import streamlit as st
 import pandas as pd
 import gspread
 import json
-import re
 from google.oauth2.service_account import Credentials
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Banca Master Luciano", layout="wide")
 
-# --- FUNÇÃO: CONEXÃO COM GOOGLE SHEETS (VERSÃO ULTRA-LIMPA) ---
+# --- FUNÇÃO: CONEXÃO COM GOOGLE SHEETS (VERSÃO À PROVA DE ERROS) ---
 def conectar_google_sheets():
     try:
-        # Puxa o conteúdo bruto como string
-        raw_content = st.secrets["gcp_service_account"]["json_data"]
+        # Puxa o conteúdo bruto como string pura
+        json_text = st.secrets["gcp_service_account"]["json_data"]
         
-        # Limpeza agressiva: Remove qualquer barra invertida duplicada antes de processar o JSON
-        # Isso resolve o erro "Invalid \escape" definitivamente
-        clean_json = raw_content.replace('\\\\', '\\')
+        # LIMPEZA CRÍTICA: Remove barras invertidas duplicadas que causam o erro de escape
+        json_text = json_text.replace('\\\\', '\\')
         
-        # Converte para dicionário
-        creds_dict = json.loads(clean_json)
+        # Converte para dicionário Python
+        creds_dict = json.loads(json_text)
         
-        # Garante que as quebras de linha da chave privada sejam as corretas para o Google
+        # Garante que as quebras de linha da chave privada sejam lidas corretamente
         if "private_key" in creds_dict:
             creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         
@@ -29,6 +27,7 @@ def conectar_google_sheets():
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         
+        # Abre a planilha pelo nome exato
         return client.open("banca_dados").worksheet("apostas")
     except Exception as e:
         st.error(f"Erro Crítico de Conexão: {e}")
@@ -72,7 +71,7 @@ if menu == "🏠 Dashboard":
     col2.metric("ROI", "0%")
     col3.metric("Win Rate", "0%")
     col4.metric("Banca Atual", "R$ 0,00")
-    st.info("O Dashboard será atualizado assim que você salvar a primeira aposta.")
+    st.info("O Dashboard será atualizado assim que você salvar a primeira aposta com sucesso.")
 
 # --- TELA: REGISTRAR APOSTA ---
 elif menu == "📝 Registrar Aposta":
@@ -110,4 +109,4 @@ elif menu == "📝 Registrar Aposta":
                     ])
                     st.success("✅ Aposta gravada com sucesso no Google Sheets!")
                 except Exception as e:
-                    st.error(f"Erro ao gravar na planilha: {e}")
+                    st.error(f"Erro ao gravar dados: {e}")
