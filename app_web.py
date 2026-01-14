@@ -1,27 +1,31 @@
 import streamlit as st
 import pandas as pd
 import gspread
-import json
 from google.oauth2.service_account import Credentials
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Banca Master Luciano", layout="wide")
 
-# --- FUNÇÃO: CONEXÃO COM GOOGLE SHEETS (VERSÃO À PROVA DE ERROS) ---
+# --- FUNÇÃO: CONEXÃO COM GOOGLE SHEETS (VERSÃO SEM JSON.LOADS) ---
 def conectar_google_sheets():
     try:
-        # Puxa o conteúdo bruto como string pura
-        json_text = st.secrets["gcp_service_account"]["json_data"]
+        # Puxamos os dados um por um dos Secrets para evitar erros de escape no JSON inteiro
+        # Certifique-se de que o seu Secret no Streamlit Cloud segue o formato abaixo
+        s = st.secrets["gcp_service_account"]
         
-        # LIMPEZA CRÍTICA: Remove barras invertidas duplicadas que causam o erro de escape
-        json_text = json_text.replace('\\\\', '\\')
-        
-        # Converte para dicionário Python
-        creds_dict = json.loads(json_text)
-        
-        # Garante que as quebras de linha da chave privada sejam lidas corretamente
-        if "private_key" in creds_dict:
-            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        # Montamos o dicionário de credenciais manualmente
+        creds_dict = {
+            "type": s["type"],
+            "project_id": s["project_id"],
+            "private_key_id": s["private_key_id"],
+            "private_key": s["private_key"].replace("\\n", "\n"), # Corrige as quebras de linha
+            "client_email": s["client_email"],
+            "client_id": s["client_id"],
+            "auth_uri": s["auth_uri"],
+            "token_uri": s["token_uri"],
+            "auth_provider_x509_cert_url": s["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": s["client_x509_cert_url"]
+        }
         
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
@@ -33,7 +37,7 @@ def conectar_google_sheets():
         st.error(f"Erro Crítico de Conexão: {e}")
         return None
 
-# --- CARREGAR DADOS DO CSV ---
+# --- CARREGAR DADOS DO CSV (PARA FILTROS) ---
 @st.cache_data
 def carregar_dados_csv():
     try:
@@ -59,7 +63,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- NAVEGAÇÃO ---
+# --- NAVEGAÇÃO LATERAL ---
 st.sidebar.title("🏆 BancaMaster")
 menu = st.sidebar.radio("Ir para:", ["🏠 Dashboard", "📝 Registrar Aposta"])
 
@@ -71,7 +75,7 @@ if menu == "🏠 Dashboard":
     col2.metric("ROI", "0%")
     col3.metric("Win Rate", "0%")
     col4.metric("Banca Atual", "R$ 0,00")
-    st.info("O Dashboard será atualizado assim que você salvar a primeira aposta com sucesso.")
+    st.info("Os dados serão atualizados após o primeiro registro de sucesso.")
 
 # --- TELA: REGISTRAR APOSTA ---
 elif menu == "📝 Registrar Aposta":
@@ -109,4 +113,4 @@ elif menu == "📝 Registrar Aposta":
                     ])
                     st.success("✅ Aposta gravada com sucesso no Google Sheets!")
                 except Exception as e:
-                    st.error(f"Erro ao gravar dados: {e}")
+                    st.error(f"Erro ao gravar na planilha: {e}")
