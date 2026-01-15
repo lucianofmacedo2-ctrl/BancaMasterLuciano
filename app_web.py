@@ -7,49 +7,58 @@ from datetime import datetime, timedelta
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Banca Master Pro", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS DE ALTO CONTRASTE ---
+# --- CSS ALTO CONTRASTE (CORRIGIDO) ---
 st.markdown("""
     <style>
-    /* Fundo Geral */
+    /* 1. Fundo Geral da Aplicação */
     .stApp {
         background-color: #0e1117;
-        color: #fafafa;
     }
-    /* Cards de Métricas */
+
+    /* 2. Texto Geral - Força Branco em Títulos e Parágrafos */
+    h1, h2, h3, h4, h5, h6, p, span, div {
+        color: #ffffff !important;
+    }
+
+    /* 3. Cards de Métricas (As caixinhas de Lucro/ROI) */
     div[data-testid="stMetric"] {
-        background-color: #262730;
-        border: 1px solid #464b5f;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        background-color: #262730 !important; /* Fundo cinza escuro */
+        border: 1px solid #4f5366 !important; /* Borda visível */
+        padding: 15px !important;
+        border-radius: 10px !important;
     }
+
+    /* 4. Rótulo da Métrica (O texto pequeno "Lucro Total") */
+    div[data-testid="stMetricLabel"] > div > p, 
     div[data-testid="stMetricLabel"] {
-        color: #d0d0d0 !important;
-        font-size: 14px !important;
-        font-weight: bold;
+        color: #e0e0e0 !important; /* Branco gelo */
+        font-size: 16px !important;
+        font-weight: 600 !important;
     }
+
+    /* 5. Valor da Métrica (O número grande "R$ 53.00") */
+    div[data-testid="stMetricValue"] > div,
     div[data-testid="stMetricValue"] {
-        color: #00e676 !important;
-        font-size: 26px !important;
+        color: #00ff88 !important; /* Verde Neon Brilhante */
+        font-size: 28px !important;
+        font-weight: bold !important;
     }
-    /* Tabelas */
-    div[data-testid="stDataFrame"] {
-        background-color: #262730;
-        border-radius: 8px;
+
+    /* 6. Tabelas (Dataframes) */
+    div[data-testid="stDataFrame"], .stDataFrame {
+        background-color: #262730 !important;
+        border: 1px solid #444 !important;
     }
-    /* Abas */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-    }
+    
+    /* 7. Abas (Tabs) */
     .stTabs [data-baseweb="tab"] {
-        background-color: #262730;
-        border-radius: 4px;
-        color: white;
-        padding: 10px 20px;
+        color: #ffffff !important;
+        background-color: #1e1e1e !important;
+        border: 1px solid #333;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #00e676 !important;
-        color: black !important;
+        background-color: #00ff88 !important;
+        color: #000000 !important; /* Texto preto na aba selecionada para contraste */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -71,10 +80,10 @@ supabase = conectar_supabase()
 def carregar_dados_csv():
     try:
         df = pd.read_csv("dados_25_26.csv", sep=None, engine='python')
-        # Padroniza nomes das colunas (remove espaços, minúsculo)
+        # Padroniza nomes das colunas
         df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]
         
-        # Lista de colunas que PRECISAM ser numéricas para as médias
+        # Colunas numéricas essenciais
         cols_numericas = [
             'gols_mandante_ft', 'gols_visitante_ft', 'gols_mandante_ht', 'gols_visitante_ht',
             'mandante_finalizacoes', 'visitante_finalizacoes',
@@ -88,7 +97,6 @@ def carregar_dados_csv():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
                 
-        # Garante coluna de data
         if 'data' in df.columns:
             df['data'] = pd.to_datetime(df['data'], errors='coerce')
             
@@ -161,7 +169,7 @@ if menu == "🏦 Minhas Bancas":
                 st.error("Apague as apostas desta banca antes de excluir.")
 
 # ==============================================================================
-# 2. ANÁLISE DE TIMES (REFORMULADA COMPLETA)
+# 2. ANÁLISE DE TIMES (COMPLETA E VISUAL)
 # ==============================================================================
 elif menu == "⚽ Análise de Times":
     st.title("🔎 Scout Avançado")
@@ -185,23 +193,20 @@ elif menu == "⚽ Análise de Times":
         # --- SELEÇÃO DOS DADOS ---
         # 1. Mandante jogando em CASA
         df_home_home = df_csv[df_csv['mandante'] == tm]
-        # 2. Mandante GERAL (Casa + Fora)
+        # 2. Mandante GERAL
         df_home_all = df_csv[(df_csv['mandante'] == tm) | (df_csv['visitante'] == tm)]
         
         # 3. Visitante jogando FORA
         df_away_away = df_csv[df_csv['visitante'] == tv]
-        # 4. Visitante GERAL (Casa + Fora)
+        # 4. Visitante GERAL
         df_away_all = df_csv[(df_csv['mandante'] == tv) | (df_csv['visitante'] == tv)]
 
         if df_home_home.empty or df_away_away.empty:
             st.warning("Dados insuficientes para análise Casa x Fora.")
         else:
-            # --- FUNÇÃO DE CÁLCULO DE MÉDIAS ---
-            def get_stats(df_input, team, side):
-                # side = 'home' (se o time procurado é mandante no df), 'away', ou 'all'
+            # Stats Function
+            def get_stats(df_input, side):
                 stats = {}
-                
-                # Filtrar colunas corretas baseadas na perspectiva
                 if side == 'home':
                     cols = {
                         'gols_pro': 'gols_mandante_ft', 'gols_sof': 'gols_visitante_ft',
@@ -216,42 +221,34 @@ elif menu == "⚽ Análise de Times":
                         'cantos': 'visitante_cantos', 'cartoes': 'visitante_cartao_amarelo',
                         'finalizacoes': 'visitante_finalizacoes', 'chutes_gol': 'visitante_chute_ao_gol'
                     }
-                else: # ALL (Calculo mais complexo, simplificado aqui pela media total das colunas se existirem)
-                    return {} 
+                else: return {}
 
-                # Verifica existencia das colunas e calcula média
                 for k, col_name in cols.items():
                     stats[k] = df_input[col_name].mean() if col_name in df_input.columns else 0.0
-                
                 return stats
 
-            # Stats Específicas (Casa x Fora)
-            st_home = get_stats(df_home_home, tm, 'home')
-            st_away = get_stats(df_away_away, tv, 'away')
+            # Stats Específicas
+            st_home = get_stats(df_home_home, 'home')
+            st_away = get_stats(df_away_away, 'away')
             
-            # --- CÁLCULO DE PROBABILIDADE (WIN RATE) ---
-            # Home Win Rate em Casa
+            # --- PROBABILIDADES ---
+            # Home Win Rate (Casa)
             hw = len(df_home_home[df_home_home['gols_mandante_ft'] > df_home_home['gols_visitante_ft']])
             hd = len(df_home_home[df_home_home['gols_mandante_ft'] == df_home_home['gols_visitante_ft']])
-            hl = len(df_home_home) - hw - hd
             
-            # Away Win Rate Fora
+            # Away Win Rate (Fora)
             aw = len(df_away_away[df_away_away['gols_visitante_ft'] > df_away_away['gols_mandante_ft']])
             ad = len(df_away_away[df_away_away['gols_visitante_ft'] == df_away_away['gols_mandante_ft']])
-            al = len(df_away_away) - aw - ad
             
-            # Probabilidade Simples Ponderada
+            # Calculo simples
             total_jogos = len(df_home_home) + len(df_away_away)
             prob_h = (hw / len(df_home_home) * 100) if len(df_home_home) > 0 else 0
             prob_a = (aw / len(df_away_away) * 100) if len(df_away_away) > 0 else 0
             prob_d = ((hd/len(df_home_home)) + (ad/len(df_away_away))) / 2 * 100
             
-            # Normalizar para 100%
+            # Normalizar
             total_p = prob_h + prob_a + prob_d
-            if total_p > 0:
-                p_h, p_a, p_d = (prob_h/total_p*100), (prob_a/total_p*100), (prob_d/total_p*100)
-            else:
-                p_h, p_a, p_d = 0, 0, 0
+            p_h, p_a, p_d = (prob_h/total_p*100), (prob_a/total_p*100), (prob_d/total_p*100) if total_p > 0 else (0,0,0)
 
             st.subheader(f"📊 Expectativa: {tm} x {tv}")
             
@@ -260,21 +257,23 @@ elif menu == "⚽ Análise de Times":
             col_p2.metric("Empate", f"{p_d:.1f}%")
             col_p3.metric(f"Vitória {tv}", f"{p_a:.1f}%")
 
-            # --- TABELAS COMPARATIVAS ---
-            tab1, tab2 = st.tabs(["🏠 Casa vs ✈️ Fora (Específico)", "🌍 Forma Geral (Últimos 5)"])
+            st.markdown("---")
+
+            # --- ABAS DE DADOS ---
+            tab1, tab2 = st.tabs(["🏠 Casa vs ✈️ Fora (Confronto)", "🌍 Forma Geral (Recente)"])
 
             with tab1:
-                st.markdown("#### Médias por Jogo (Fator Local)")
+                st.markdown("### ⚡ Médias por Jogo (Fator Local)")
+                st.markdown("Comparativo do Mandante jogando **EM CASA** contra o Visitante jogando **FORA**.")
                 
-                # Montando o DataFrame Comparativo Bonito
                 data_compare = {
                     "Estatística": [
-                        "Gols Marcados FT", "Gols Sofridos FT", 
-                        "Gols Marcados HT", "Gols Sofridos HT",
+                        "Gols Feitos FT", "Gols Sofridos FT", 
+                        "Gols Feitos HT", "Gols Sofridos HT",
                         "Cantos", "Cartões Amarelos", 
                         "Finalizações Totais", "Chutes ao Gol"
                     ],
-                    f"{tm} (em Casa)": [
+                    f"{tm} (Casa)": [
                         st_home['gols_pro'], st_home['gols_sof'],
                         st_home['gols_pro_ht'], st_home['gols_sof_ht'],
                         st_home['cantos'], st_home['cartoes'],
@@ -288,27 +287,33 @@ elif menu == "⚽ Análise de Times":
                     ]
                 }
                 df_comp = pd.DataFrame(data_compare)
-                st.dataframe(df_comp.style.format(precision=2), use_container_width=True, hide_index=True)
+                st.dataframe(
+                    df_comp.style.format(precision=2).background_gradient(axis=1, cmap='Greens'), 
+                    use_container_width=True, 
+                    hide_index=True
+                )
                 
+                st.markdown("#### 📜 Últimos 5 Jogos nesta condição")
                 c_last1, c_last2 = st.columns(2)
                 with c_last1:
-                    st.write(f"**Últimos 5 do {tm} em Casa:**")
+                    st.write(f"**{tm} (Em Casa):**")
                     st.dataframe(df_home_home.sort_values('data', ascending=False).head(5)[['data', 'visitante', 'gols_mandante_ft', 'gols_visitante_ft']], hide_index=True)
                 with c_last2:
-                    st.write(f"**Últimos 5 do {tv} Fora:**")
+                    st.write(f"**{tv} (Fora):**")
                     st.dataframe(df_away_away.sort_values('data', ascending=False).head(5)[['data', 'mandante', 'gols_mandante_ft', 'gols_visitante_ft']], hide_index=True)
 
             with tab2:
-                st.markdown("#### Forma Recente (Todos os Jogos)")
+                st.markdown("### 🌍 Forma Geral (Últimos 5 Gerais)")
+                st.markdown("Desempenho recente independente do mando de campo.")
                 
                 c_gen1, c_gen2 = st.columns(2)
                 with c_gen1:
-                    st.write(f"**Últimos 5 Gerais - {tm}:**")
+                    st.write(f"**{tm} (Geral):**")
                     last5_gen_home = df_home_all.sort_values('data', ascending=False).head(5)
                     st.dataframe(last5_gen_home[['data', 'mandante', 'visitante', 'gols_mandante_ft', 'gols_visitante_ft']], hide_index=True)
                     
                 with c_gen2:
-                    st.write(f"**Últimos 5 Gerais - {tv}:**")
+                    st.write(f"**{tv} (Geral):**")
                     last5_gen_away = df_away_all.sort_values('data', ascending=False).head(5)
                     st.dataframe(last5_gen_away[['data', 'mandante', 'visitante', 'gols_mandante_ft', 'gols_visitante_ft']], hide_index=True)
 
