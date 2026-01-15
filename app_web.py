@@ -8,72 +8,82 @@ from datetime import datetime
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Banca Master Pro", layout="wide", initial_sidebar_state="expanded")
 
-# --- CSS DE ALTO CONTRASTE (SIDEBAR + INPUTS + SELEÇÃO) ---
-st.markdown("""
+# --- CSS PERSONALIZADO (CORES ESPECÍFICAS) ---
+st.markdown(f"""
     <style>
-    /* 1. FUNDO GERAL E TEXTO */
-    .stApp { background-color: #0e1117; color: #ffffff; }
+    /* 1. FUNDO DA TELA PRINCIPAL */
+    .stApp {{
+        background-color: #0b5754 !important;
+        color: #ffffff !important;
+    }}
     
-    /* 2. MENU LATERAL (SIDEBAR) - CORREÇÃO DE CONTRASTE */
-    [data-testid="stSidebar"] {
-        background-color: #1a1c24 !important;
-        border-right: 1px solid #333;
-    }
-    /* Texto das opções do menu lateral */
+    /* 2. MENU LATERAL (SIDEBAR) */
+    [data-testid="stSidebar"] {{
+        background-color: #030844 !important;
+        border-right: 1px solid #ffffff33;
+    }}
+    /* Texto do menu lateral */
     [data-testid="stSidebar"] .st-emotion-cache-17l6i46, 
     [data-testid="stSidebar"] p, 
     [data-testid="stSidebar"] span,
-    [data-testid="stSidebar"] label {
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] h1 {{
         color: #ffffff !important;
         font-weight: 600 !important;
-        font-size: 16px !important;
-    }
-    /* Título do menu lateral */
-    [data-testid="stSidebar"] h1 { color: #00ff88 !important; }
+    }}
 
-    /* 3. INPUTS E SELECTBOX (CAMPOS DE SELEÇÃO) */
-    .stTextInput input, .stNumberInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #1e222e !important;
-        color: #ffffff !important;
-        border: 2px solid #00ff88 !important; /* Borda Neon visível */
-        border-radius: 8px !important;
-    }
-    
-    /* Texto dentro dos campos de seleção */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-        color: #ffffff !important;
-        font-weight: bold !important;
-    }
-
-    /* Dropdown (Lista que abre ao clicar) */
-    div[role="listbox"] { 
-        background-color: #1e222e !important; 
-        border: 2px solid #4f5366 !important; 
-    }
-    div[role="option"] { 
-        color: #ffffff !important; 
-        padding: 10px !important;
-    }
-    div[role="option"]:hover { 
-        background-color: #00ff88 !important; 
-        color: #000000 !important; 
-    }
-
-    /* 4. CARDS DE MÉTRICAS (DASHBOARD) */
-    div[data-testid="stMetric"] {
-        background-color: #1a1c24 !important;
-        border: 1px solid #333 !important;
+    /* 3. CARDS DE MÉTRICAS */
+    div[data-testid="stMetric"] {{
+        background-color: #050f54 !important;
+        border: 1px solid #ffffff33 !important;
         padding: 20px !important;
         border-radius: 12px !important;
-    }
-    div[data-testid="stMetricValue"] > div { color: #00ff88 !important; }
-    div[data-testid="stMetricLabel"] > div > p { color: #aaaaaa !important; }
+    }}
+    div[data-testid="stMetricValue"] > div {{ color: #ffffff !important; }}
+    div[data-testid="stMetricLabel"] > div > p {{ color: #ffffff !important; }}
 
-    /* 5. TABELAS */
-    .stDataFrame, div[data-testid="stTable"] { 
-        background-color: #1a1c24 !important; 
-        border-radius: 8px !important;
-    }
+    /* 4. TEXTOS GERAIS (TÍTULOS E LABELS) */
+    h1, h2, h3, h4, h5, h6, label, .stMarkdown p {{
+        color: #ffffff !important;
+    }}
+
+    /* 5. CAIXAS DE SELEÇÃO E DIGITAÇÃO (Fundo Branco, Texto Preto) */
+    .stTextInput input, .stNumberInput input, .stDateInput input, 
+    .stSelectbox div[data-baseweb="select"], .stTextArea textarea {{
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #cccccc !important;
+        border-radius: 5px !important;
+    }}
+    
+    /* Texto dentro do campo selecionado */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {{
+        color: #000000 !important;
+    }}
+
+    /* Estilo para a lista de opções (Dropdown) */
+    div[role="listbox"] {{
+        background-color: #ffffff !important;
+    }}
+    div[role="option"] {{
+        color: #000000 !important;
+    }}
+    div[role="option"]:hover {{
+        background-color: #eeeeee !important;
+    }}
+
+    /* Botões */
+    .stButton>button {{
+        background-color: #030844 !important;
+        color: white !important;
+        border: 1px solid #ffffff !important;
+    }}
+
+    /* Tabelas */
+    .stDataFrame {{
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -163,11 +173,12 @@ if menu == "📊 Dashboard Analítico":
         c2.metric("ROI Geral", f"{roi:.2f}%")
         c3.metric("Entradas", len(resolvidas))
         
-        st.subheader("📈 Evolução")
+        st.subheader("📈 Curva de Crescimento")
         resolvidas = resolvidas.sort_values('data')
         resolvidas['acumulado'] = resolvidas['lucro'].cumsum()
-        fig = px.line(resolvidas, x='data', y='acumulado', markers=True, template="plotly_dark")
-        fig.update_traces(line_color='#00ff88')
+        fig = px.line(resolvidas, x='data', y='acumulado', markers=True)
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
+        fig.update_traces(line_color='#ffffff')
         st.plotly_chart(fig, use_container_width=True)
 
 # ==============================================================================
@@ -187,11 +198,10 @@ elif menu == "⚽ Análise de Times":
         m_sel = c3.selectbox("Mandante", times)
         v_sel = c4.selectbox("Visitante", [t for t in times if t != m_sel])
 
-        # Estatísticas Casa vs Fora
         df_m = df_csv[(df_csv['mandante'] == m_sel) & (df_csv['divisao'] == liga_sel)]
         df_v = df_csv[(df_csv['visitante'] == v_sel) & (df_csv['divisao'] == liga_sel)]
         
-        st.subheader("📊 Médias do Confronto")
+        st.subheader("📊 Comparativo de Médias")
         res_m = {"Gols FT": df_m['gols_mandante_ft'].mean(), "Cantos": df_m['mandante_cantos'].mean(), "Chutes": df_m['mandante_chute_ao_gol'].mean()}
         res_v = {"Gols FT": df_v['gols_visitante_ft'].mean(), "Cantos": df_v['visitante_cantos'].mean(), "Chutes": df_v['visitante_chute_ao_gol'].mean()}
         
@@ -207,17 +217,17 @@ elif menu == "📝 Registrar Aposta":
         st.warning("Crie uma banca primeiro.")
     else:
         with st.form("form_registro"):
-            b_sel = st.selectbox("Banca", df_bancas['nome'])
+            b_sel = st.selectbox("Selecione a Banca", df_bancas['nome'])
             c1, c2 = st.columns(2)
             mandante = c1.text_input("Mandante")
             visitante = c2.text_input("Visitante")
             mercado = st.text_input("Mercado")
             c3, c4, c5 = st.columns(3)
             odd = c3.number_input("Odd", 1.01, value=1.90)
-            stake = c4.number_input("Stake", 1.0, value=50.0)
+            stake = c4.number_input("Stake (R$)", 1.0, value=50.0)
             res = c5.selectbox("Resultado", ["Pendente", "Green", "Red", "Meio Green", "Meio Red"])
             
-            if st.form_submit_button("SALVAR"):
+            if st.form_submit_button("SALVAR APOSTA"):
                 b_id = int(df_bancas[df_bancas['nome'] == b_sel]['id'].iloc[0])
                 lucro = calcular_lucro_real(res, odd, stake)
                 supabase.table("apostas").insert({
@@ -225,34 +235,36 @@ elif menu == "📝 Registrar Aposta":
                     "visitante": visitante, "mercado": mercado, "odd": odd, "stake": stake, 
                     "resultado": res, "lucro": lucro
                 }).execute()
-                st.success("Salvo!")
+                st.success("Aposta Salva com Sucesso!")
 
 # ==============================================================================
 # 4. HISTÓRICO
 # ==============================================================================
 elif menu == "📂 Histórico de Apostas":
-    st.title("Gestão de Entradas")
+    st.title("Histórico de Entradas")
     df = carregar_apostas()
     if not df.empty:
         config = {"resultado": st.column_config.SelectboxColumn("Resultado", options=["Pendente", "Green", "Meio Green", "Red", "Meio Red", "Anulada"])}
         editado = st.data_editor(df, column_config=config, use_container_width=True, hide_index=True)
-        if st.button("💾 SALVAR ALTERAÇÕES"):
+        if st.button("💾 ATUALIZAR DADOS"):
             for i, row in editado.iterrows():
                 novo_lucro = calcular_lucro_real(row['resultado'], row['odd'], row['stake'])
                 supabase.table("apostas").update({"resultado": row['resultado'], "lucro": novo_lucro}).eq("id", row['id']).execute()
             st.rerun()
 
 # ==============================================================================
-# 5. DEPÓSITOS / 6. BANCAS
+# 5. DEPÓSITOS E BANCAS
 # ==============================================================================
 elif menu == "💰 Depósitos e Saques":
-    st.title("Caixa")
-    # Lógica de transações simplificada
-    st.info("Menu para controle de depósitos e saques nas bancas.")
+    st.title("Gestão de Caixa")
+    st.info("Utilize este menu para registrar entradas e saídas financeiras das suas bancas.")
 
 elif menu == "🏦 Minhas Bancas":
-    st.title("Bancas")
-    nome = st.text_input("Nome da Banca")
-    if st.button("CRIAR"):
-        supabase.table("bancas").insert({"nome": nome}).execute()
-        st.rerun()
+    st.title("Gerenciar Minhas Bancas")
+    with st.form("nova_banca"):
+        nome = st.text_input("Nome da Banca")
+        if st.form_submit_button("CRIAR BANCA"):
+            if nome:
+                supabase.table("bancas").insert({"nome": nome}).execute()
+                st.success("Banca criada!")
+                st.rerun()
