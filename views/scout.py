@@ -39,30 +39,20 @@ def mostrar_scout(df):
         df_rank['pos'] = range(1, len(df_rank) + 1)
         return df_rank['pos'].to_dict()
 
-    # --- CSS PARA ALTO CONTRASTE TOTAL (MÉTRICAS E TABELAS) ---
+    # --- CSS PARA TABELAS CENTRALIZADAS E BRANCAS ---
     st.markdown("""
         <style>
-            /* 1. Cores das Tabelas */
             div[data-testid="stTable"] td, div[data-testid="stTable"] th { 
                 text-align: center !important; 
-                color: white !important; 
-            }
-            
-            /* 2. Rótulos dos Cards (Posição Geral, etc.) - Forçando Branco */
-            [data-testid="stMetricLabel"] > div > span {
+                vertical-align: middle !important; 
                 color: white !important;
                 font-size: 1.1rem !important;
-                font-weight: 700 !important;
-                opacity: 1 !important;
             }
-            
-            /* 3. Valores dos Cards (1º, 12º, etc.) */
-            [data-testid="stMetricValue"] > div {
-                color: white !important;
+            .titulo-tabela {
+                color: #00ffcc;
+                font-weight: bold;
+                margin-top: 10px;
             }
-
-            /* 4. Títulos das Seções */
-            h3 { color: white !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -83,21 +73,16 @@ def mostrar_scout(df):
     m_sel = c3.selectbox("Mandante (Casa)", times)
     v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
 
-    # --- CARDS DE POSIÇÃO ---
-    st.markdown("### 🏆 Classificação")
-    cp1, cp2 = st.columns(2)
+    # --- NOVA SEÇÃO: TABELA DE CLASSIFICAÇÃO COMPARATIVA ---
+    st.markdown("### 🏆 Posições na Tabela")
     
-    with cp1:
-        st.markdown(f"**{m_sel}**")
-        col1, col2 = st.columns(2)
-        col1.metric("Posição Geral", f"{rank_geral.get(m_sel, 'N/A')}º")
-        col2.metric("Como Mandante", f"{rank_casa.get(m_sel, 'N/A')}º")
-
-    with cp2:
-        st.markdown(f"**{v_sel}**")
-        col1, col2 = st.columns(2)
-        col1.metric("Posição Geral", f"{rank_geral.get(v_sel, 'N/A')}º")
-        col2.metric("Como Visitante", f"{rank_fora.get(v_sel, 'N/A')}º")
+    df_posicoes = pd.DataFrame({
+        "Critério": ["Posição Geral", "Posição Específica (Casa/Fora)"],
+        f"{m_sel}": [f"{rank_geral.get(m_sel, '-')}º", f"{rank_casa.get(m_sel, '-')}º (Casa)"],
+        f"{v_sel}": [f"{rank_geral.get(v_sel, '-')}º", f"{rank_fora.get(v_sel, '-')}º (Fora)"]
+    }).set_index("Critério")
+    
+    st.table(df_posicoes)
 
     # --- COMPARATIVO DE MÉDIAS ---
     st.divider()
@@ -128,7 +113,7 @@ def mostrar_scout(df):
 
     st.table(df_tab.style.format(precision=2))
 
-    # --- FORMA RECENTE (COM ODDS DA BET365) ---
+    # --- FORMA RECENTE ---
     st.subheader("📈 Forma Recente (Últimos 5 Jogos)")
     cf1, cf2 = st.columns(2)
     
@@ -139,7 +124,6 @@ def mostrar_scout(df):
             if not jogos.empty:
                 for _, r in jogos.iterrows():
                     gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
-                    
                     if is_m:
                         res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
                         oponente = r['visitante']
@@ -150,7 +134,6 @@ def mostrar_scout(df):
                         odd = r.get('odd_visitante_bet365', 'N/A')
                     
                     data_str = r['data'].strftime('%d/%m') if pd.notnull(r['data']) else "S/D"
-                    
                     try:
                         odd_val = float(odd)
                         odd_str = f"@{odd_val:.2f}"
