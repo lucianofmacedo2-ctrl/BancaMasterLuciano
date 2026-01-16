@@ -10,7 +10,6 @@ def mostrar_scout(df):
     # --- LÓGICA DE RANKING (EM TEMPO REAL) ---
     def calcular_classificacao(dados, filtro=None):
         stats = {}
-        # Garante que os gols sejam numéricos para o cálculo de pontos
         dados['gols_mandante_ft'] = pd.to_numeric(dados['gols_mandante_ft'], errors='coerce').fillna(0)
         dados['gols_visitante_ft'] = pd.to_numeric(dados['gols_visitante_ft'], errors='coerce').fillna(0)
         
@@ -40,6 +39,26 @@ def mostrar_scout(df):
         df_rank['pos'] = range(1, len(df_rank) + 1)
         return df_rank['pos'].to_dict()
 
+    # --- CSS PARA ALTO CONTRASTE (CARDS E TABELAS) ---
+    st.markdown("""
+        <style>
+            /* Centralização e cor branca para tabelas */
+            div[data-testid="stTable"] td { text-align: center !important; vertical-align: middle !important; color: white !important; }
+            div[data-testid="stTable"] th { text-align: center !important; color: white !important; }
+            
+            /* Correção de contraste para rótulos dos cards (st.metric) */
+            div[data-testid="stMetricLabel"] p {
+                color: white !important;
+                font-weight: bold !important;
+                font-size: 1.1rem !important;
+            }
+            /* Garante que o valor da métrica também esteja bem visível */
+            div[data-testid="stMetricValue"] {
+                color: white !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
     # --- SELEÇÃO DE LIGA E TIMES ---
     c1, c2 = st.columns(2)
     pais = c1.selectbox("País", sorted(df['pais'].unique()))
@@ -48,7 +67,6 @@ def mostrar_scout(df):
     df_liga = df[df['divisao'] == liga].copy()
     df_liga['data'] = pd.to_datetime(df_liga['data'], errors='coerce')
     
-    # Cálculos de Ranking
     rank_geral = calcular_classificacao(df_liga)
     rank_casa = calcular_classificacao(df_liga, 'casa')
     rank_fora = calcular_classificacao(df_liga, 'fora')
@@ -101,14 +119,6 @@ def mostrar_scout(df):
         f"{v_sel} (Fora)": stats_v.values()
     }).set_index("Estatística")
 
-    # CSS para centralizar e garantir contraste branco
-    st.markdown("""
-        <style>
-            div[data-testid="stTable"] td { text-align: center !important; vertical-align: middle !important; color: white !important; }
-            div[data-testid="stTable"] th { text-align: center !important; color: white !important; }
-        </style>
-    """, unsafe_allow_html=True)
-    
     st.table(df_tab.style.format(precision=2))
 
     # --- FORMA RECENTE (COM ODDS DA BET365) ---
@@ -134,7 +144,6 @@ def mostrar_scout(df):
                     
                     data_str = r['data'].strftime('%d/%m') if pd.notnull(r['data']) else "S/D"
                     
-                    # Formatação da Odd
                     try:
                         odd_val = float(odd)
                         odd_str = f"@{odd_val:.2f}"
