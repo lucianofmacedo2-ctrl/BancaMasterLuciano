@@ -10,7 +10,7 @@ def mostrar_scout(df):
     # --- LÓGICA DE RANKING (EM TEMPO REAL) ---
     def calcular_classificacao(dados, filtro=None):
         stats = {}
-        # Garantir que os gols sejam numéricos para o cálculo
+        # Garante que os gols sejam numéricos para o cálculo de pontos
         dados['gols_mandante_ft'] = pd.to_numeric(dados['gols_mandante_ft'], errors='coerce').fillna(0)
         dados['gols_visitante_ft'] = pd.to_numeric(dados['gols_visitante_ft'], errors='coerce').fillna(0)
         
@@ -46,9 +46,9 @@ def mostrar_scout(df):
     liga = c2.selectbox("Liga", sorted(df[df['pais'] == pais]['divisao'].unique()))
     
     df_liga = df[df['divisao'] == liga].copy()
-    # Converte data para datetime logo no início para evitar erros em cascata
     df_liga['data'] = pd.to_datetime(df_liga['data'], errors='coerce')
     
+    # Cálculos de Ranking
     rank_geral = calcular_classificacao(df_liga)
     rank_casa = calcular_classificacao(df_liga, 'casa')
     rank_fora = calcular_classificacao(df_liga, 'fora')
@@ -101,7 +101,7 @@ def mostrar_scout(df):
         f"{v_sel} (Fora)": stats_v.values()
     }).set_index("Estatística")
 
-    # CSS para centralizar e garantir contraste
+    # CSS para centralizar e garantir contraste branco
     st.markdown("""
         <style>
             div[data-testid="stTable"] td { text-align: center !important; vertical-align: middle !important; color: white !important; }
@@ -111,7 +111,7 @@ def mostrar_scout(df):
     
     st.table(df_tab.style.format(precision=2))
 
-    # --- FORMA RECENTE (ÚLTIMOS 5 JOGOS) ---
+    # --- FORMA RECENTE (COM ODDS DA BET365) ---
     st.subheader("📈 Forma Recente (Últimos 5 Jogos)")
     cf1, cf2 = st.columns(2)
     
@@ -122,15 +122,25 @@ def mostrar_scout(df):
             if not jogos.empty:
                 for _, r in jogos.iterrows():
                     gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
+                    
                     if is_m:
                         res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
                         oponente = r['visitante']
+                        odd = r.get('odd_mandante_bet365', 'N/A') 
                     else:
                         res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
                         oponente = r['mandante']
+                        odd = r.get('odd_visitante_bet365', 'N/A')
                     
-                    # Formatação segura da data para evitar AttributeError
                     data_str = r['data'].strftime('%d/%m') if pd.notnull(r['data']) else "S/D"
-                    st.write(f"{res} {data_str} {'vs' if is_m else '@'} {oponente} ({int(gm)} - {int(gv)})")
+                    
+                    # Formatação da Odd
+                    try:
+                        odd_val = float(odd)
+                        odd_str = f"@{odd_val:.2f}"
+                    except:
+                        odd_str = f"@{odd}"
+                    
+                    st.write(f"{res} {data_str} {'vs' if is_m else '@'} {oponente} ({int(gm)} - {int(gv)}) **{odd_str}**")
             else:
                 st.info("Sem histórico recente.")
