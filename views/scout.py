@@ -39,23 +39,30 @@ def mostrar_scout(df):
         df_rank['pos'] = range(1, len(df_rank) + 1)
         return df_rank['pos'].to_dict()
 
-    # --- CSS PARA ALTO CONTRASTE (CARDS E TABELAS) ---
+    # --- CSS PARA ALTO CONTRASTE TOTAL (MÉTRICAS E TABELAS) ---
     st.markdown("""
         <style>
-            /* Centralização e cor branca para tabelas */
-            div[data-testid="stTable"] td { text-align: center !important; vertical-align: middle !important; color: white !important; }
-            div[data-testid="stTable"] th { text-align: center !important; color: white !important; }
+            /* 1. Cores das Tabelas */
+            div[data-testid="stTable"] td, div[data-testid="stTable"] th { 
+                text-align: center !important; 
+                color: white !important; 
+            }
             
-            /* Correção de contraste para rótulos dos cards (st.metric) */
-            div[data-testid="stMetricLabel"] p {
+            /* 2. Rótulos dos Cards (Posição Geral, etc.) - Forçando Branco */
+            [data-testid="stMetricLabel"] > div > span {
                 color: white !important;
-                font-weight: bold !important;
                 font-size: 1.1rem !important;
+                font-weight: 700 !important;
+                opacity: 1 !important;
             }
-            /* Garante que o valor da métrica também esteja bem visível */
-            div[data-testid="stMetricValue"] {
+            
+            /* 3. Valores dos Cards (1º, 12º, etc.) */
+            [data-testid="stMetricValue"] > div {
                 color: white !important;
             }
+
+            /* 4. Títulos das Seções */
+            h3 { color: white !important; }
         </style>
     """, unsafe_allow_html=True)
 
