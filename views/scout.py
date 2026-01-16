@@ -10,6 +10,10 @@ def mostrar_scout(df):
     # --- LÓGICA DE RANKING (EM TEMPO REAL) ---
     def calcular_classificacao(dados, filtro=None):
         stats = {}
+        # Garantir que os gols sejam numéricos para o cálculo
+        dados['gols_mandante_ft'] = pd.to_numeric(dados['gols_mandante_ft'], errors='coerce').fillna(0)
+        dados['gols_visitante_ft'] = pd.to_numeric(dados['gols_visitante_ft'], errors='coerce').fillna(0)
+        
         for _, r in dados.iterrows():
             m, v = r['mandante'], r['visitante']
             gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
@@ -17,12 +21,11 @@ def mostrar_scout(df):
             for time in [m, v]:
                 if time not in stats: stats[time] = {'pts': 0, 'j': 0}
             
-            # Filtro para Ranking Casa ou Fora
-            if filtro == 'casa' and m in stats:
+            if filtro == 'casa':
                 stats[m]['j'] += 1
                 if gm > gv: stats[m]['pts'] += 3
                 elif gm == gv: stats[m]['pts'] += 1
-            elif filtro == 'fora' and v in stats:
+            elif filtro == 'fora':
                 stats[v]['j'] += 1
                 if gv > gm: stats[v]['pts'] += 3
                 elif gm == gv: stats[v]['pts'] += 1
@@ -33,17 +36,19 @@ def mostrar_scout(df):
                 else: stats[m]['pts'] += 1; stats[v]['pts'] += 1
 
         df_rank = pd.DataFrame.from_dict(stats, orient='index')
-        df_rank = df_rank[df_rank['j'] > 0] # Remove times sem jogos no filtro
-        df_rank = df_rank.sort_values(by=['pts'], ascending=False)
+        df_rank = df_rank[df_rank['j'] > 0].sort_values(by=['pts'], ascending=False)
         df_rank['pos'] = range(1, len(df_rank) + 1)
         return df_rank['pos'].to_dict()
 
-    # --- SELEÇÃO DE TIMES ---
+    # --- SELEÇÃO DE LIGA E TIMES ---
     c1, c2 = st.columns(2)
     pais = c1.selectbox("País", sorted(df['pais'].unique()))
     liga = c2.selectbox("Liga", sorted(df[df['pais'] == pais]['divisao'].unique()))
     
     df_liga = df[df['divisao'] == liga].copy()
+    # Converte data para datetime logo no início para evitar erros em cascata
+    df_liga['data'] = pd.to_datetime(df_liga['data'], errors='coerce')
+    
     rank_geral = calcular_classificacao(df_liga)
     rank_casa = calcular_classificacao(df_liga, 'casa')
     rank_fora = calcular_classificacao(df_liga, 'fora')
@@ -57,20 +62,22 @@ def mostrar_scout(df):
     st.markdown("### 🏆 Classificação")
     cp1, cp2 = st.columns(2)
     
-    with cp1: # Mandante
+    with cp1:
         st.markdown(f"**{m_sel}**")
         col1, col2 = st.columns(2)
         col1.metric("Posição Geral", f"{rank_geral.get(m_sel, 'N/A')}º")
         col2.metric("Como Mandante", f"{rank_casa.get(m_sel, 'N/A')}º")
 
-    with cp2: # Visitante
+    with cp2:
         st.markdown(f"**{v_sel}**")
         col1, col2 = st.columns(2)
         col1.metric("Posição Geral", f"{rank_geral.get(v_sel, 'N/A')}º")
         col2.metric("Como Visitante", f"{rank_fora.get(v_sel, 'N/A')}º")
 
-    # --- MÉDIAS DETALHADAS ---
+    # --- COMPARATIVO DE MÉDIAS ---
     st.divider()
+    st.subheader("📊 Comparativo de Médias")
+    
     df_m = df_liga[df_liga['mandante'] == m_sel].sort_values('data', ascending=False)
     df_v = df_liga[df_liga['visitante'] == v_sel].sort_values('data', ascending=False)
 
@@ -88,20 +95,42 @@ def mostrar_scout(df):
     stats_m = calcular_medias(df_m, True)
     stats_v = calcular_medias(df_v, False)
     
-    df_tab = pd.DataFrame({"Estatística": stats_m.keys(), f"{m_sel} (Casa)": stats_m.values(), f"{v_sel} (Fora)": stats_v.values()}).set_index("Estatística")
+    df_tab = pd.DataFrame({
+        "Estatística": stats_m.keys(), 
+        f"{m_sel} (Casa)": stats_m.values(), 
+        f"{v_sel} (Fora)": stats_v.values()
+    }).set_index("Estatística")
 
-    st.markdown("<style>div[data-testid='stTable'] td { text-align: center !important; }</style>", unsafe_allow_html=True)
+    # CSS para centralizar e garantir contraste
+    st.markdown("""
+        <style>
+            div[data-testid="stTable"] td { text-align: center !important; vertical-align: middle !important; color: white !important; }
+            div[data-testid="stTable"] th { text-align: center !important; color: white !important; }
+        </style>
+    """, unsafe_allow_html=True)
+    
     st.table(df_tab.style.format(precision=2))
 
-    # --- FORMA RECENTE ---
+    # --- FORMA RECENTE (ÚLTIMOS 5 JOGOS) ---
     st.subheader("📈 Forma Recente (Últimos 5 Jogos)")
     cf1, cf2 = st.columns(2)
     
     for col, time, data_f, is_m in [(cf1, m_sel, df_m, True), (cf2, v_sel, df_v, False)]:
         with col:
             st.write(f"**{time}** {'em Casa' if is_m else 'Fora'}")
-            for _, r in data_f.head(5).iterrows():
-                gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
-                if is_m: res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
-                else: res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
-                st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['visitante'] if is_m else r['mandante']} ({int(gm)} - {int(gv)})")
+            jogos = data_f.head(5)
+            if not jogos.empty:
+                for _, r in jogos.iterrows():
+                    gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
+                    if is_m:
+                        res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
+                        oponente = r['visitante']
+                    else:
+                        res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
+                        oponente = r['mandante']
+                    
+                    # Formatação segura da data para evitar AttributeError
+                    data_str = r['data'].strftime('%d/%m') if pd.notnull(r['data']) else "S/D"
+                    st.write(f"{res} {data_str} {'vs' if is_m else '@'} {oponente} ({int(gm)} - {int(gv)})")
+            else:
+                st.info("Sem histórico recente.")
