@@ -1,145 +1,152 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 def mostrar_scout(df):
-    st.title("🔎 Scout de Times")
+    st.title("🔎 Scout Avançado")
     if df.empty:
         st.error("Dados não encontrados.")
         return
 
-    # --- LÓGICA DE RANKING (EM TEMPO REAL) ---
-    def calcular_classificacao(dados, filtro=None):
-        stats = {}
-        dados['gols_mandante_ft'] = pd.to_numeric(dados['gols_mandante_ft'], errors='coerce').fillna(0)
-        dados['gols_visitante_ft'] = pd.to_numeric(dados['gols_visitante_ft'], errors='coerce').fillna(0)
-        
-        for _, r in dados.iterrows():
-            m, v = r['mandante'], r['visitante']
-            gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
-            
-            for time in [m, v]:
-                if time not in stats: stats[time] = {'pts': 0, 'j': 0}
-            
-            if filtro == 'casa':
-                stats[m]['j'] += 1
-                if gm > gv: stats[m]['pts'] += 3
-                elif gm == gv: stats[m]['pts'] += 1
-            elif filtro == 'fora':
-                stats[v]['j'] += 1
-                if gv > gm: stats[v]['pts'] += 3
-                elif gm == gv: stats[v]['pts'] += 1
-            elif filtro is None:
-                stats[m]['j'] += 1; stats[v]['j'] += 1
-                if gm > gv: stats[m]['pts'] += 3
-                elif gv > gm: stats[v]['pts'] += 3
-                else: stats[m]['pts'] += 1; stats[v]['pts'] += 1
-
-        df_rank = pd.DataFrame.from_dict(stats, orient='index')
-        df_rank = df_rank[df_rank['j'] > 0].sort_values(by=['pts'], ascending=False)
-        df_rank['pos'] = range(1, len(df_rank) + 1)
-        return df_rank['pos'].to_dict()
-
-    # --- CSS PARA TABELAS CENTRALIZADAS E BRANCAS ---
-    st.markdown("""
-        <style>
-            div[data-testid="stTable"] td, div[data-testid="stTable"] th { 
-                text-align: center !important; 
-                vertical-align: middle !important; 
-                color: white !important;
-                font-size: 1.1rem !important;
-            }
-            .titulo-tabela {
-                color: #00ffcc;
-                font-weight: bold;
-                margin-top: 10px;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # --- SELEÇÃO DE LIGA E TIMES ---
+    # --- 1. FILTROS (LIGA -> TEMPORADA -> MANDANTE/VISITANTE) ---
     c1, c2 = st.columns(2)
-    pais = c1.selectbox("País", sorted(df['pais'].unique()))
-    liga = c2.selectbox("Liga", sorted(df[df['pais'] == pais]['divisao'].unique()))
+    liga = c1.selectbox("Liga", sorted(df['Liga'].unique()))
+    temp = c2.selectbox("Temporada", sorted(df[df['Liga'] == liga]['Temporada'].unique(), reverse=True))
     
-    df_liga = df[df['divisao'] == liga].copy()
-    df_liga['data'] = pd.to_datetime(df_liga['data'], errors='coerce')
-    
-    rank_geral = calcular_classificacao(df_liga)
-    rank_casa = calcular_classificacao(df_liga, 'casa')
-    rank_fora = calcular_classificacao(df_liga, 'fora')
+    df_filt = df[(df['Liga'] == liga) & (df['Temporada'] == temp)].copy()
+    df_filt['Data'] = pd.to_datetime(df_filt['Data'], errors='coerce')
 
-    times = sorted(df_liga['mandante'].unique())
+    times = sorted(df_filt['Mandande'].unique())
     c3, c4 = st.columns(2)
     m_sel = c3.selectbox("Mandante (Casa)", times)
     v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
 
-    # --- NOVA SEÇÃO: TABELA DE CLASSIFICAÇÃO COMPARATIVA ---
-    st.markdown("### 🏆 Posições na Tabela")
-    
-    df_posicoes = pd.DataFrame({
-        "Critério": ["Posição Geral", "Posição Específica (Casa/Fora)"],
-        f"{m_sel}": [f"{rank_geral.get(m_sel, '-')}º", f"{rank_casa.get(m_sel, '-')}º (Casa)"],
-        f"{v_sel}": [f"{rank_geral.get(v_sel, '-')}º", f"{rank_fora.get(v_sel, '-')}º (Fora)"]
-    }).set_index("Critério")
-    
-    st.table(df_posicoes)
+    # Bases específicas: Mandante em Casa e Visitante Fora
+    df_m = df_filt[df_filt['Mandande'] == m_sel].sort_values('Data', ascending=False)
+    df_v = df_filt[df_filt['Visitante'] == v_sel].sort_values('Data', ascending=False)
 
-    # --- COMPARATIVO DE MÉDIAS ---
+    # --- CSS PARA ALTO CONTRASTE ---
+    st.markdown("""
+        <style>
+            div[data-testid="stTable"] td, div[data-testid="stTable"] th { 
+                text-align: center !important; color: white !important; font-size: 1rem !important;
+            }
+            .stMetricLabel p { color: white !important; font-weight: bold !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- 2. % VITÓRIA, EMPATE, DERROTA ---
+    st.subheader("🎯 Probabilidades Históricas (Cenário Casa/Fora)")
+    def calc_ved(dados, is_home):
+        if dados.empty: return 0, 0, 0
+        total = len(dados)
+        v = len(dados[dados['Gols_Mandante_FT'] > dados['Gols_Visitante_FT']]) if is_home else len(dados[dados['Gols_Visitante_FT'] > dados['Gols_Mandante_FT']])
+        e = len(dados[dados['Gols_Mandante_FT'] == dados['Gols_Visitante_FT']])
+        d = total - v - e
+        return (v/total)*100, (e/total)*100, (d/total)*100
+
+    v_m, e_m, d_m = calc_ved(df_m, True)
+    v_v, e_v, d_v = calc_ved(df_v, False)
+
+    col_v1, col_v2 = st.columns(2)
+    col_v1.write(f"**{m_sel} (Casa):** ✅ {v_m:.1f}% | 🟧 {e_m:.1f}% | ❌ {d_m:.1f}%")
+    col_v2.write(f"**{v_sel} (Fora):** ✅ {v_v:.1f}% | 🟧 {e_v:.1f}% | ❌ {d_v:.1f}%")
+
+    # --- 3. FORMA RECENTE ---
     st.divider()
-    st.subheader("📊 Comparativo de Médias")
-    
-    df_m = df_liga[df_liga['mandante'] == m_sel].sort_values('data', ascending=False)
-    df_v = df_liga[df_liga['visitante'] == v_sel].sort_values('data', ascending=False)
-
-    def calcular_medias(data, is_home):
-        if data.empty: return {k: 0 for k in ["Gols FT", "Gols HT", "Cantos", "Chutes", "Cartões"]}
-        pre = 'mandante_' if is_home else 'visitante_'
-        return {
-            "Gols FT": data[f'gols_{pre}ft'].mean(),
-            "Gols HT": data[f'gols_{pre}ht'].mean(),
-            "Cantos": data[f'{pre}cantos'].mean(),
-            "Chutes": data[f'{pre}chute_ao_gol'].mean(),
-            "Cartões": data[f'{pre}cartao_amarelo'].mean()
-        }
-
-    stats_m = calcular_medias(df_m, True)
-    stats_v = calcular_medias(df_v, False)
-    
-    df_tab = pd.DataFrame({
-        "Estatística": stats_m.keys(), 
-        f"{m_sel} (Casa)": stats_m.values(), 
-        f"{v_sel} (Fora)": stats_v.values()
-    }).set_index("Estatística")
-
-    st.table(df_tab.style.format(precision=2))
-
-    # --- FORMA RECENTE ---
-    st.subheader("📈 Forma Recente (Últimos 5 Jogos)")
-    cf1, cf2 = st.columns(2)
-    
-    for col, time, data_f, is_m in [(cf1, m_sel, df_m, True), (cf2, v_sel, df_v, False)]:
+    st.subheader("📈 Forma (Últimos 5 Jogos no Cenário)")
+    f1, f2 = st.columns(2)
+    for col, time, dados, is_m in [(f1, m_sel, df_m, True), (f2, v_sel, df_v, False)]:
         with col:
-            st.write(f"**{time}** {'em Casa' if is_m else 'Fora'}")
-            jogos = data_f.head(5)
-            if not jogos.empty:
-                for _, r in jogos.iterrows():
-                    gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
-                    if is_m:
-                        res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
-                        oponente = r['visitante']
-                        odd = r.get('odd_mandante_bet365', 'N/A') 
-                    else:
-                        res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
-                        oponente = r['mandante']
-                        odd = r.get('odd_visitante_bet365', 'N/A')
-                    
-                    data_str = r['data'].strftime('%d/%m') if pd.notnull(r['data']) else "S/D"
-                    try:
-                        odd_val = float(odd)
-                        odd_str = f"@{odd_val:.2f}"
-                    except:
-                        odd_str = f"@{odd}"
-                    
-                    st.write(f"{res} {data_str} {'vs' if is_m else '@'} {oponente} ({int(gm)} - {int(gv)}) **{odd_str}**")
-            else:
-                st.info("Sem histórico recente.")
+            st.write(f"**{time}**")
+            for _, r in dados.head(5).iterrows():
+                gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
+                if is_m: res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
+                else: res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
+                odd = r.get('Odd_Mandante_FT' if is_m else 'Odd_Visitante_FT', 'N/A')
+                st.write(f"{res} {r['Data'].strftime('%d/%m') if pd.notnull(r['Data']) else 'S/D'} vs {r['Visitante'] if is_m else r['Mandande']} ({int(gm)}-{int(gv)}) **@{odd}**")
+
+    # --- 4. MÉTRICAS ESTATÍSTICAS COMPLETAS ---
+    st.divider()
+    st.subheader("📊 Estatísticas Detalhadas")
+    
+    cols_analise = {
+        "Gols HT": ("Total_Gols_HT", "Total_Gols_HT"),
+        "Gols FT": ("Total_Gols_FT", "Total_Gols_FT"),
+        "Cantos": ("Cantos_Mandante", "Cantos_Visitante"),
+        "Chutes ao Gol": ("Chutes_Gol_Mandante", "Chutes_Gol_Visitante"),
+        "Chutes Fora": ("Chutes_Fora_Mandante", "Chutes_Fora_Visitante"),
+        "Finalizações": ("Finalizações_Totais_Mandante", "Finalizações_Totais_Visitante")
+    }
+
+    def extrair_stats(dados, col_name):
+        s = dados[col_name].replace(0, np.nan).dropna() # Evita erro em modas/cv
+        if s.empty: return [0]*6
+        mean = s.mean()
+        std = s.std()
+        return [
+            mean, 
+            s.median(), 
+            s.mode().iloc[0] if not s.mode().empty else 0,
+            (std / mean) if mean != 0 else 0, # CV
+            std
+        ]
+
+    res_m = {k: extrair_stats(df_m, v[0]) for k, v in cols_analise.items()}
+    res_v = {k: extrair_stats(df_v, v[1]) for k, v in cols_analise.items()}
+
+    df_estat = pd.DataFrame({
+        "Métrica": ["Média", "Mediana", "Moda", "Coef. Var.", "Desv. Padrão"],
+        **{f"{m_sel} {k}": res_m[k] for k in cols_analise},
+        **{f"{v_sel} {k}": res_v[k] for k in cols_analise}
+    }).set_index("Métrica")
+    
+    st.table(df_estat.style.format(precision=2))
+
+    # --- 5. INCIDÊNCIA DE GOLS (%) ---
+    st.divider()
+    st.subheader("⚽ Tendência de Gols (Over)")
+    
+    def calc_over(dados, limites, col):
+        if dados.empty: return [0]*len(limites)
+        return [(len(dados[dados[col] > lim]) / len(dados)) * 100 for lim in limites]
+
+    limites_ht = [0.5, 1.5, 2.5, 3.5]
+    limites_ft = [0.5, 1.5, 2.5, 3.5]
+
+    over_ht_m = calc_over(df_m, limites_ht, 'Total_Gols_HT')
+    over_ft_m = calc_over(df_m, limites_ft, 'Total_Gols_FT')
+    over_ht_v = calc_over(df_v, limites_ht, 'Total_Gols_HT')
+    over_ft_v = calc_over(df_v, limites_ft, 'Total_Gols_FT')
+
+    df_over = pd.DataFrame({
+        "Linha": ["+0.5", "+1.5", "+2.5", "+3.5"],
+        f"HT {m_sel}": [f"{x:.1f}%" for x in over_ht_m],
+        f"FT {m_sel}": [f"{x:.1f}%" for x in over_ft_m],
+        f"HT {v_sel}": [f"{x:.1f}%" for x in over_ht_v],
+        f"FT {v_sel}": [f"{x:.1f}%" for x in over_ft_v]
+    }).set_index("Linha")
+    st.table(df_over)
+
+    # --- 6. GOLS POR FAIXA DE MINUTOS ---
+    st.divider()
+    st.subheader("⏱️ Distribuição de Gols por Minutos")
+    faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
+    
+    def get_minutos(dados, sufixo):
+        cols = [f"{f}_{sufixo}" for f in faixas]
+        existentes = [c for c in cols if c in dados.columns]
+        if not existentes: return [0]*6
+        total_gols = dados[existentes].sum().sum()
+        if total_gols == 0: return [0]*6
+        return [(dados[c].sum() / total_gols) * 100 for c in existentes]
+
+    min_m = get_minutos(df_m, "Mandante")
+    min_v = get_minutos(df_v, "Visitante")
+
+    df_minutos = pd.DataFrame({
+        "Minutos": faixas,
+        f"{m_sel} (Gols Feitos)": [f"{x:.1f}%" for x in min_m],
+        f"{v_sel} (Gols Feitos)": [f"{x:.1f}%" for x in min_v]
+    }).set_index("Minutos")
+    st.table(df_minutos)
