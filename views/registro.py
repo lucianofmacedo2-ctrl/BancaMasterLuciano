@@ -10,73 +10,45 @@ def mostrar_registro(df_csv):
         st.warning("Carregue a base de dados para habilitar o registro.")
         return
 
-    # Estilização
-    st.markdown("""
-        <style>
-            input, div[data-baseweb="select"] > div, textarea {
-                background-color: white !important;
-                color: black !important;
-            }
-            label p { color: white !important; font-weight: bold; }
-            .sessao-mercado {
-                background-color: rgba(255, 255, 255, 0.05);
-                padding: 20px;
-                border-radius: 10px;
-                border: 1px solid #00ffcc;
-                margin-bottom: 25px;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+    # --- 1. GERENCIAMENTO DE MERCADOS ---
+    with st.expander("⚙️ Gerenciar Mercados (Adicionar/Remover)"):
+        tab1, tab2 = st.tabs(["➕ Adicionar", "🗑️ Remover"])
+        with tab1:
+            c_add1, c_add2 = st.columns([3, 1])
+            novo_m = c_add1.text_input("Novo mercado", key="add_m")
+            if c_add2.button("Salvar"):
+                if salvar_novo_mercado(novo_m): st.rerun()
+        with tab2:
+            c_rem1, c_rem2 = st.columns([3, 1])
+            m_para_remover = c_rem1.selectbox("Remover", carregar_mercados(), key="rem_m")
+            if c_rem2.button("Excluir"):
+                if remover_mercado(m_para_remover): st.rerun()
 
-    # --- 1. SEÇÃO DE GERENCIAMENTO DE MERCADOS ---
-    st.markdown('<div class="sessao-mercado">', unsafe_allow_html=True)
-    st.subheader("⚙️ Configurar Mercados")
+    st.divider()
+
+    # --- 2. SELEÇÃO DE TIME (FORA DO FORM PARA FUNCIONAR O FILTRO) ---
+    st.subheader("Seleção da Partida")
+    c1, c2 = st.columns(2)
     
-    tab1, tab2 = st.tabs(["➕ Adicionar", "🗑️ Remover"])
+    # Seleção de Liga
+    ligas_disponiveis = sorted(df_csv['liga'].unique())
+    liga_sel = c1.selectbox("Escolha a Liga", ligas_disponiveis)
     
-    with tab1:
-        c_add1, c_add2 = st.columns([3, 1])
-        novo_m = c_add1.text_input("Nome do novo mercado", placeholder="Ex: Chutes ao Gol", key="add_m")
-        if c_add2.button("Adicionar", use_container_width=True):
-            if salvar_novo_mercado(novo_m):
-                st.success("Adicionado!")
-                st.rerun()
+    # Filtragem imediata dos times daquela liga
+    df_filtrado = df_csv[df_csv['liga'] == liga_sel]
+    col_m = 'mandande' if 'mandande' in df_filtrado.columns else 'mandante'
+    
+    times_mandantes = sorted(df_filtrado[col_m].unique())
+    mandante_sel = c2.selectbox("Mandante", times_mandantes)
+    
+    times_visitantes = sorted(df_filtrado[df_filtrado[col_m] != mandante_sel]['visitante'].unique())
+    visitante_sel = c1.selectbox("Visitante", times_visitantes)
+    
+    data_sel = c2.date_input("Data", datetime.now())
 
-    with tab2:
-        c_rem1, c_rem2 = st.columns([3, 1])
-        mercados_atuais = carregar_mercados()
-        m_para_remover = c_rem1.selectbox("Selecione para excluir", mercados_atuais, key="rem_m")
-        if c_rem2.button("Excluir", use_container_width=True):
-            if remover_mercado(m_para_remover):
-                st.warning(f"'{m_para_remover}' removido.")
-                st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- 2. FORMULÁRIO DE REGISTRO (CORRIGIDO) ---
-    with st.form("form_registro", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        data = c1.date_input("Data da Aposta", datetime.now())
-        
-        # FILTRO DE LIGA
-        ligas_disponiveis = sorted(df_csv['liga'].unique())
-        liga = c2.selectbox("Liga", ligas_disponiveis, key="liga_selector")
-        
-        # FILTRO DE TIMES DINÂMICO BASEADO NA LIGA SELECIONADA
-        df_times_filtrados = df_csv[df_csv['liga'] == liga]
-        
-        # Pegamos os nomes das colunas de mandante e visitante (tratando variações de nome como 'mandande')
-        col_mandante = 'mandande' if 'mandande' in df_times_filtrados.columns else 'mandante'
-        col_visitante = 'visitante' if 'visitante' in df_times_filtrados.columns else 'visitante'
-        
-        lista_mandantes = sorted(df_times_filtrados[col_mandante].unique())
-        mandante = c1.selectbox("Mandante", lista_mandantes)
-        
-        # Visitante: filtra para não mostrar o mesmo time que o mandante
-        lista_visitantes = sorted(df_times_filtrados[df_times_filtrados[col_mandante] != mandante][col_visitante].unique())
-        visitante = c2.selectbox("Visitante", lista_visitantes)
-
-        st.divider()
-
+    # --- 3. DEMAIS DADOS (DENTRO DO FORM) ---
+    with st.form("form_final"):
+        st.write("---")
         c3, c4, c5 = st.columns(3)
         mercado = c3.selectbox("Mercado", carregar_mercados())
         linha = c4.text_input("Linha (ex: 2.5, -1.0)")
@@ -89,7 +61,7 @@ def mostrar_registro(df_csv):
 
         obs = st.text_area("Observações")
         
-        submit = st.form_submit_button("Confirmar Registro")
+        submit = st.form_submit_button("Confirmar Registro da Aposta")
 
         if submit:
             lucro = 0
@@ -99,10 +71,10 @@ def mostrar_registro(df_csv):
             elif resultado == "Half Red": lucro = -stake / 2
             
             dados = {
-                'data': data.strftime('%Y-%m-%d'), 
-                'liga': liga, 
-                'mandante': mandante,
-                'visitante': visitante, 
+                'data': data_sel.strftime('%Y-%m-%d'), 
+                'liga': liga_sel, 
+                'mandante': mandante_sel,
+                'visitante': visitante_sel, 
                 'mercado': mercado, 
                 'linha': linha,
                 'metodo': metodo, 
@@ -114,6 +86,7 @@ def mostrar_registro(df_csv):
             }
             
             if salvar_aposta(dados):
-                st.success("Aposta registrada com sucesso!")
+                st.success(f"✅ Aposta em {mandante_sel} x {visitante_sel} registrada!")
+                st.balloons()
             else:
                 st.error("Erro ao salvar.")
