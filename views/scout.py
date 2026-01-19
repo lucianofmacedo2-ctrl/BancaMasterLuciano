@@ -63,19 +63,18 @@ def mostrar_scout(df):
         with f4:
             st.markdown(f"**{v_sel} (Somente Fora)**")
             for _, r in df_v_fora.head(5).iterrows():
-                gm, gv = r['gols_visitante_ft'] > r['gols_mandante_ft']
-                res = "✅" if gv else ("🟧" if r['gols_mandante_ft'] == r['gols_visitante_ft'] else "❌")
-                st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['mandande']} ({int(r['gols_mandante_ft'])}-{int(r['gols_visitante_ft'])})")
+                # CORREÇÃO AQUI: Definindo gm e gv corretamente antes da lógica
+                gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
+                res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
+                st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['mandande']} ({int(gm)}-{int(gv)})")
 
     with tab_h2h:
         st.subheader(f"⚔️ {m_sel} vs {v_sel}")
         h1, h2 = st.columns(2)
         
-        # H2H GERAL (Independente do mando)
-        df_h2h_geral = df[( (df['mandande'] == m_sel) & (df['visitante'] == v_sel) ) | 
-                          ( (df['mandande'] == v_sel) & (df['visitante'] == m_sel) )].sort_values('data', ascending=False).head(10)
+        df_h2h_geral = df[((df['mandande'] == m_sel) & (df['visitante'] == v_sel)) | 
+                          ((df['mandande'] == v_sel) & (df['visitante'] == m_sel))].sort_values('data', ascending=False).head(10)
         
-        # H2H NESTA CASA (Mandante sendo Mandante e Visitante sendo Visitante)
         df_h2h_casa = df[(df['mandande'] == m_sel) & (df['visitante'] == v_sel)].sort_values('data', ascending=False).head(10)
 
         with h1:
