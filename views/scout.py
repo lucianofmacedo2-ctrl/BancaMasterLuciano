@@ -21,16 +21,18 @@ def mostrar_scout(df):
     m_sel = c3.selectbox("Mandante (Casa)", times)
     v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
 
-    # --- 2. ANÁLISE DE FORMA (RECUPERADA E ORGANIZADA) ---
+    # --- 2. ANÁLISE DE FORMA E H2H (ABAS) ---
     st.divider()
     
-    tab_geral, tab_especifica = st.tabs(["📊 Últimos 10 Jogos (Geral)", "🏠 Últimos 5 (Casa vs Fora)"])
+    tab_geral, tab_especifica, tab_h2h = st.tabs([
+        "📊 Últimos 10 Geral", 
+        "🏠 Forma Local (Casa/Fora)", 
+        "⚔️ Confronto Direto (H2H)"
+    ])
 
     with tab_geral:
         st.subheader("Desempenho Geral (Casa & Fora)")
         f1, f2 = st.columns(2)
-        
-        # Busca 10 jogos independente de onde jogou
         df_m_geral = df_filt[(df_filt['mandande'] == m_sel) | (df_filt['visitante'] == m_sel)].sort_values('data', ascending=False).head(10)
         df_v_geral = df_filt[(df_filt['mandande'] == v_sel) | (df_filt['visitante'] == v_sel)].sort_values('data', ascending=False).head(10)
         
@@ -40,42 +42,65 @@ def mostrar_scout(df):
                 for _, r in dados.iterrows():
                     is_home = r['mandande'] == time
                     gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
-                    
                     if gm == gv: res = "🟧"
                     elif (is_home and gm > gv) or (not is_home and gv > gm): res = "✅"
                     else: res = "❌"
-                    
                     oponente = r['visitante'] if is_home else r['mandande']
-                    local = "🏠" if is_home else "✈️"
-                    st.write(f"{res} {r['data'].strftime('%d/%m')} {local} vs {oponente} ({int(gm)}-{int(gv)})")
+                    st.write(f"{res} {r['data'].strftime('%d/%m')} {'🏠' if is_home else '✈️'} vs {oponente} ({int(gm)}-{int(gv)})")
 
     with tab_especifica:
         st.subheader("Desempenho por Mando de Campo")
         f3, f4 = st.columns(2)
-        
-        # Busca 5 jogos estritamente Casa para o Mandante e Fora para o Visitante
-        df_m_casa = df_filt[df_filt['mandande'] == m_sel].sort_values('data', ascending=False).head(5)
-        df_v_fora = df_filt[df_filt['visitante'] == v_sel].sort_values('data', ascending=False).head(5)
+        df_m_casa = df_filt[df_filt['mandande'] == m_sel].sort_values('data', ascending=False).head(10)
+        df_v_fora = df_filt[df_filt['visitante'] == v_sel].sort_values('data', ascending=False).head(10)
         
         with f3:
             st.markdown(f"**{m_sel} (Somente Casa)**")
-            for _, r in df_m_casa.iterrows():
+            for _, r in df_m_casa.head(5).iterrows():
                 gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
                 res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
                 st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['visitante']} ({int(gm)}-{int(gv)})")
-        
         with f4:
             st.markdown(f"**{v_sel} (Somente Fora)**")
-            for _, r in df_v_fora.iterrows():
-                gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
-                res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
-                st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['mandande']} ({int(gm)}-{int(gv)})")
+            for _, r in df_v_fora.head(5).iterrows():
+                gm, gv = r['gols_visitante_ft'] > r['gols_mandante_ft']
+                res = "✅" if gv else ("🟧" if r['gols_mandante_ft'] == r['gols_visitante_ft'] else "❌")
+                st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['mandande']} ({int(r['gols_mandante_ft'])}-{int(r['gols_visitante_ft'])})")
+
+    with tab_h2h:
+        st.subheader(f"⚔️ {m_sel} vs {v_sel}")
+        h1, h2 = st.columns(2)
+        
+        # H2H GERAL (Independente do mando)
+        df_h2h_geral = df[( (df['mandande'] == m_sel) & (df['visitante'] == v_sel) ) | 
+                          ( (df['mandande'] == v_sel) & (df['visitante'] == m_sel) )].sort_values('data', ascending=False).head(10)
+        
+        # H2H NESTA CASA (Mandante sendo Mandante e Visitante sendo Visitante)
+        df_h2h_casa = df[(df['mandande'] == m_sel) & (df['visitante'] == v_sel)].sort_values('data', ascending=False).head(10)
+
+        with h1:
+            st.markdown("**Últimos 10 Confrontos (Geral)**")
+            if not df_h2h_geral.empty:
+                for _, r in df_h2h_geral.iterrows():
+                    gm, gv = int(r['gols_mandante_ft']), int(r['gols_visitante_ft'])
+                    st.write(f"📅 {pd.to_datetime(r['data']).strftime('%d/%m/%Y')} | {r['mandande']} {gm}-{gv} {r['visitante']}")
+            else:
+                st.info("Sem confrontos diretos registrados.")
+
+        with h2:
+            st.markdown(f"**Nesta Casa ({m_sel} como Mandante)**")
+            if not df_h2h_casa.empty:
+                for _, r in df_h2h_casa.iterrows():
+                    gm, gv = int(r['gols_mandante_ft']), int(r['gols_visitante_ft'])
+                    res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
+                    st.write(f"{res} {pd.to_datetime(r['data']).strftime('%d/%m/%Y')} | {gm}-{gv} vs {v_sel}")
+            else:
+                st.info("Sem confrontos diretos nesta casa.")
 
     # --- 3. ESTATÍSTICAS DETALHADAS (MANTIDAS) ---
     st.divider()
     st.subheader("📊 Análise Estatística Profissional")
-    st.caption("Estatísticas baseadas no Mandante em Casa e Visitante Fora")
-
+    
     def get_col(palavra):
         for c in df_filt.columns:
             if palavra.lower() in c.lower(): return c
@@ -92,18 +117,13 @@ def mostrar_scout(df):
     def calcular_metricas(dados):
         if dados is None or dados.empty or dados.isnull().all():
             return {"Média": 0, "Mediana": 0, "Moda": 0, "Desvio P.": 0, "CV (%)": 0}
-        
         media = dados.mean()
         desvio = dados.std()
         moda_series = dados.mode()
         moda = moda_series.iloc[0] if not moda_series.empty else 0
-        
         return {
-            "Média": media,
-            "Mediana": dados.median(),
-            "Moda": moda,
-            "Desvio P.": desvio,
-            "CV (%)": (desvio / media * 100) if media > 0 else 0
+            "Média": media, "Mediana": dados.median(), "Moda": moda, 
+            "Desvio P.": desvio, "CV (%)": (desvio / media * 100) if media > 0 else 0
         }
 
     def style_cv(val):
@@ -116,22 +136,14 @@ def mostrar_scout(df):
         if col_m and col_v:
             st.write(f"#### {label}")
             c_res1, c_res2 = st.columns(2)
-            
-            # Recalculando as bases para garantir precisão nas tabelas
-            base_m_casa = df_filt[df_filt['mandande'] == m_sel].sort_values('data', ascending=False).head(10)
-            base_v_fora = df_filt[df_filt['visitante'] == v_sel].sort_values('data', ascending=False).head(10)
-
             with c_res1:
                 st.markdown(f"**{m_sel} (Em Casa)**")
-                m_f = calcular_metricas(base_m_casa[col_m])
-                m_s = calcular_metricas(base_m_casa[col_v])
-                df_m = pd.DataFrame([m_f, m_s], index=["Feitos", "Sofridos"])
-                st.dataframe(df_m.style.format(precision=2).applymap(style_cv, subset=['CV (%)']), use_container_width=True)
-
+                m_f = calcular_metricas(df_m_casa[col_m])
+                m_s = calcular_metricas(df_m_casa[col_v])
+                st.dataframe(pd.DataFrame([m_f, m_s], index=["Feitos", "Sofridos"]).style.format(precision=2).applymap(style_cv, subset=['CV (%)']), use_container_width=True)
             with c_res2:
                 st.markdown(f"**{v_sel} (Fora)**")
-                v_f = calcular_metricas(base_v_fora[col_v])
-                v_s = calcular_metricas(base_v_fora[col_m])
-                df_v = pd.DataFrame([v_f, v_s], index=["Feitos", "Sofridos"])
-                st.dataframe(df_v.style.format(precision=2).applymap(style_cv, subset=['CV (%)']), use_container_width=True)
+                v_f = calcular_metricas(df_v_fora[col_v])
+                v_s = calcular_metricas(df_v_fora[col_m])
+                st.dataframe(pd.DataFrame([v_f, v_s], index=["Feitos", "Sofridos"]).style.format(precision=2).applymap(style_cv, subset=['CV (%)']), use_container_width=True)
             st.divider()
