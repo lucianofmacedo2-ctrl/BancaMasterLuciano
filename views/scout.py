@@ -63,7 +63,6 @@ def mostrar_scout(df):
         with f4:
             st.markdown(f"**{v_sel} (Somente Fora)**")
             for _, r in df_v_fora.head(5).iterrows():
-                # CORREÇÃO AQUI: Definindo gm e gv corretamente antes da lógica
                 gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
                 res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
                 st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['mandande']} ({int(gm)}-{int(gv)})")
@@ -71,10 +70,8 @@ def mostrar_scout(df):
     with tab_h2h:
         st.subheader(f"⚔️ {m_sel} vs {v_sel}")
         h1, h2 = st.columns(2)
-        
         df_h2h_geral = df[((df['mandande'] == m_sel) & (df['visitante'] == v_sel)) | 
                           ((df['mandande'] == v_sel) & (df['visitante'] == m_sel))].sort_values('data', ascending=False).head(10)
-        
         df_h2h_casa = df[(df['mandande'] == m_sel) & (df['visitante'] == v_sel)].sort_values('data', ascending=False).head(10)
 
         with h1:
@@ -83,8 +80,7 @@ def mostrar_scout(df):
                 for _, r in df_h2h_geral.iterrows():
                     gm, gv = int(r['gols_mandante_ft']), int(r['gols_visitante_ft'])
                     st.write(f"📅 {pd.to_datetime(r['data']).strftime('%d/%m/%Y')} | {r['mandande']} {gm}-{gv} {r['visitante']}")
-            else:
-                st.info("Sem confrontos diretos registrados.")
+            else: st.info("Sem confrontos diretos.")
 
         with h2:
             st.markdown(f"**Nesta Casa ({m_sel} como Mandante)**")
@@ -93,10 +89,79 @@ def mostrar_scout(df):
                     gm, gv = int(r['gols_mandante_ft']), int(r['gols_visitante_ft'])
                     res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
                     st.write(f"{res} {pd.to_datetime(r['data']).strftime('%d/%m/%Y')} | {gm}-{gv} vs {v_sel}")
-            else:
-                st.info("Sem confrontos diretos nesta casa.")
+            else: st.info("Sem confrontos diretos nesta casa.")
 
-    # --- 3. ESTATÍSTICAS DETALHADAS (MANTIDAS) ---
+    # --- 3. INCIDÊNCIA DE GOLS (MANDANTE CASA / VISITANTE FORA) ---
+    st.divider()
+    st.subheader("🎯 Incidência de Gols (%)")
+    st.caption("Frequência de Over nos últimos jogos (Mandante em Casa vs Visitante Fora)")
+    
+    def calc_incidencia(dados_gols):
+        if len(dados_gols) == 0: return {}
+        total = len(dados_gols)
+        return {
+            "0.5": (dados_gols > 0.5).sum() / total * 100,
+            "1.5": (dados_gols > 1.5).sum() / total * 100,
+            "2.5": (dados_gols > 2.5).sum() / total * 100,
+            "3.5": (dados_gols > 3.5).sum() / total * 100,
+        }
+
+    # Pegando gols totais (Mandante + Visitante) de cada jogo
+    gols_ht_m = df_m_casa['gols_mandante_ht'] + df_m_casa['gols_visitante_ht']
+    gols_ft_m = df_m_casa['gols_mandante_ft'] + df_m_casa['gols_visitante_ft']
+    gols_ht_v = df_v_fora['gols_mandante_ht'] + df_v_fora['gols_visitante_ht']
+    gols_ft_v = df_v_fora['gols_mandante_ft'] + df_v_fora['gols_visitante_ft']
+
+    inc_ht_m = calc_incidencia(gols_ht_m)
+    inc_ft_m = calc_incidencia(gols_ft_m)
+    inc_ht_v = calc_incidencia(gols_ht_v)
+    inc_ft_v = calc_incidencia(gols_ft_v)
+
+    c_inc1, c_inc2 = st.columns(2)
+    with c_inc1:
+        st.markdown(f"**{m_sel} (Casa)**")
+        df_inc_m = pd.DataFrame([inc_ht_m, inc_ft_m], index=["Over HT %", "Over FT %"])
+        st.table(df_inc_m.style.format("{:.1f}%"))
+    
+    with c_inc2:
+        st.markdown(f"**{v_sel} (Fora)**")
+        df_inc_v = pd.DataFrame([inc_ht_v, inc_ft_v], index=["Over HT %", "Over FT %"])
+        st.table(df_inc_v.style.format("{:.1f}%"))
+
+    # --- 4. GOLS POR FAIXA DE MINUTOS ---
+    st.divider()
+    st.subheader("⏰ Gols por Faixa de Minutos (%)")
+    
+    # Lista de colunas de tempo (ajuste conforme seu CSV se necessário)
+    colunas_tempo = ["0-15", "15-30", "30-45", "45-60", "60-75", "75-90"]
+    
+    c_time1, c_time2 = st.columns(2)
+    
+    def get_time_stats(time, is_home, df_base):
+        # Filtra colunas que contém o nome das faixas e "feito" ou "sofrido"
+        prefixo = "gols_feitos_" if is_home else "gols_feitos_" # Simplificado para busca
+        stats_faixa = {}
+        for faixa in colunas_tempo:
+            col_busca = f"{faixa}" # O código busca qualquer coluna que tenha a faixa (ex: "0-15_gols")
+            col_real = [c for c in df_base.columns if faixa in c]
+            if col_real:
+                stats_faixa[faixa] = df_base[col_real[0]].mean() * 100 # Assume que no CSV está em decimal ou já %
+            else:
+                stats_faixa[faixa] = 0
+        return stats_faixa
+
+    with c_time1:
+        st.markdown(f"**{m_sel} (Gols Marcados Casa)**")
+        # Se seu CSV não tiver faixas de tempo, o código mostrará 0.0%
+        stats_m = get_time_stats(m_sel, True, df_m_casa)
+        st.bar_chart(pd.Series(stats_m))
+
+    with c_time2:
+        st.markdown(f"**{v_sel} (Gols Marcados Fora)**")
+        stats_v = get_time_stats(v_sel, False, df_v_fora)
+        st.bar_chart(pd.Series(stats_v))
+
+    # --- 5. ESTATÍSTICAS DETALHADAS (MÉDIAS/MEDIANAS) ---
     st.divider()
     st.subheader("📊 Análise Estatística Profissional")
     
@@ -116,8 +181,7 @@ def mostrar_scout(df):
     def calcular_metricas(dados):
         if dados is None or dados.empty or dados.isnull().all():
             return {"Média": 0, "Mediana": 0, "Moda": 0, "Desvio P.": 0, "CV (%)": 0}
-        media = dados.mean()
-        desvio = dados.std()
+        media, desvio = dados.mean(), dados.std()
         moda_series = dados.mode()
         moda = moda_series.iloc[0] if not moda_series.empty else 0
         return {
@@ -137,12 +201,10 @@ def mostrar_scout(df):
             c_res1, c_res2 = st.columns(2)
             with c_res1:
                 st.markdown(f"**{m_sel} (Em Casa)**")
-                m_f = calcular_metricas(df_m_casa[col_m])
-                m_s = calcular_metricas(df_m_casa[col_v])
+                m_f = calcular_metricas(df_m_casa[col_m]); m_s = calcular_metricas(df_m_casa[col_v])
                 st.dataframe(pd.DataFrame([m_f, m_s], index=["Feitos", "Sofridos"]).style.format(precision=2).applymap(style_cv, subset=['CV (%)']), use_container_width=True)
             with c_res2:
                 st.markdown(f"**{v_sel} (Fora)**")
-                v_f = calcular_metricas(df_v_fora[col_v])
-                v_s = calcular_metricas(df_v_fora[col_m])
+                v_f = calcular_metricas(df_v_fora[col_v]); v_s = calcular_metricas(df_v_fora[col_m])
                 st.dataframe(pd.DataFrame([v_f, v_s], index=["Feitos", "Sofridos"]).style.format(precision=2).applymap(style_cv, subset=['CV (%)']), use_container_width=True)
             st.divider()
