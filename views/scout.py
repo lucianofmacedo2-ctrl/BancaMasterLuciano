@@ -10,201 +10,126 @@ def mostrar_scout(df):
 
     # --- 1. FILTROS ---
     c1, c2 = st.columns(2)
-    liga = c1.selectbox("Liga", sorted(df['liga'].unique()))
-    temp = c2.selectbox("Temporada", sorted(df[df['liga'] == liga]['temporada'].unique(), reverse=True))
+    liga = c1.selectbox("Liga", sorted(df['Liga'].unique()))
+    temp = c2.selectbox("Temporada", sorted(df[df['Liga'] == liga]['Temporada'].unique(), reverse=True))
     
-    df_filt = df[(df['liga'] == liga) & (df['temporada'] == temp)].copy()
-    df_filt['data'] = pd.to_datetime(df_filt['data'], errors='coerce')
+    df_filt = df[(df['Liga'] == liga) & (df['Temporada'] == temp)].copy()
+    df_filt['Data'] = pd.to_datetime(df_filt['Data'], errors='coerce')
 
-    times = sorted(df_filt['mandande'].unique())
+    times = sorted(df_filt['Mandande'].unique())
     c3, c4 = st.columns(2)
     m_sel = c3.selectbox("Mandante (Casa)", times)
     v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
 
-    # --- 2. ANÁLISE DE FORMA E H2H (ABAS) ---
+    # --- BASES DE DADOS (Últimos 10 jogos) ---
+    df_m_casa = df_filt[df_filt['Mandande'] == m_sel].sort_values('Data', ascending=False).head(10)
+    df_v_fora = df_filt[df_filt['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
+
+    # --- 2. ABAS DE FORMA E H2H ---
     st.divider()
-    
-    tab_geral, tab_especifica, tab_h2h = st.tabs([
-        "📊 Últimos 10 Geral", 
-        "🏠 Forma Local (Casa/Fora)", 
-        "⚔️ Confronto Direto (H2H)"
-    ])
+    tab_geral, tab_especifica, tab_h2h = st.tabs(["📊 Últimos 10 Geral", "🏠 Forma Local", "⚔️ H2H"])
 
     with tab_geral:
-        st.subheader("Desempenho Geral (Casa & Fora)")
         f1, f2 = st.columns(2)
-        df_m_geral = df_filt[(df_filt['mandande'] == m_sel) | (df_filt['visitante'] == m_sel)].sort_values('data', ascending=False).head(10)
-        df_v_geral = df_filt[(df_filt['mandande'] == v_sel) | (df_filt['visitante'] == v_sel)].sort_values('data', ascending=False).head(10)
+        df_m_geral = df_filt[(df_filt['Mandande'] == m_sel) | (df_filt['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(10)
+        df_v_geral = df_filt[(df_filt['Mandande'] == v_sel) | (df_filt['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(10)
         
         for col, time, dados in [(f1, m_sel, df_m_geral), (f2, v_sel, df_v_geral)]:
             with col:
                 st.markdown(f"**{time}**")
                 for _, r in dados.iterrows():
-                    is_home = r['mandande'] == time
-                    gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
+                    is_home = r['Mandande'] == time
+                    gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
                     if gm == gv: res = "🟧"
                     elif (is_home and gm > gv) or (not is_home and gv > gm): res = "✅"
                     else: res = "❌"
-                    oponente = r['visitante'] if is_home else r['mandande']
-                    st.write(f"{res} {r['data'].strftime('%d/%m')} {'🏠' if is_home else '✈️'} vs {oponente} ({int(gm)}-{int(gv)})")
+                    st.write(f"{res} {r['Data'].strftime('%d/%m')} {'🏠' if is_home else '✈️'} vs {r['Visitante'] if is_home else r['Mandande']} ({int(gm)}-{int(gv)})")
 
     with tab_especifica:
-        st.subheader("Desempenho por Mando de Campo")
         f3, f4 = st.columns(2)
-        df_m_casa = df_filt[df_filt['mandande'] == m_sel].sort_values('data', ascending=False).head(10)
-        df_v_fora = df_filt[df_filt['visitante'] == v_sel].sort_values('data', ascending=False).head(10)
-        
         with f3:
-            st.markdown(f"**{m_sel} (Somente Casa)**")
+            st.markdown(f"**{m_sel} (Casa)**")
             for _, r in df_m_casa.head(5).iterrows():
-                gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
+                gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
                 res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
-                st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['visitante']} ({int(gm)}-{int(gv)})")
+                st.write(f"{res} {r['Data'].strftime('%d/%m')} vs {r['Visitante']} ({int(gm)}-{int(gv)})")
         with f4:
-            st.markdown(f"**{v_sel} (Somente Fora)**")
+            st.markdown(f"**{v_sel} (Fora)**")
             for _, r in df_v_fora.head(5).iterrows():
-                gm, gv = r['gols_mandante_ft'], r['gols_visitante_ft']
+                gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
                 res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
-                st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['mandande']} ({int(gm)}-{int(gv)})")
+                st.write(f"{res} {r['Data'].strftime('%d/%m')} vs {r['Mandande']} ({int(gm)}-{int(gv)})")
 
     with tab_h2h:
-        st.subheader(f"⚔️ {m_sel} vs {v_sel}")
-        h1, h2 = st.columns(2)
-        df_h2h_geral = df[((df['mandande'] == m_sel) & (df['visitante'] == v_sel)) | 
-                          ((df['mandande'] == v_sel) & (df['visitante'] == m_sel))].sort_values('data', ascending=False).head(10)
-        df_h2h_casa = df[(df['mandande'] == m_sel) & (df['visitante'] == v_sel)].sort_values('data', ascending=False).head(10)
+        df_h2h = df[((df['Mandande'] == m_sel) & (df['Visitante'] == v_sel)) | ((df['Mandande'] == v_sel) & (df['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
+        if not df_h2h.empty:
+            for _, r in df_h2h.iterrows():
+                st.write(f"📅 {pd.to_datetime(r['Data']).strftime('%d/%m/%y')} | {r['Mandande']} {int(r['Gols_Mandante_FT'])}-{int(r['Gols_Visitante_FT'])} {r['Visitante']}")
+        else: st.info("Sem H2H.")
 
-        with h1:
-            st.markdown("**Últimos 10 Confrontos (Geral)**")
-            if not df_h2h_geral.empty:
-                for _, r in df_h2h_geral.iterrows():
-                    gm, gv = int(r['gols_mandante_ft']), int(r['gols_visitante_ft'])
-                    st.write(f"📅 {pd.to_datetime(r['data']).strftime('%d/%m/%Y')} | {r['mandande']} {gm}-{gv} {r['visitante']}")
-            else: st.info("Sem confrontos diretos.")
-
-        with h2:
-            st.markdown(f"**Nesta Casa ({m_sel} como Mandante)**")
-            if not df_h2h_casa.empty:
-                for _, r in df_h2h_casa.iterrows():
-                    gm, gv = int(r['gols_mandante_ft']), int(r['gols_visitante_ft'])
-                    res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
-                    st.write(f"{res} {pd.to_datetime(r['data']).strftime('%d/%m/%Y')} | {gm}-{gv} vs {v_sel}")
-            else: st.info("Sem confrontos diretos nesta casa.")
-
-    # --- 3. INCIDÊNCIA DE GOLS (MANDANTE CASA / VISITANTE FORA) ---
+    # --- 3. INCIDÊNCIA DE GOLS (%) ---
     st.divider()
     st.subheader("🎯 Incidência de Gols (%)")
-    st.caption("Frequência de Over nos últimos jogos (Mandante em Casa vs Visitante Fora)")
     
-    def calc_incidencia(dados_gols):
-        if len(dados_gols) == 0: return {}
-        total = len(dados_gols)
-        return {
-            "0.5": (dados_gols > 0.5).sum() / total * 100,
-            "1.5": (dados_gols > 1.5).sum() / total * 100,
-            "2.5": (dados_gols > 2.5).sum() / total * 100,
-            "3.5": (dados_gols > 3.5).sum() / total * 100,
-        }
-
-    # Pegando gols totais (Mandante + Visitante) de cada jogo
-    gols_ht_m = df_m_casa['gols_mandante_ht'] + df_m_casa['gols_visitante_ht']
-    gols_ft_m = df_m_casa['gols_mandante_ft'] + df_m_casa['gols_visitante_ft']
-    gols_ht_v = df_v_fora['gols_mandante_ht'] + df_v_fora['gols_visitante_ht']
-    gols_ft_v = df_v_fora['gols_mandante_ft'] + df_v_fora['gols_visitante_ft']
-
-    inc_ht_m = calc_incidencia(gols_ht_m)
-    inc_ft_m = calc_incidencia(gols_ft_m)
-    inc_ht_v = calc_incidencia(gols_ht_v)
-    inc_ft_v = calc_incidencia(gols_ft_v)
+    def calc_perc(serie, corte):
+        return (serie > corte).sum() / len(serie) * 100 if len(serie) > 0 else 0
 
     c_inc1, c_inc2 = st.columns(2)
-    with c_inc1:
-        st.markdown(f"**{m_sel} (Casa)**")
-        df_inc_m = pd.DataFrame([inc_ht_m, inc_ft_m], index=["Over HT %", "Over FT %"])
-        st.table(df_inc_m.style.format("{:.1f}%"))
-    
-    with c_inc2:
-        st.markdown(f"**{v_sel} (Fora)**")
-        df_inc_v = pd.DataFrame([inc_ht_v, inc_ft_v], index=["Over HT %", "Over FT %"])
-        st.table(df_inc_v.style.format("{:.1f}%"))
+    for col, time, dados, total_ht, total_ft in [(c_inc1, m_sel, df_m_casa, 'Total_Gols_HT', 'Total_Gols_FT'), (c_inc2, v_sel, df_v_fora, 'Total_Gols_HT', 'Total_Gols_FT')]:
+        with col:
+            st.markdown(f"**{time}**")
+            data_inc = {
+                "0.5": [calc_perc(dados[total_ht], 0.5), calc_perc(dados[total_ft], 0.5)],
+                "1.5": [calc_perc(dados[total_ht], 1.5), calc_perc(dados[total_ft], 1.5)],
+                "2.5": [calc_perc(dados[total_ht], 2.5), calc_perc(dados[total_ft], 2.5)],
+                "3.5": [calc_perc(dados[total_ht], 3.5), calc_perc(dados[total_ft], 3.5)]
+            }
+            st.table(pd.DataFrame(data_inc, index=["Over HT %", "Over FT %"]).style.format("{:.1f}%"))
 
-    # --- 4. GOLS POR FAIXA DE MINUTOS ---
+    # --- 4. GOLS POR FAIXA DE MINUTOS (TABELA) ---
     st.divider()
     st.subheader("⏰ Gols por Faixa de Minutos (%)")
     
-    # Lista de colunas de tempo (ajuste conforme seu CSV se necessário)
-    colunas_tempo = ["0-15", "15-30", "30-45", "45-60", "60-75", "75-90"]
+    faixas_m = ["0-15_Mandante", "16-30_Mandante", "31-45+_Mandante", "46-60_Mandante", "61-75_Mandante", "76-90+_Mandante"]
+    faixas_v = ["0-15_Visitante", "16-30_Visitante", "31-45+_Visitante", "46-60_Visitante", "61-75_Visitante", "76-90+_Visitante"]
+    labels = ["0-15'", "16-30'", "31-45'", "46-60'", "61-75'", "76-90'"]
+
+    c_f1, c_f2 = st.columns(2)
+    with c_f1:
+        st.markdown(f"**{m_sel} (Marcados em Casa)**")
+        vals_m = [df_m_casa[f].mean() * 100 if df_m_casa[f].mean() <= 1 else df_m_casa[f].mean() for f in faixas_m]
+        st.table(pd.DataFrame([vals_m], columns=labels, index=["% Gols"]).style.format("{:.1f}%"))
     
-    c_time1, c_time2 = st.columns(2)
-    
-    def get_time_stats(time, is_home, df_base):
-        # Filtra colunas que contém o nome das faixas e "feito" ou "sofrido"
-        prefixo = "gols_feitos_" if is_home else "gols_feitos_" # Simplificado para busca
-        stats_faixa = {}
-        for faixa in colunas_tempo:
-            col_busca = f"{faixa}" # O código busca qualquer coluna que tenha a faixa (ex: "0-15_gols")
-            col_real = [c for c in df_base.columns if faixa in c]
-            if col_real:
-                stats_faixa[faixa] = df_base[col_real[0]].mean() * 100 # Assume que no CSV está em decimal ou já %
-            else:
-                stats_faixa[faixa] = 0
-        return stats_faixa
+    with c_f2:
+        st.markdown(f"**{v_sel} (Marcados Fora)**")
+        vals_v = [df_v_fora[f].mean() * 100 if df_v_fora[f].mean() <= 1 else df_v_fora[f].mean() for f in faixas_v]
+        st.table(pd.DataFrame([vals_v], columns=labels, index=["% Gols"]).style.format("{:.1f}%"))
 
-    with c_time1:
-        st.markdown(f"**{m_sel} (Gols Marcados Casa)**")
-        # Se seu CSV não tiver faixas de tempo, o código mostrará 0.0%
-        stats_m = get_time_stats(m_sel, True, df_m_casa)
-        st.bar_chart(pd.Series(stats_m))
-
-    with c_time2:
-        st.markdown(f"**{v_sel} (Gols Marcados Fora)**")
-        stats_v = get_time_stats(v_sel, False, df_v_fora)
-        st.bar_chart(pd.Series(stats_v))
-
-    # --- 5. ESTATÍSTICAS DETALHADAS (MÉDIAS/MEDIANAS) ---
+    # --- 5. ESTATÍSTICAS DETALHADAS ---
     st.divider()
     st.subheader("📊 Análise Estatística Profissional")
-    
-    def get_col(palavra):
-        for c in df_filt.columns:
-            if palavra.lower() in c.lower(): return c
-        return None
 
-    metrics_map = {
-        "Gols HT": (get_col("gols_mandante_ht"), get_col("gols_visitante_ht")),
-        "Gols FT": (get_col("gols_mandante_ft"), get_col("gols_visitante_ft")),
-        "Cantos": (get_col("cantos_mandante"), get_col("cantos_visitante")),
-        "Chutes Gol": (get_col("chutes_gol_mandante"), get_col("chutes_gol_visitante")),
-        "Chutes Fora": (get_col("chutes_fora_mandante"), get_col("chutes_fora_visitante"))
+    metrics = {
+        "Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"),
+        "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"),
+        "Cantos": ("Cantos_Mandante", "Cantos_Visitante"),
+        "Chutes Gol": ("Chutes_Gol_Mandante", "Chutes_Gol_Visitante"),
+        "Chutes Fora": ("Chutes_Fora_Mandante", "Chutes_Fora_Visitante")
     }
 
-    def calcular_metricas(dados):
-        if dados is None or dados.empty or dados.isnull().all():
-            return {"Média": 0, "Mediana": 0, "Moda": 0, "Desvio P.": 0, "CV (%)": 0}
-        media, desvio = dados.mean(), dados.std()
-        moda_series = dados.mode()
-        moda = moda_series.iloc[0] if not moda_series.empty else 0
-        return {
-            "Média": media, "Mediana": dados.median(), "Moda": moda, 
-            "Desvio P.": desvio, "CV (%)": (desvio / media * 100) if media > 0 else 0
-        }
+    def get_stats(dados, col_f, col_s):
+        f, s = dados[col_f], dados[col_s]
+        res = {}
+        for nome, serie in [("Feitos", f), ("Sofridos", s)]:
+            res[nome] = {"Média": serie.mean(), "Mediana": serie.median(), "CV (%)": (serie.std()/serie.mean()*100) if serie.mean()>0 else 0}
+        return pd.DataFrame(res).T
 
-    def style_cv(val):
-        if not isinstance(val, (int, float)): return ''
-        if val < 20: return 'background-color: rgba(0, 255, 204, 0.2); color: #00ffcc;'
-        if val < 40: return 'color: #ffaa00;'
-        return 'color: #ff4b4b;'
-
-    for label, (col_m, col_v) in metrics_map.items():
-        if col_m and col_v:
-            st.write(f"#### {label}")
-            c_res1, c_res2 = st.columns(2)
-            with c_res1:
-                st.markdown(f"**{m_sel} (Em Casa)**")
-                m_f = calcular_metricas(df_m_casa[col_m]); m_s = calcular_metricas(df_m_casa[col_v])
-                st.dataframe(pd.DataFrame([m_f, m_s], index=["Feitos", "Sofridos"]).style.format(precision=2).applymap(style_cv, subset=['CV (%)']), use_container_width=True)
-            with c_res2:
-                st.markdown(f"**{v_sel} (Fora)**")
-                v_f = calcular_metricas(df_v_fora[col_v]); v_s = calcular_metricas(df_v_fora[col_m])
-                st.dataframe(pd.DataFrame([v_f, v_s], index=["Feitos", "Sofridos"]).style.format(precision=2).applymap(style_cv, subset=['CV (%)']), use_container_width=True)
-            st.divider()
+    for label, (cm, cv) in metrics.items():
+        st.write(f"#### {label}")
+        c_m, c_v = st.columns(2)
+        with c_m:
+            st.markdown(f"**{m_sel}**")
+            st.dataframe(get_stats(df_m_casa, cm, cv).style.format(precision=2), use_container_width=True)
+        with c_v:
+            st.markdown(f"**{v_sel}**")
+            st.dataframe(get_stats(df_v_fora, cv, cm).style.format(precision=2), use_container_width=True)
