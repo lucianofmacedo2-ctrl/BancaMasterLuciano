@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-# --- 1. BASE DE ESTATÍSTICAS (Scout) ---
+# --- BASE DE ESTATÍSTICAS ---
 def carregar_csv():
     caminho = 'dados_25_26.csv'
     if os.path.exists(caminho):
@@ -13,26 +13,38 @@ def carregar_csv():
             return pd.DataFrame()
     return pd.DataFrame()
 
-# --- 2. GESTÃO DE MERCADOS (Dinâmico) ---
+# --- GESTÃO DE MERCADOS (DINÂMICO COM EXCLUSÃO) ---
 def carregar_mercados():
     caminho = 'mercados_cadastrados.csv'
+    padrao = ["Match Odds", "Over/Under", "Ambas Marcam"]
     if os.path.exists(caminho):
         try:
-            return sorted(pd.read_csv(caminho)['nome'].tolist())
+            df = pd.read_csv(caminho)
+            return sorted(df['nome'].unique().tolist())
         except:
-            return ["Match Odds", "Over/Under", "Ambas Marcam"]
-    return ["Match Odds", "Over/Under", "Ambas Marcam"]
+            return padrao
+    return padrao
 
 def salvar_novo_mercado(novo_nome):
     caminho = 'mercados_cadastrados.csv'
     mercados = carregar_mercados()
-    if novo_nome not in mercados:
+    if novo_nome and novo_nome not in mercados:
         df = pd.DataFrame({'nome': mercados + [novo_nome]})
         df.to_csv(caminho, index=False)
         return True
     return False
 
-# --- 3. GESTÃO DE APOSTAS (Registro/Histórico) ---
+def remover_mercado(nome_remover):
+    caminho = 'mercados_cadastrados.csv'
+    mercados = carregar_mercados()
+    if nome_remover in mercados:
+        mercados.remove(nome_remover)
+        df = pd.DataFrame({'nome': mercados})
+        df.to_csv(caminho, index=False)
+        return True
+    return False
+
+# --- GESTÃO DE APOSTAS ---
 def carregar_apostas():
     caminho = 'apostas_registradas.csv'
     if os.path.exists(caminho):
@@ -49,12 +61,11 @@ def salvar_aposta(dados_aposta):
     df.to_csv(caminho, index=False)
     return True
 
-# --- 4. GESTÃO DE BANCAS (Financeiro) ---
+# --- GESTÃO DE BANCAS ---
 def carregar_bancas():
     caminho = 'bancas.csv'
     if os.path.exists(caminho):
         return pd.read_csv(caminho)
-    # Estrutura inicial se não existir
     return pd.DataFrame(columns=['nome', 'saldo_inicial', 'saldo_atual'])
 
 def salvar_banca(dados_banca):
