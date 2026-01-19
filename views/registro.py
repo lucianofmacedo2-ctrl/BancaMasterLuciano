@@ -26,15 +26,13 @@ def mostrar_registro(df_csv):
 
     st.divider()
 
-    # --- 2. SELEÇÃO DE TIME (FORA DO FORM PARA FUNCIONAR O FILTRO) ---
+    # --- 2. SELEÇÃO DA PARTIDA (DINÂMICA) ---
     st.subheader("Seleção da Partida")
     c1, c2 = st.columns(2)
     
-    # Seleção de Liga
     ligas_disponiveis = sorted(df_csv['liga'].unique())
     liga_sel = c1.selectbox("Escolha a Liga", ligas_disponiveis)
     
-    # Filtragem imediata dos times daquela liga
     df_filtrado = df_csv[df_csv['liga'] == liga_sel]
     col_m = 'mandande' if 'mandande' in df_filtrado.columns else 'mandante'
     
@@ -46,7 +44,7 @@ def mostrar_registro(df_csv):
     
     data_sel = c2.date_input("Data", datetime.now())
 
-    # --- 3. DEMAIS DADOS (DENTRO DO FORM) ---
+    # --- 3. DADOS DA APOSTA (FORMULÁRIO) ---
     with st.form("form_final"):
         st.write("---")
         c3, c4, c5 = st.columns(3)
@@ -57,7 +55,8 @@ def mostrar_registro(df_csv):
         c6, c7, c8 = st.columns(3)
         odd = c6.number_input("Odd", min_value=1.01, format="%.2f", step=0.01)
         stake = c7.number_input("Stake (R$)", min_value=1.0, step=1.0)
-        resultado = c8.selectbox("Resultado", ["Green", "Red", "Void", "Half Green", "Half Red"])
+        # Adicionado o status "Aberto"
+        resultado = c8.selectbox("Resultado", ["Aberto", "Green", "Red", "Void", "Half Green", "Half Red"])
 
         obs = st.text_area("Observações")
         
@@ -65,6 +64,7 @@ def mostrar_registro(df_csv):
 
         if submit:
             lucro = 0
+            # Lógica de cálculo (Lucro é 0 se estiver Aberto)
             if resultado == "Green": lucro = stake * (odd - 1)
             elif resultado == "Red": lucro = -stake
             elif resultado == "Half Green": lucro = (stake * (odd - 1)) / 2
@@ -86,7 +86,7 @@ def mostrar_registro(df_csv):
             }
             
             if salvar_aposta(dados):
-                st.success(f"✅ Aposta em {mandante_sel} x {visitante_sel} registrada!")
+                st.success(f"✅ Aposta registrada como {resultado}!")
                 st.balloons()
             else:
-                st.error("Erro ao salvar.")
+                st.error("Erro ao salvar no banco de dados.")
