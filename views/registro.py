@@ -28,7 +28,7 @@ def mostrar_registro(df_csv):
         </style>
     """, unsafe_allow_html=True)
 
-    # --- SEÇÃO DE GERENCIAMENTO DE MERCADOS ---
+    # --- 1. SEÇÃO DE GERENCIAMENTO DE MERCADOS ---
     st.markdown('<div class="sessao-mercado">', unsafe_allow_html=True)
     st.subheader("⚙️ Configurar Mercados")
     
@@ -52,16 +52,28 @@ def mostrar_registro(df_csv):
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- FORMULÁRIO DE REGISTRO ---
+    # --- 2. FORMULÁRIO DE REGISTRO (CORRIGIDO) ---
     with st.form("form_registro", clear_on_submit=True):
         c1, c2 = st.columns(2)
         data = c1.date_input("Data da Aposta", datetime.now())
-        liga = c2.selectbox("Liga", sorted(df_csv['liga'].unique()))
         
-        df_l = df_csv[df_csv['liga'] == liga]
-        # Usando 'mandande' conforme sua base
-        mandante = c1.selectbox("Mandante", sorted(df_l['mandande'].unique()))
-        visitante = c2.selectbox("Visitante", sorted(df_l[df_l['mandande'] != mandante]['visitante'].unique()))
+        # FILTRO DE LIGA
+        ligas_disponiveis = sorted(df_csv['liga'].unique())
+        liga = c2.selectbox("Liga", ligas_disponiveis, key="liga_selector")
+        
+        # FILTRO DE TIMES DINÂMICO BASEADO NA LIGA SELECIONADA
+        df_times_filtrados = df_csv[df_csv['liga'] == liga]
+        
+        # Pegamos os nomes das colunas de mandante e visitante (tratando variações de nome como 'mandande')
+        col_mandante = 'mandande' if 'mandande' in df_times_filtrados.columns else 'mandante'
+        col_visitante = 'visitante' if 'visitante' in df_times_filtrados.columns else 'visitante'
+        
+        lista_mandantes = sorted(df_times_filtrados[col_mandante].unique())
+        mandante = c1.selectbox("Mandante", lista_mandantes)
+        
+        # Visitante: filtra para não mostrar o mesmo time que o mandante
+        lista_visitantes = sorted(df_times_filtrados[df_times_filtrados[col_mandante] != mandante][col_visitante].unique())
+        visitante = c2.selectbox("Visitante", lista_visitantes)
 
         st.divider()
 
@@ -87,10 +99,18 @@ def mostrar_registro(df_csv):
             elif resultado == "Half Red": lucro = -stake / 2
             
             dados = {
-                'data': data.strftime('%Y-%m-%d'), 'liga': liga, 'mandante': mandante,
-                'visitante': visitante, 'mercado': mercado, 'linha': linha,
-                'metodo': metodo, 'odd': odd, 'stake': stake,
-                'resultado': resultado, 'lucro_prejuizo': lucro, 'obs': obs
+                'data': data.strftime('%Y-%m-%d'), 
+                'liga': liga, 
+                'mandante': mandante,
+                'visitante': visitante, 
+                'mercado': mercado, 
+                'linha': linha,
+                'metodo': metodo, 
+                'odd': odd, 
+                'stake': stake,
+                'resultado': resultado, 
+                'lucro_prejuizo': lucro, 
+                'obs': obs
             }
             
             if salvar_aposta(dados):
