@@ -3,56 +3,78 @@ import pandas as pd
 from database import carregar_apostas
 
 def mostrar_historico():
-    st.title("📜 Histórico de Apostas")
+    st.title("📜 Histórico e Gestão de Apostas")
 
     df = carregar_apostas()
-
     if df.empty:
         st.info("Nenhuma aposta registrada até o momento.")
         return
 
-    # --- CSS para Tabelas e Cores de Resultado ---
-    st.markdown("""
-        <style>
-            div[data-testid="stTable"] td { text-align: center !important; color: white !important; }
-            div[data-testid="stTable"] th { text-align: center !important; color: white !important; }
-        </style>
-    """, unsafe_allow_html=True)
+    # Organização por Abas
+    tab_pendentes, tab_completo = st.tabs(["⏳ Apostas em Aberto", "📅 Histórico Geral"])
 
-    # Ordenar por data mais recente
-    df['data'] = pd.to_datetime(df['data']).dt.strftime('%d/%m/%Y')
-    df = df.sort_index(ascending=False)
+    # --- ABA 1: GESTÃO DE APOSTAS ABERTAS ---
+    with tab_pendentes:
+        df_abertas = df[df['resultado'] == "Aberto"].copy()
+        
+        if df_abertas.empty:
+            st.success("Tudo em dia! Você não possui apostas pendentes.")
+        else:
+            st.warning(f"Você tem {len(df_abertas)} apostas aguardando resultado.")
+            
+            for idx, row in df_abertas.iterrows():
+                # Card de atualização
+                with st.expander(f"⚽ {row['mandante']} x {row['visitante']} ({row['mercado']} {row['linha']})"):
+                    st.write(f"**Data:** {row['data']} | **Stake:** R$ {row['stake']} | **Odd:** {row['odd']}")
+                    
+                    c_update1, c_update2 = st.columns([2, 1])
+                    
+                    novo_res = c_update1.selectbox(
+                        "Qual foi o resultado?", 
+                        ["Aberto", "Green", "Red", "Void", "Half Green", "Half Red"], 
+                        key=f"sel_{idx}"
+                    )
+                    
+                    if c_update2.button("Atualizar", key=f"btn_{idx}", use_container_width=True):
+                        if novo_res != "Aberto":
+                            # Recalcular Lucro no momento do fechamento
+                            lucro = 0
+                            odd, stake = float(row['odd']), float(row['stake'])
+                            if novo_res == "Green": lucro = stake * (odd - 1)
+                            elif novo_res == "Red": lucro = -stake
+                            elif novo_res == "Half Green": lucro = (stake * (odd - 1)) / 2
+                            elif novo_res == "Half Red": lucro = -stake / 2
+                            
+                            # Aplicar mudanças no DataFrame
+                            df.at[idx, 'resultado'] = novo_res
+                            df.at[idx, 'lucro_prejuizo'] = lucro
+                            
+                            # Salvar no CSV
+                            df.to_csv('apostas_registradas.csv', index=False)
+                            st.success("Aposta encerrada com sucesso!")
+                            st.rerun()
 
-    # --- Filtros Rápidos ---
-    c1, c2, c3 = st.columns(3)
-    filtro_liga = c1.multiselect("Filtrar Liga", df['liga'].unique())
-    filtro_res = c2.multiselect("Filtrar Resultado", df['resultado'].unique())
-    filtro_metodo = c3.multiselect("Filtrar Método", df['metodo'].unique() if 'metodo' in df.columns else [])
+    # --- ABA 2: HISTÓRICO GERAL ---
+    with tab_completo:
+        # Filtros básicos para o histórico
+        c1, c2 = st.columns(2)
+        filtro_res = c1.multiselect("Filtrar por Resultado", df['resultado'].unique())
+        if filtro_res:
+            df_display = df[df['resultado'].isin(filtro_res)]
+        else:
+            df_display = df
 
-    if filtro_liga: df = df[df['liga'].isin(filtro_liga)]
-    if filtro_res: df = df[df['resultado'].isin(filtro_res)]
-    if filtro_metodo: df = df[df['metodo'].isin(filtro_metodo)]
+        # Formatação de cores para a tabela
+        def color_resultado(val):
+            color = '#2ecc71' if val in ['Green', 'Half Green'] else ('#e74c3c' if val in ['Red', 'Half Red'] else 'white')
+            return f'color: {color}; font-weight: bold'
 
-    # --- Tabela Principal ---
-    # Reorganizando as colunas para incluir Mercado + Linha
-    colunas_exibir = ['data', 'liga', 'mandante', 'visitante', 'mercado', 'linha', 'metodo', 'odd', 'stake', 'resultado', 'lucro_prejuizo']
-    
-    # Verifica se todas as colunas existem no DF para evitar erros
-    colunas_finais = [c for c in colunas_exibir if c in df.columns]
-    
-    # Formatação visual: Green em verde, Red em vermelho (opcional via Pandas Styler)
-    def color_resultado(val):
-        color = '#2ecc71' if val == 'Green' or val == 'Half Green' else ('#e74c3c' if val == 'Red' or val == 'Half Red' else 'white')
-        return f'color: {color}; font-weight: bold'
+        st.dataframe(
+            df_display.sort_index(ascending=False).style.applymap(color_resultado, subset=['resultado']).format(precision=2),
+            use_container_width=True
+        )
 
-    st.table(df[colunas_finais].style.applymap(color_resultado, subset=['resultado']).format(precision=2))
-
-    # --- Seção de Detalhes (Observações) ---
-    st.subheader("📝 Detalhes e Observações")
-    for _, row in df.head(10).iterrows():
-        with st.expander(f"📌 {row['data']} - {row['mandante']} x {row['visitante']} ({row['mercado']} {row['linha']})"):
-            c_obs1, c_obs2 = st.columns(2)
-            c_obs1.write(f"**Método:** {row.get('metodo', 'N/A')}")
-            c_obs1.write(f"**Odd:** {row['odd']} | **Stake:** R$ {row['stake']}")
-            c_obs2.write(f"**Lucro/Prejuízo:** R$ {row['lucro_prejuizo']:.2f}")
-            st.info(f"**Observação:** {row.get('obs', 'Sem observações.')}")
+        # Resumo Financeiro Simples
+        st.divider()
+        total_lucro = df[df['resultado'] != 'Aberto']['lucro_prejuizo'].sum()
+        st.metric("Lucro/Prejuízo Total Acumulado", f"R$ {total_lucro:.2f}")
