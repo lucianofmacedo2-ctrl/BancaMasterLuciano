@@ -3,35 +3,32 @@ import pandas as pd
 from views import scout, registro, historico, dashboard, bancas
 import styles
 
-st.set_page_config(page_title="Banca Master", layout="wide", page_icon="⚽")
+st.set_page_config(page_title="Banca Master Luciano", layout="wide", page_icon="⚽")
 
-# Aplica o estilo visual customizado
+# Aplica estilos visuais (Cores e fontes)
 styles.apply_styles()
 
 def carregar_dados():
     try:
         df = pd.read_csv('dados_25_26.csv')
-        # Normaliza nomes de colunas: remove espaços e garante padrão
-        df.columns = [c.strip() for c in df.columns]
+        df.columns = [c.strip() for c in df.columns] # Limpa espaços nos nomes das colunas
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar dados_25_26.csv: {e}")
+        st.error(f"Erro ao carregar o arquivo CSV: {e}")
         return pd.DataFrame()
 
 df_csv = carregar_dados()
 
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/5329/5329304.png", width=100)
-st.sidebar.title("Banca Master")
+# Barra Lateral
+st.sidebar.title("🏆 Master Luciano")
+banca_inicial = st.sidebar.number_input("Banca Inicial (R$)", value=1000.0)
 
-menu = st.sidebar.radio(
-    "Navegação",
-    ["📊 Dashboard", "⚽ Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"]
-)
+menu = st.sidebar.radio("Navegação", ["📊 Dashboard", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"])
 
 if not df_csv.empty:
     if menu == "📊 Dashboard":
-        dashboard.mostrar_dashboard()
-    elif menu == "⚽ Scout":
+        dashboard.mostrar_dashboard(banca_inicial)
+    elif menu == "🔎 Scout":
         scout.mostrar_scout(df_csv)
     elif menu == "📝 Registro":
         registro.mostrar_registro(df_csv)
@@ -39,5 +36,3 @@ if not df_csv.empty:
         historico.mostrar_historico()
     elif menu == "🏦 Bancas":
         bancas.mostrar_bancas()
-else:
-    st.warning("Arquivo de dados não encontrado ou vazio.")
