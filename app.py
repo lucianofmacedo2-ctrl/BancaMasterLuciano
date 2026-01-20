@@ -10,6 +10,7 @@ styles.apply_styles()
 
 def carregar_dados():
     try:
+        # Importante: certifique-se que o nome do arquivo está correto (dados_25_26.csv)
         df = pd.read_csv('dados_25_26.csv')
         df.columns = [c.strip() for c in df.columns] # Remove espaços extras das colunas
         return df
@@ -20,14 +21,15 @@ def carregar_dados():
 df_csv = carregar_dados()
 
 st.sidebar.title("🏆 Master Luciano")
-# Recupera a banca configurada
-banca_inicial = st.sidebar.number_input("Banca Inicial (R$)", value=1000.0, step=50.0)
+
+# --- ALTERAÇÃO AQUI: Removi a linha da banca_inicial ---
 
 menu = st.sidebar.radio("Navegação", ["📊 Dashboard", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"])
 
 if not df_csv.empty:
     if menu == "📊 Dashboard":
-        dashboard.mostrar_dashboard(banca_inicial)
+        # Ajustamos o dashboard para não depender mais daquele input fixo
+        dashboard.mostrar_dashboard() 
     elif menu == "🔎 Scout":
         scout.mostrar_scout(df_csv)
     elif menu == "📝 Registro":
