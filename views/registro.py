@@ -39,16 +39,14 @@ def mostrar_registro(df_csv):
     # --- ÁREA DE GESTÃO (MERCADOS E MÉTODOS) NO TOPO ---
     with st.expander("⚙️ Gerenciar Mercados e Métodos", expanded=False):
         c_aux1, c_aux2 = st.columns(2)
-        
         with c_aux1:
             st.markdown("**📁 Mercados**")
-            novo_m = st.text_input("Novo Mercado (ex: Over 2.5 FT)", key="add_m")
+            novo_m = st.text_input("Novo Mercado", key="add_m")
             if st.button("Adicionar Mercado"):
                 if salvar_auxiliar('Mercado', novo_m):
-                    st.success(f"Mercado '{novo_m}' adicionado!")
+                    st.success(f"Mercado adicionado!")
                     time.sleep(0.5)
                     st.rerun()
-            
             df_m = carregar_auxiliares()
             lista_m = df_m[df_m['Tipo'] == 'Mercado']['Nome'].tolist()
             if lista_m:
@@ -59,13 +57,12 @@ def mostrar_registro(df_csv):
 
         with c_aux2:
             st.markdown("**🎯 Métodos**")
-            novo_met = st.text_input("Novo Método (ex: Funil, Corridinha)", key="add_met")
+            novo_met = st.text_input("Novo Método", key="add_met")
             if st.button("Adicionar Método"):
                 if salvar_auxiliar('Metodo', novo_met):
-                    st.success(f"Método '{novo_met}' adicionado!")
+                    st.success(f"Método adicionado!")
                     time.sleep(0.5)
                     st.rerun()
-                
             df_met = carregar_auxiliares()
             lista_met = df_met[df_met['Tipo'] == 'Metodo']['Nome'].tolist()
             if lista_met:
@@ -76,21 +73,28 @@ def mostrar_registro(df_csv):
 
     st.divider()
 
-    # --- SELEÇÃO DE JOGO (LIGA E TIMES) ---
+    # --- NOVA OPÇÃO: JOGO FORA DO CSV ---
+    fora_csv = st.checkbox("🏟️ Jogo fora do CSV? (Entrada Manual)")
+
     df_bancas = pd.read_csv(PATH_BANCAS)
     df_aux = carregar_auxiliares()
     
     col_j1, col_j2, col_j3 = st.columns(3)
-    with col_j1:
-        liga_sel = st.selectbox("1. Selecione a Liga", sorted(df_csv['Liga'].unique()))
-    
-    df_filtrado = df_csv[df_csv['Liga'] == liga_sel]
-    times = sorted(pd.concat([df_filtrado['Mandande'], df_filtrado['Visitante']]).unique())
 
-    with col_j2:
-        mandante = st.selectbox("2. Mandante", times)
-    with col_j3:
-        visitante = st.selectbox("3. Visitante", [t for t in times if t != mandante])
+    if fora_csv:
+        # Se for fora do CSV, habilitamos campos de texto
+        liga_final = col_j1.text_input("Liga (Manual)")
+        mandante_final = col_j2.text_input("Mandante (Manual)")
+        visitante_final = col_j3.text_input("Visitante (Manual)")
+    else:
+        # Lógica padrão de filtragem do CSV
+        liga_sel = col_j1.selectbox("1. Selecione a Liga", sorted(df_csv['Liga'].unique()))
+        df_filtrado = df_csv[df_csv['Liga'] == liga_sel]
+        times = sorted(pd.concat([df_filtrado['Mandande'], df_filtrado['Visitante']]).unique())
+        
+        mandante_final = col_j2.selectbox("2. Mandante", times)
+        visitante_final = col_j3.selectbox("3. Visitante", [t for t in times if t != mandante_final])
+        liga_final = liga_sel
 
     # --- FORMULÁRIO DE REGISTRO ---
     st.subheader("📋 Detalhes da Aposta")
@@ -120,27 +124,23 @@ def mostrar_registro(df_csv):
         btn_final = st.form_submit_button("🚀 Registrar Aposta")
 
         if btn_final:
-            if not mercados_finais or not metodos_finais or stake <= 0:
-                st.error("Erro: Verifique se cadastrou Mercado/Método e se a Stake é maior que zero.")
+            if not liga_final or not mandante_final or not visitante_final:
+                st.error("Erro: Preencha os dados do jogo (Liga e Times)!")
+            elif not mercados_finais or not metodos_finais or stake <= 0:
+                st.error("Erro: Verifique Mercado/Método e Stake!")
             else:
-                # Cálculo automático do resultado financeiro
+                # Cálculo financeiro
                 resultado_fin = 0.0
-                if status_reg == "Green":
-                    resultado_fin = stake * (odd - 1)
-                elif status_reg == "Meio Green":
-                    resultado_fin = (stake * (odd - 1)) / 2
-                elif status_reg == "Red":
-                    resultado_fin = -stake
-                elif status_reg == "Meio Red":
-                    resultado_fin = -stake / 2
-                elif status_reg == "Devolvida" or status_reg == "Aberta":
-                    resultado_fin = 0.0
+                if status_reg == "Green": resultado_fin = stake * (odd - 1)
+                elif status_reg == "Meio Green": resultado_fin = (stake * (odd - 1)) / 2
+                elif status_reg == "Red": resultado_fin = -stake
+                elif status_reg == "Meio Red": resultado_fin = -stake / 2
 
                 nova_aposta = {
                     "Data": data_aposta.strftime('%Y-%m-%d'),
                     "Banca": banca_sel,
-                    "Liga": liga_sel,
-                    "Jogo": f"{mandante} x {visitante}",
+                    "Liga": liga_final,
+                    "Jogo": f"{mandante_final} x {visitante_final}",
                     "Mercado": mercado_reg,
                     "Linha": linha,
                     "Metodo": metodo_reg,
@@ -152,21 +152,12 @@ def mostrar_registro(df_csv):
                 }
                 
                 # Salvar em CSV
-                if not os.path.exists("data"): 
-                    os.makedirs("data")
-                
-                if os.path.exists(PATH_APOSTAS):
-                    df_apostas = pd.read_csv(PATH_APOSTAS)
-                else:
-                    df_apostas = pd.DataFrame()
-                
+                if not os.path.exists("data"): os.makedirs("data")
+                df_apostas = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
                 df_apostas = pd.concat([df_apostas, pd.DataFrame([nova_aposta])], ignore_index=True)
                 df_apostas.to_csv(PATH_APOSTAS, index=False)
                 
-                # Comemoração e feedback
                 st.balloons()
-                st.success(f"✅ Aposta registrada com sucesso como {status_reg}!")
-                
-                # Pausa para os balões aparecerem antes do rerun
+                st.success(f"✅ Aposta em '{mandante_final} x {visitante_final}' registrada!")
                 time.sleep(2)
                 st.rerun()
