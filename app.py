@@ -10,45 +10,59 @@ import styles
 def realizar_backup():
     pasta_data = "data"
     pasta_backup = "backups"
-    if not os.path.exists(pasta_data): return
-    if not os.path.exists(pasta_backup): os.makedirs(pasta_backup)
     
-    hoje = datetime.now().strftime("%Y-%m-%d")
-    nome_zip = os.path.join(pasta_backup, f"backup_{hoje}")
-    
-    if not os.path.exists(nome_zip + ".zip"):
-        try:
-            shutil.make_archive(nome_zip, 'zip', pasta_data)
-        except: pass
+    # Só faz backup se a pasta de dados existir
+    if not os.path.exists(pasta_data):
+        return
 
-# Executa o backup ao iniciar
+    # Cria a pasta de backup se não existir
+    if not os.path.exists(pasta_backup):
+        os.makedirs(pasta_backup)
+
+    # Nome do backup baseado no dia (formato: backup_2024-05-20.zip)
+    data_hoje = datetime.now().strftime("%Y-%m-%d")
+    arquivo_zip = os.path.join(pasta_backup, f"backup_{data_hoje}")
+
+    # Só cria o zip se ainda não existir um backup hoje
+    if not os.path.exists(arquivo_zip + ".zip"):
+        try:
+            shutil.make_archive(arquivo_zip, 'zip', pasta_data)
+        except Exception as e:
+            print(f"Erro no backup: {e}")
+
+# Executa o backup toda vez que o app inicia ou atualiza
 realizar_backup()
 
 st.set_page_config(page_title="Master Luciano - Banca", layout="wide", page_icon="⚽")
+
+# Aplica o visual profissional
 styles.apply_styles()
 
-def carregar_dados():
+def carregar_dados_csv():
     try:
+        # Carrega o arquivo de scout (dados_25_26.csv)
         df = pd.read_csv('dados_25_26.csv')
-        df.columns = [c.strip() for c in df.columns]
+        df.columns = [c.strip() for c in df.columns] 
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar o arquivo: {e}")
         return pd.DataFrame()
 
-df_csv = carregar_dados()
+df_csv = carregar_dados_csv()
 
 st.sidebar.title("🏆 Master Luciano")
+
 menu = st.sidebar.radio("Navegação", ["📊 Dashboard", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"])
 
-if not df_csv.empty:
-    if menu == "📊 Dashboard":
-        dashboard.mostrar_dashboard() 
-    elif menu == "🔎 Scout":
+if menu == "📊 Dashboard":
+    dashboard.mostrar_dashboard() 
+elif menu == "🔎 Scout":
+    if not df_csv.empty:
         scout.mostrar_scout(df_csv)
-    elif menu == "📝 Registro":
-        registro.mostrar_registro(df_csv)
-    elif menu == "📂 Histórico":
-        historico.mostrar_historico()
-    elif menu == "🏦 Bancas":
-        bancas.mostrar_bancas()
+    else:
+        st.error("Arquivo 'dados_25_26.csv' não encontrado para o Scout.")
+elif menu == "📝 Registro":
+    registro.mostrar_registro(df_csv)
+elif menu == "📂 Histórico":
+    historico.mostrar_historico()
+elif menu == "🏦 Bancas":
+    bancas.mostrar_bancas()
