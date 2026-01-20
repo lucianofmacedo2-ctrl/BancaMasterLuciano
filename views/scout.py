@@ -1,65 +1,95 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 def mostrar_scout(df):
-    st.title("🔎 Scout Estatístico Profissional")
+    st.title("🔎 Scout Estatístico")
 
-    try:
-        # Filtros principais
-        c1, c2 = st.columns(2)
-        liga_sel = c1.selectbox("Selecione a Liga", sorted(df['Liga'].unique()))
+    # --- DIAGNÓSTICO DE SEGURANÇA ---
+    # Se der erro, isso vai mostrar quais colunas o sistema está lendo
+    if 'Liga' not in df.columns:
+        st.error("⚠️ Erro Crítico: A coluna 'Liga' não foi encontrada.")
+        st.write("Colunas detectadas no seu arquivo:", list(df.columns))
+        st.stop() # Para o código aqui para não dar o erro de KeyError
+
+    # --- 1. FILTROS (Usando 'Liga' explicitamente) ---
+    c1, c2 = st.columns(2)
+    
+    # AQUI ESTAVA O ERRO ANTIGO: trocamos df['pais'] por df['Liga']
+    ligas_disponiveis = sorted(df['Liga'].unique())
+    liga_sel = c1.selectbox("Selecione a Liga", ligas_disponiveis)
+    
+    df_liga = df[df['Liga'] == liga_sel].copy()
+    
+    # Filtro de Temporada
+    temps_disponiveis = sorted(df_liga['Temporada'].unique(), reverse=True)
+    temp_sel = c2.selectbox("Temporada", temps_disponiveis)
+    
+    df_filt = df_liga[df_liga['Temporada'] == temp_sel].copy()
+    
+    # Tratamento de data seguro
+    df_filt['Data'] = pd.to_datetime(df_filt['Data'], dayfirst=True, errors='coerce')
+
+    # Seleção de Times (Usando 'Mandande' com 'e' no final, conforme seu CSV)
+    times = sorted(df_filt['Mandande'].unique())
+    c3, c4 = st.columns(2)
+    m_sel = c3.selectbox("Mandante", times)
+    v_sel = c4.selectbox("Visitante", [t for t in times if t != m_sel])
+
+    # Bases de dados
+    df_m = df_filt[df_filt['Mandande'] == m_sel].sort_values('Data', ascending=False).head(10)
+    df_v = df_filt[df_filt['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
+
+    # --- 2. EXIBIÇÃO ---
+    st.divider()
+    tab1, tab2 = st.tabs(["📊 Forma e H2H", "⏰ Minutos"])
+
+    with tab1:
+        col1, col2 = st.columns(2)
+        # Mandante
+        with col1:
+            st.write(f"**{m_sel} (Casa)**")
+            for _, r in df_m.head(5).iterrows():
+                gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
+                res = "✅" if gm > gv else ("🟧" if gm == gv else "❌")
+                st.write(f"{res} vs {r['Visitante']} ({int(gm)}-{int(gv)})")
         
-        df_liga = df[df['Liga'] == liga_sel].copy()
-        temp_sel = c2.selectbox("Temporada", sorted(df_liga['Temporada'].unique(), reverse=True))
+        # Visitante
+        with col2:
+            st.write(f"**{v_sel} (Fora)**")
+            for _, r in df_v.head(5).iterrows():
+                gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
+                res = "✅" if gv > gm else ("🟧" if gm == gv else "❌")
+                st.write(f"{res} vs {r['Mandande']} ({int(gm)}-{int(gv)})")
+
+    with tab2:
+        st.subheader("Gols por Faixa de Tempo (%)")
+        faixas = ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]
         
-        df_filt = df_liga[df_liga['Temporada'] == temp_sel].copy()
-        df_filt['Data'] = pd.to_datetime(df_filt['Data'], dayfirst=True, errors='coerce')
+        c_fm, c_fv = st.columns(2)
+        
+        # Usando os nomes exatos das suas colunas de minutos
+        # Ex: 0-15_Mandante, 31-45+_Mandante (conforme seu CSV)
+        with c_fm:
+            vals_m = []
+            for f in faixas:
+                col_name = f"{f}_Mandante"
+                if col_name in df_m.columns:
+                    vals_m.append(df_m[col_name].mean() * 100)
+                else:
+                    vals_m.append(0)
+            
+            st.write(f"**{m_sel}**")
+            st.dataframe(pd.DataFrame([vals_m], columns=faixas, index=["%"]).style.format("{:.1f}%").background_gradient(cmap="Greens", axis=1))
 
-        # Seleção de Times (Usando 'Mandande' com 'e' no final conforme seu CSV)
-        times = sorted(df_filt['Mandande'].unique())
-        c3, c4 = st.columns(2)
-        m_sel = c3.selectbox("Mandante (Casa)", times)
-        v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
+        with c_fv:
+            vals_v = []
+            for f in faixas:
+                col_name = f"{f}_Visitante"
+                if col_name in df_v.columns:
+                    vals_v.append(df_v[col_name].mean() * 100)
+                else:
+                    vals_v.append(0)
 
-        # Bases de Dados - Últimos 10
-        df_m = df_filt[df_filt['Mandande'] == m_sel].sort_values('Data', ascending=False).head(10)
-        df_v = df_filt[df_filt['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
-
-        st.divider()
-        tab1, tab2, tab3 = st.tabs(["📊 Forma Recente", "⏰ Gols por Minuto", "⚔️ H2H"])
-
-        with tab1:
-            col1, col2 = st.columns(2)
-            for col, time, dados, is_casa in [(col1, m_sel, df_m, True), (col2, v_sel, df_v, False)]:
-                with col:
-                    st.markdown(f"**{time} ({'Casa' if is_casa else 'Fora'})**")
-                    for _, r in dados.head(5).iterrows():
-                        gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
-                        if gm == gv: res = "🟧"
-                        elif (is_casa and gm > gv) or (not is_casa and gv > gm): res = "✅"
-                        else: res = "❌"
-                        st.write(f"{res} vs {r['Visitante'] if is_casa else r['Mandande']} ({int(gm)}-{int(gv)})")
-
-        with tab2:
-            st.subheader("Análise de Minutos (Gols Marcados %)")
-            faixas = ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]
-            c_fm, c_fv = st.columns(2)
-            with c_fm:
-                v_m = [df_m[f"{f}_Mandante"].mean() * 100 for f in faixas]
-                st.dataframe(pd.DataFrame([v_m], columns=faixas, index=[m_sel]).style.format("{:.1f}%").background_gradient(cmap="Greens", axis=1))
-            with c_fv:
-                v_v = [df_v[f"{f}_Visitante"].mean() * 100 for f in faixas]
-                st.dataframe(pd.DataFrame([v_v], columns=faixas, index=[v_sel]).style.format("{:.1f}%").background_gradient(cmap="Greens", axis=1))
-
-        with tab3:
-            h2h = df[((df['Mandande'] == m_sel) & (df['Visitante'] == v_sel)) | 
-                     ((df['Mandande'] == v_sel) & (df['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(5)
-            if not h2h.empty:
-                for _, r in h2h.iterrows():
-                    st.write(f"📅 {pd.to_datetime(r['Data']).strftime('%d/%m/%Y')} | {r['Mandande']} {int(r['Gols_Mandante_FT'])}-{int(r['Gols_Visitante_FT'])} {r['Visitante']}")
-            else:
-                st.info("Sem confrontos diretos recentes.")
-
-    except KeyError as e:
-        st.error(f"Erro de coluna no CSV: {e}")
-        st.info("O sistema tentou buscar uma coluna que não existe. Verifique se o arquivo CSV está correto.")
+            st.write(f"**{v_sel}**")
+            st.dataframe(pd.DataFrame([vals_v], columns=faixas, index=["%"]).style.format("{:.1f}%").background_gradient(cmap="Greens", axis=1))
