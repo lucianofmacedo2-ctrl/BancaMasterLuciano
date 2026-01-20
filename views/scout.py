@@ -9,7 +9,7 @@ def calcular_stats_completas(serie):
     
     s = serie.dropna()
     media = s.mean()
-    mediana = s.median() # <-- Aqui estava o erro, agora definido corretamente
+    mediana = s.median()
     
     try:
         moda = s.mode()[0] if not s.mode().empty else 0.0
@@ -19,13 +19,24 @@ def calcular_stats_completas(serie):
     desvio = s.std() if len(s) > 1 else 0.0
     cv = (desvio / media * 100) if media > 0 else 0.0
     
-    return {
-        "Média": media, 
-        "Mediana": mediana, 
-        "Moda": moda, 
-        "DP": desvio, 
-        "CV%": cv
-    }
+    return {"Média": media, "Mediana": mediana, "Moda": moda, "DP": desvio, "CV%": cv}
+
+def calcular_wdl(df_games, time_nome):
+    """Calcula Vitórias, Empates e Derrotas para um time específico em um conjunto de jogos."""
+    v, e, d = 0, 0, 0
+    for _, row in df_games.iterrows():
+        sou_m = row['Mandande'] == time_nome
+        gm = row['Gols_Mandante_FT']
+        gv = row['Gols_Visitante_FT']
+        
+        # Placar do meu time vs Placar do adversário
+        meus = gm if sou_m else gv
+        adv = gv if sou_m else gm
+        
+        if meus > adv: v += 1
+        elif meus == adv: e += 1
+        else: d += 1
+    return v, e, d
 
 def formatar_data_seguro(valor):
     try:
@@ -49,7 +60,6 @@ def mostrar_scout(df):
     temps = sorted(df_liga['Temporada'].unique(), reverse=True)
     temp_sel = c2.selectbox("Temporada", temps)
     
-    # Base filtrada pela temporada atual
     df_season = df_liga[df_liga['Temporada'] == temp_sel].copy()
     df_season['Data'] = pd.to_datetime(df_season['Data'], dayfirst=True, errors='coerce')
 
@@ -64,6 +74,18 @@ def mostrar_scout(df):
     
     df_m_geral = df_season[(df_season['Mandande'] == m_sel) | (df_season['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(10)
     df_v_geral = df_season[(df_season['Mandande'] == v_sel) | (df_season['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(10)
+
+    # --- NOVO: RESUMO DE VITÓRIAS/EMPATES/DERROTAS ---
+    st.subheader("🏆 Resumo de Aproveitamento (Últimos Jogos)")
+    
+    vm_h, em_h, dm_h = calcular_wdl(df_m_home, m_sel)
+    vv_a, ev_a, dv_a = calcular_wdl(df_v_away, v_sel)
+    
+    col_res1, col_res2 = st.columns(2)
+    with col_res1:
+        st.info(f"**{m_sel} em Casa:** {vm_h}V | {em_h}E | {dm_h}D")
+    with col_res2:
+        st.info(f"**{v_sel} Fora:** {vv_a}V | {ev_a}E | {dv_a}D")
 
     # --- 2. ABAS DE FORMA E H2H ---
     st.divider()
@@ -85,7 +107,8 @@ def mostrar_scout(df):
     with tab_geral:
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown(f"**Geral: {m_sel}**")
+            vm_g, em_g, dm_g = calcular_wdl(df_m_geral, m_sel)
+            st.markdown(f"**Geral: {m_sel}** ({vm_g}V-{em_g}E-{dm_g}D)")
             for _, r in df_m_geral.iterrows():
                 sou_m = r['Mandande'] == m_sel
                 meus = r['Gols_Mandante_FT'] if sou_m else r['Gols_Visitante_FT']
@@ -93,7 +116,8 @@ def mostrar_scout(df):
                 res = "✅" if meus > adv else ("🟧" if meus == adv else "❌")
                 st.write(f"{res} {formatar_data_seguro(r['Data'])} {'🏠' if sou_m else '✈️'} vs {r['Visitante'] if sou_m else r['Mandande']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
         with col2:
-            st.markdown(f"**Geral: {v_sel}**")
+            vv_g, ev_g, dv_g = calcular_wdl(df_v_geral, v_sel)
+            st.markdown(f"**Geral: {v_sel}** ({vv_g}V-{ev_g}E-{dv_g}D)")
             for _, r in df_v_geral.iterrows():
                 sou_m = r['Mandande'] == v_sel
                 meus = r['Gols_Mandante_FT'] if sou_m else r['Gols_Visitante_FT']
@@ -131,7 +155,7 @@ def mostrar_scout(df):
         with st.expander(f"📊 {label} (Feitos vs Levados)", expanded=True):
             m_col, v_col = st.columns(2)
             
-            # Processamento Mandante
+            # Mandante
             m_f = df_m_home[col_m]
             m_l = df_m_home[col_v]
             df_st_m = pd.DataFrame({
@@ -140,7 +164,7 @@ def mostrar_scout(df):
                 "Total Jogo": calcular_stats_completas(m_f + m_l)
             }).T
             
-            # Processamento Visitante
+            # Visitante
             v_f = df_v_away[col_v]
             v_l = df_v_away[col_m]
             df_st_v = pd.DataFrame({
@@ -166,8 +190,10 @@ def mostrar_scout(df):
 
     c_m1, c_v1 = st.columns(2)
     with c_m1:
+        st.write(f"**Minutos Gols: {m_sel}**")
         s_m = df_m_home[faixas_m].sum()
         st.dataframe(pd.DataFrame([s_m.values], columns=labels, index=["Gols"]).style.background_gradient(cmap="RdYlGn", axis=1), use_container_width=True)
     with c_v1:
+        st.write(f"**Minutos Gols: {v_sel}**")
         s_v = df_v_away[faixas_v].sum()
         st.dataframe(pd.DataFrame([s_v.values], columns=labels, index=["Gols"]).style.background_gradient(cmap="RdYlGn", axis=1), use_container_width=True)
