@@ -5,13 +5,13 @@ import styles
 
 st.set_page_config(page_title="Banca Master Luciano", layout="wide", page_icon="⚽")
 
-# Aplica estilos visuais (Cores e fontes)
+# Aplica o CSS customizado
 styles.apply_styles()
 
 def carregar_dados():
     try:
         df = pd.read_csv('dados_25_26.csv')
-        df.columns = [c.strip() for c in df.columns] # Limpa espaços nos nomes das colunas
+        df.columns = [c.strip() for c in df.columns] # Remove espaços extras
         return df
     except Exception as e:
         st.error(f"Erro ao carregar o arquivo CSV: {e}")
@@ -19,7 +19,6 @@ def carregar_dados():
 
 df_csv = carregar_dados()
 
-# Barra Lateral
 st.sidebar.title("🏆 Master Luciano")
 banca_inicial = st.sidebar.number_input("Banca Inicial (R$)", value=1000.0)
 
