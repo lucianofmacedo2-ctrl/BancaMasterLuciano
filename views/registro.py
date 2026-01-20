@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import time
 from datetime import datetime
 
 # --- CONFIGURAÇÃO DE CAMINHOS ---
@@ -40,29 +41,35 @@ def mostrar_registro(df_csv):
         c_aux1, c_aux2 = st.columns(2)
         
         with c_aux1:
-            st.markdown("**Mercados**")
+            st.markdown("**📁 Mercados**")
             novo_m = st.text_input("Novo Mercado (ex: Over 2.5 FT)", key="add_m")
             if st.button("Adicionar Mercado"):
-                if salvar_auxiliar('Mercado', novo_m): st.rerun()
+                if salvar_auxiliar('Mercado', novo_m):
+                    st.success(f"Mercado '{novo_m}' adicionado!")
+                    time.sleep(0.5)
+                    st.rerun()
             
             df_m = carregar_auxiliares()
             lista_m = df_m[df_m['Tipo'] == 'Mercado']['Nome'].tolist()
             if lista_m:
-                m_excluir = st.selectbox("Excluir Mercado", ["Selecione..."] + lista_m, key="del_m")
+                m_excluir = st.selectbox("Excluir Mercado", ["Selecione..."] + sorted(lista_m), key="del_m")
                 if m_excluir != "Selecione..." and st.button("❌ Remover Mercado"):
                     excluir_auxiliar('Mercado', m_excluir)
                     st.rerun()
 
         with c_aux2:
-            st.markdown("**Métodos**")
+            st.markdown("**🎯 Métodos**")
             novo_met = st.text_input("Novo Método (ex: Funil, Corridinha)", key="add_met")
             if st.button("Adicionar Método"):
-                if salvar_auxiliar('Metodo', novo_met): st.rerun()
+                if salvar_auxiliar('Metodo', novo_met):
+                    st.success(f"Método '{novo_met}' adicionado!")
+                    time.sleep(0.5)
+                    st.rerun()
                 
             df_met = carregar_auxiliares()
             lista_met = df_met[df_met['Tipo'] == 'Metodo']['Nome'].tolist()
             if lista_met:
-                met_excluir = st.selectbox("Excluir Método", ["Selecione..."] + lista_met, key="del_met")
+                met_excluir = st.selectbox("Excluir Método", ["Selecione..."] + sorted(lista_met), key="del_met")
                 if met_excluir != "Selecione..." and st.button("❌ Remover Método"):
                     excluir_auxiliar('Metodo', met_excluir)
                     st.rerun()
@@ -88,7 +95,7 @@ def mostrar_registro(df_csv):
     # --- FORMULÁRIO DE REGISTRO ---
     st.subheader("📋 Detalhes da Aposta")
     with st.form("form_final_aposta", clear_on_submit=True):
-        f1, f2, f3, f4 = st.columns(4) # Aumentei para 4 colunas
+        f1, f2, f3, f4 = st.columns(4)
         
         with f1:
             data_aposta = st.date_input("Data", datetime.now())
@@ -116,7 +123,7 @@ def mostrar_registro(df_csv):
             if not mercados_finais or not metodos_finais or stake <= 0:
                 st.error("Erro: Verifique se cadastrou Mercado/Método e se a Stake é maior que zero.")
             else:
-                # Cálculo automático do resultado financeiro baseado no status
+                # Cálculo automático do resultado financeiro
                 resultado_fin = 0.0
                 if status_reg == "Green":
                     resultado_fin = stake * (odd - 1)
@@ -144,11 +151,22 @@ def mostrar_registro(df_csv):
                     "Obs": obs
                 }
                 
-                # Salvar Apostas
-                if not os.path.exists("data"): os.makedirs("data")
-                df_apostas = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
+                # Salvar em CSV
+                if not os.path.exists("data"): 
+                    os.makedirs("data")
+                
+                if os.path.exists(PATH_APOSTAS):
+                    df_apostas = pd.read_csv(PATH_APOSTAS)
+                else:
+                    df_apostas = pd.DataFrame()
+                
                 df_apostas = pd.concat([df_apostas, pd.DataFrame([nova_aposta])], ignore_index=True)
                 df_apostas.to_csv(PATH_APOSTAS, index=False)
                 
-                st.success(f"Aposta registrada como {status_reg}!")
+                # Comemoração e feedback
+                st.balloons()
+                st.success(f"✅ Aposta registrada com sucesso como {status_reg}!")
+                
+                # Pausa para os balões aparecerem antes do rerun
+                time.sleep(2)
                 st.rerun()
