@@ -2,106 +2,89 @@ import streamlit as st
 import pandas as pd
 import os
 
-# --- CAMINHOS ---
 PATH_APOSTAS = "data/historico_apostas.csv"
 
-def carregar_apostas():
-    if os.path.exists(PATH_APOSTAS):
-        df = pd.read_csv(PATH_APOSTAS)
-        df['Data'] = pd.to_datetime(df['Data'])
-        return df
-    return pd.DataFrame()
-
-def salvar_apostas(df):
-    df.to_csv(PATH_APOSTAS, index=False)
-
 def mostrar_historico():
-    st.title("📂 Histórico de Apostas")
+    st.title("📂 Histórico e Atualização")
 
-    df = carregar_apostas()
-
-    if df.empty:
+    if not os.path.exists(PATH_APOSTAS):
         st.info("Nenhuma aposta registrada ainda.")
         return
 
-    # --- FILTROS NO TOPO ---
-    with st.expander("🔍 Filtros Avançados", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        bancas_disp = ["Todas"] + sorted(df['Banca'].unique().tolist())
-        banca_f = c1.selectbox("Filtrar por Banca", bancas_disp)
-        
-        status_disp = ["Todos"] + sorted(df['Status'].unique().tolist())
-        status_f = c2.selectbox("Filtrar por Status", status_disp)
-        
-        # Filtro de lógica
-        df_filtrado = df.copy()
-        if banca_f != "Todas":
-            df_filtrado = df_filtrado[df_filtrado['Banca'] == banca_f]
-        if status_f != "Todos":
-            df_filtrado = df_filtrado[df_filtrado['Status'] == status_f]
-
-    # --- MÉTRICAS DO FILTRO ---
-    lucro_total = df_filtrado['Resultado'].sum()
-    roi = (lucro_total / df_filtrado['Stake'].sum() * 100) if df_filtrado['Stake'].sum() > 0 else 0
+    df = pd.read_csv(PATH_APOSTAS)
     
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Qtd. Apostas", len(df_filtrado))
-    m2.metric("Lucro/Prejuízo (P&L)", f"R$ {lucro_total:.2f}", delta=f"{lucro_total:.2f}")
-    m3.metric("ROI %", f"{roi:.2f}%")
+    # Se existirem apostas antigas sem ID, preenchemos com 'Antiga'
+    if "ID" not in df.columns:
+        df.insert(0, "ID", "Antiga")
+
+    st.subheader("Lista Geral de Apostas")
+    st.dataframe(df, use_container_width=True)
 
     st.divider()
 
-    # --- TABELA DE EXIBIÇÃO ---
-    # Centralizando os dados conforme seu padrão
-    st.subheader("📋 Lista de Registros")
-    df_display = df_filtrado.copy()
-    df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
+    # --- SISTEMA DE ATUALIZAÇÃO ---
+    st.subheader("🔄 Atualizar Resultado da Aposta")
     
-    st.dataframe(
-        df_display.style.format({"Stake": "R$ {:.2f}", "Odd": "{:.2f}", "Resultado": "R$ {:.2f}"})
-        .set_properties(**{'text-align': 'center'})
-        .background_gradient(cmap="RdYlGn", subset=['Resultado']),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # --- ÁREA DE AÇÕES (EDITAR/EXCLUIR) ---
-    st.divider()
-    st.subheader("⚙️ Ações")
+    # Criar coluna temporária para identificar com clareza no Selectbox
+    df['Descricao_Busca'] = df['ID'].astype(str) + " | " + df['Jogo'] + " | " + df['Mercado']
     
-    col_edit, col_del = st.columns(2)
+    escolha = st.selectbox("Selecione qual aposta deseja atualizar:", df['Descricao_Busca'].tolist())
 
-    with col_edit:
-        with st.expander("🔄 Atualizar Status de Aposta"):
-            # Seleciona a aposta pelo índice e descrição
-            opcoes_aposta = {i: f"{r['Data'].strftime('%d/%m')} - {r['Jogo']} ({r['Mercado']})" for i, r in df.iterrows()}
-            id_sel = st.selectbox("Selecione a aposta para alterar", options=opcoes_aposta.keys(), format_func=lambda x: opcoes_aposta[x])
+    if escolha:
+        # Localiza o índice da aposta
+        idx = df[df['Descricao_Busca'] == escolha].index[0]
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Pega o status atual para vir pré-selecionado
+            status_atual = df.at[idx, 'Status']
+            lista_status = ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"]
+            try:
+                idx_status = lista_status.index(status_atual)
+            except:
+                idx_status = 0
+                
+            novo_status = st.selectbox("Novo Status", lista_status, index=idx_status)
+        
+        with col2:
+            nova_odd = st.number_input("Odd Final", value=float(df.at[idx, 'Odd']), step=0.01)
             
-            novo_status = st.selectbox("Novo Status", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"], key="edit_status")
-            
-            if st.button("Confirmar Alteração"):
-                # Recalcular resultado financeiro
-                stake = df.at[id_sel, 'Stake']
-                odd = df.at[id_sel, 'Odd']
-                
-                res_novo = 0.0
-                if novo_status == "Green": res_novo = stake * (odd - 1)
-                elif novo_status == "Meio Green": res_novo = (stake * (odd - 1)) / 2
-                elif novo_status == "Red": res_novo = -stake
-                elif novo_status == "Meio Red": res_novo = -stake / 2
-                
-                df.at[id_sel, 'Status'] = novo_status
-                df.at[id_sel, 'Resultado'] = res_novo
-                
-                salvar_apostas(df)
-                st.success("Status atualizado!")
-                st.rerun()
+        with col3:
+            nova_stake = st.number_input("Stake Utilizada", value=float(df.at[idx, 'Stake']), step=1.0)
 
-    with col_del:
-        with st.expander("🗑️ Excluir Registro"):
-            id_del = st.selectbox("Selecione a aposta para remover", options=opcoes_aposta.keys(), format_func=lambda x: opcoes_aposta[x], key="del_ap")
-            if st.button("Remover Permanentemente", type="primary"):
-                df = df.drop(id_del)
-                salvar_apostas(df)
-                st.warning("Aposta excluída com sucesso!")
-                st.rerun()
+        if st.button("Salvar Alterações"):
+            # Recálculo Matemático Profissional
+            resultado_fin = 0.0
+            if novo_status == "Green": 
+                resultado_fin = nova_stake * (nova_odd - 1)
+            elif novo_status == "Meio Green": 
+                resultado_fin = (nova_stake * (nova_odd - 1)) / 2
+            elif novo_status == "Red": 
+                resultado_fin = -nova_stake
+            elif novo_status == "Meio Red": 
+                resultado_fin = -nova_stake / 2
+            elif novo_status == "Devolvida":
+                resultado_fin = 0.0
+            
+            # Aplica no DataFrame
+            df.at[idx, 'Status'] = novo_status
+            df.at[idx, 'Odd'] = nova_odd
+            df.at[idx, 'Stake'] = nova_stake
+            df.at[idx, 'Resultado'] = resultado_fin
+            
+            # Remove coluna auxiliar e salva
+            df_final = df.drop(columns=['Descricao_Busca'])
+            df_final.to_csv(PATH_APOSTAS, index=False)
+            
+            st.success("Aposta atualizada com sucesso!")
+            st.rerun()
+
+    # --- EXCLUSÃO ---
+    with st.expander("🗑️ Zona de Exclusão"):
+        if st.button("❌ Remover esta aposta permanentemente"):
+            df_excluir = df[df['Descricao_Busca'] != escolha]
+            df_excluir = df_excluir.drop(columns=['Descricao_Busca'])
+            df_excluir.to_csv(PATH_APOSTAS, index=False)
+            st.warning("Aposta excluída.")
+            st.rerun()
