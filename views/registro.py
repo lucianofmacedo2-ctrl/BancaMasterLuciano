@@ -82,12 +82,10 @@ def mostrar_registro(df_csv):
     col_j1, col_j2, col_j3 = st.columns(3)
 
     if fora_csv:
-        # Se for fora do CSV, habilitamos campos de texto
         liga_final = col_j1.text_input("Liga (Manual)")
         mandante_final = col_j2.text_input("Mandante (Manual)")
         visitante_final = col_j3.text_input("Visitante (Manual)")
     else:
-        # Lógica padrão de filtragem do CSV
         liga_sel = col_j1.selectbox("1. Selecione a Liga", sorted(df_csv['Liga'].unique()))
         df_filtrado = df_csv[df_csv['Liga'] == liga_sel]
         times = sorted(pd.concat([df_filtrado['Mandande'], df_filtrado['Visitante']]).unique())
@@ -129,6 +127,9 @@ def mostrar_registro(df_csv):
             elif not mercados_finais or not metodos_finais or stake <= 0:
                 st.error("Erro: Verifique Mercado/Método e Stake!")
             else:
+                # GERAÇÃO DO ID ÚNICO PARA O HISTÓRICO
+                id_unico = f"{datetime.now().strftime('%M%S')}-{mandante_final[:3].upper().replace(' ', '')}"
+
                 # Cálculo financeiro
                 resultado_fin = 0.0
                 if status_reg == "Green": resultado_fin = stake * (odd - 1)
@@ -137,6 +138,7 @@ def mostrar_registro(df_csv):
                 elif status_reg == "Meio Red": resultado_fin = -stake / 2
 
                 nova_aposta = {
+                    "ID": id_unico, # Inclusão da nova coluna
                     "Data": data_aposta.strftime('%Y-%m-%d'),
                     "Banca": banca_sel,
                     "Liga": liga_final,
@@ -151,13 +153,18 @@ def mostrar_registro(df_csv):
                     "Obs": obs
                 }
                 
-                # Salvar em CSV
+                # Salvar em CSV com proteção de colunas
                 if not os.path.exists("data"): os.makedirs("data")
                 df_apostas = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
+                
+                # Garante que o arquivo existente tenha a coluna ID antes de salvar a nova
+                if not df_apostas.empty and "ID" not in df_apostas.columns:
+                    df_apostas.insert(0, "ID", "Antiga")
+
                 df_apostas = pd.concat([df_apostas, pd.DataFrame([nova_aposta])], ignore_index=True)
                 df_apostas.to_csv(PATH_APOSTAS, index=False)
                 
                 st.balloons()
-                st.success(f"✅ Aposta em '{mandante_final} x {visitante_final}' registrada!")
+                st.success(f"✅ Aposta ID: {id_unico} registrada!")
                 time.sleep(2)
                 st.rerun()
