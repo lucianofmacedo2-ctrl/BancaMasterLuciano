@@ -229,3 +229,4 @@ def mostrar_scout(df):
     c_m1, c_v1 = st.columns(2)
     with c_m1: st.dataframe(pd.DataFrame([df_m_home[faixas_m].sum().values], columns=labels, index=["Gols"]).style.background_gradient(cmap="RdYlGn", axis=1), use_container_width=True)
     with c_v1: st.dataframe(pd.DataFrame([df_v_away[faixas_v].sum().values], columns=labels, index=["Gols"]).style.background_gradient(cmap="RdYlGn", axis=1), use_container_width=True)
+
