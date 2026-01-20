@@ -1,38 +1,25 @@
 import streamlit as st
-import pandas as pd
-from database import carregar_apostas
+from database import carregar_apostas, supabase, calcular_lucro_real
 
 def mostrar_historico():
-    st.title("📜 Gestão de Apostas")
+    st.title("📂 Histórico de Apostas")
     df = carregar_apostas()
     
     if df.empty:
-        st.info("Nenhuma aposta pendente.")
+        st.info("Histórico vazio.")
         return
 
-    tab1, tab2 = st.tabs(["⏳ Pendentes", "📅 Histórico Geral"])
-
-    with tab1:
-        df_ab = df[df['resultado'] == "Aberto"]
-        for idx, row in df_ab.iterrows():
-            with st.expander(f"⚽ {row['mandante']} x {row['visitante']} | {row['mercado']}"):
-                res = st.selectbox("Resultado", ["Aberto", "Green", "Red", "Half Green", "Half Red", "Void"], key=idx)
-                if st.button("Confirmar", key=f"btn_{idx}"):
-                    # Lógica financeira
-                    s, o = float(row['stake']), float(row['odd'])
-                    if res == "Green": lucro = s * (o - 1)
-                    elif res == "Red": lucro = -s
-                    elif res == "Half Green": lucro = (s * (o - 1)) / 2
-                    elif res == "Half Red": lucro = -s / 2
-                    else: lucro = 0
-                    
-                    df.at[idx, 'resultado'] = res
-                    df.at[idx, 'lucro_prejuizo'] = lucro
-                    df.to_csv('apostas_registradas.csv', index=False)
-                    st.rerun()
-
-    with tab2:
-        def color_res(val):
-            color = '#2ecc71' if 'Green' in str(val) else ('#e74c3c' if 'Red' in str(val) else 'white')
-            return f'color: {color}'
-        st.dataframe(df.style.applymap(color_res, subset=['resultado']).format(precision=2), use_container_width=True)
+    config = {
+        "resultado": st.column_config.SelectboxColumn("Resultado", options=["Pendente", "Green", "Red", "Meio Green", "Meio Red"]),
+        "lucro": st.column_config.NumberColumn("Lucro", disabled=True)
+    }
+    
+    editado = st.data_editor(df, column_config=config, use_container_width=True, hide_index=True)
+    
+    if st.button("💾 Salvar Alterações"):
+        for i, row in editado.iterrows():
+            novo_lucro = calcular_lucro_real(row['resultado'], row['odd'], row['stake'])
+            supabase.table("apostas").update({
+                "resultado": row['resultado'], "lucro": novo_lucro
+            }).eq("id", row['id']).execute()
+        st.rerun()
