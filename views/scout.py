@@ -1,87 +1,66 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 def mostrar_scout(df):
-    st.title("🔎 Scout de Times")
-    if df.empty:
-        st.error("Dados não encontrados ou CSV vazio.")
-        return
+    st.title("🔎 Scout Estatístico")
 
+    # Mapeamento dinâmico para evitar KeyError/TypeError
+    cols = {c.lower(): c for c in df.columns}
+    def get_col(name, default): return cols.get(name.lower(), default)
+
+    c_liga = get_col('Liga', 'Liga')
+    c_mand = get_col('Mandande', 'Mandande')
+    c_visi = get_col('Visitante', 'Visitante')
+    c_data = get_col('Data', 'Data')
+    c_gm_ft = get_col('Gols_Mandante_FT', 'Gols_Mandante_FT')
+    c_gv_ft = get_col('Gols_Visitante_FT', 'Gols_Visitante_FT')
+
+    # Filtros
     c1, c2 = st.columns(2)
-    pais = c1.selectbox("País", sorted(df['pais'].unique()))
-    liga = c2.selectbox("Liga", sorted(df[df['pais'] == pais]['divisao'].unique()))
+    liga = c1.selectbox("Selecione a Liga", sorted(df[c_liga].unique()))
+    df_liga = df[df[c_liga] == liga].copy()
     
-    times = sorted(df[df['divisao'] == liga]['mandante'].unique())
-    c3, c4 = st.columns(2)
-    m_sel = c3.selectbox("Mandante (Casa)", times)
-    v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
+    times = sorted(df_liga[c_mand].unique())
+    time_m = c1.selectbox("Mandante", times)
+    time_v = c2.selectbox("Visitante", [t for t in times if t != time_m])
 
-    # Filtros específicos: Mandante jogando em CASA e Visitante jogando FORA
-    df_m = df[(df['mandante'] == m_sel) & (df['divisao'] == liga)]
-    df_v = df[(df['visitante'] == v_sel) & (df['divisao'] == liga)]
+    # Bases de dados (últimos 10 jogos)
+    df_m = df_liga[df_liga[c_mand] == time_m].tail(10)
+    df_v = df_liga[df_liga[c_visi] == time_v].tail(10)
 
-    st.subheader("📊 Médias Detalhadas (Alto Contraste)")
+    st.divider()
 
-    # Função corrigida para bater com as colunas do seu CSV
-    def calcular_medias(data, is_home):
-        # Mapeamento exato das colunas do seu arquivo
-        if is_home:
-            return {
-                "Gols FT": data['gols_mandante_ft'].mean(),
-                "Gols HT": data['gols_mandante_ht'].mean(),
-                "Cantos": data['mandante_cantos'].mean(),
-                "Finalizações": data['mandante_finalizacoes'].mean(),
-                "Chutes ao Gol": data['mandante_chute_ao_gol'].mean(),
-                "Cartões Amarelos": data['mandante_cartao_amarelo'].mean()
-            }
-        else:
-            return {
-                "Gols FT": data['gols_visitante_ft'].mean(),
-                "Gols HT": data['gols_visitante_ht'].mean(),
-                "Cantos": data['visitante_cantos'].mean(),
-                "Finalizações": data['visitante_finalizacoes'].mean(),
-                "Chutes ao Gol": data['visitante_chute_ao_gol'].mean(),
-                "Cartões Amarelos": data['visitante_cartao_amarelo'].mean()
-            }
+    # Gráficos de Faixa de Minutos
+    st.subheader("⏰ Gols por Faixa de Minutos (%)")
+    faixas = ["0-15", "16-30", "31-45", "46-60", "61-75", "76-90"]
+    
+    # Exemplo para Mandante (ajuste os nomes das colunas de faixa conforme seu CSV)
+    cols_m = [get_col(f"{f}_Mandante", f"{f}_Mandante") for f in faixas]
+    cols_v = [get_col(f"{f}_Visitante", f"{f}_Visitante") for f in faixas]
 
-    try:
-        stats_m = calcular_medias(df_m, True)
-        stats_v = calcular_medias(df_v, False)
-        
-        # Tabela de Comparação
-        df_final = pd.DataFrame({
-            f"{m_sel} (Em Casa)": stats_m, 
-            f"{v_sel} (Fora)": stats_v
-        })
-        
-        # Exibição com estilo de alta visibilidade
-        st.table(df_final.style.format(precision=2))
+    c_g1, c_g2 = st.columns(2)
+    with c_g1:
+        st.write(f"**{time_m} (Casa)**")
+        if all(col in df.columns for col in cols_m):
+            val_m = df_m[cols_m].mean() * 100
+            fig_m = px.bar(x=faixas, y=val_m, labels={'x':'Minutos', 'y':'%'}, color_discrete_sequence=['#0088ff'])
+            st.plotly_chart(fig_m, use_container_width=True)
 
-        # 📈 FORMA ÚLTIMOS 5 JOGOS
-        st.divider()
-        st.subheader("📈 Forma Recente (Últimos 5 Jogos)")
-        col_f1, col_f2 = st.columns(2)
-        
-        with col_f1:
-            st.write(f"**{m_sel}** - Desempenho em Casa")
-            # Pega os 5 jogos mais recentes do mandante em casa
-            ultimos_casa = df_m.sort_values('data', ascending=False).head(5)
-            if not ultimos_casa.empty:
-                for _, r in ultimos_casa.iterrows():
-                    res = "✅" if r['gols_mandante_ft'] > r['gols_visitante_ft'] else ("🟧" if r['gols_mandante_ft'] == r['gols_visitante_ft'] else "❌")
-                    st.write(f"{res} {r['data'].strftime('%d/%m')} vs {r['visitante']} ({int(r['gols_mandante_ft'])} - {int(r['gols_visitante_ft'])})")
-            else: st.info("Sem histórico em casa.")
+    with c_g2:
+        st.write(f"**{time_v} (Fora)**")
+        if all(col in df.columns for col in cols_v):
+            val_v = df_v[cols_v].mean() * 100
+            fig_v = px.bar(x=faixas, y=val_v, labels={'x':'Minutos', 'y':'%'}, color_discrete_sequence=['#ff4444'])
+            st.plotly_chart(fig_v, use_container_width=True)
 
-        with col_f2:
-            st.write(f"**{v_sel}** - Desempenho Fora")
-            # Pega os 5 jogos mais recentes do visitante fora
-            ultimos_fora = df_v.sort_values('data', ascending=False).head(5)
-            if not ultimos_fora.empty:
-                for _, r in ultimos_fora.iterrows():
-                    res = "✅" if r['gols_visitante_ft'] > r['gols_mandante_ft'] else ("🟧" if r['gols_visitante_ft'] == r['gols_mandante_ft'] else "❌")
-                    st.write(f"{res} {r['data'].strftime('%d/%m')} @ {r['mandante']} ({int(r['gols_mandante_ft'])} - {int(r['gols_visitante_ft'])})")
-            else: st.info("Sem histórico fora.")
-
-    except Exception as e:
-        st.error(f"Erro ao processar médias: {e}")
-        st.info("Verifique se o CSV contém as colunas de gols, cantos e chutes.")
+    # Confronto Direto (H2H)
+    st.subheader("⚔️ Confronto Direto (H2H)")
+    h2h = df[((df[c_mand] == time_m) & (df[c_visi] == time_v)) | 
+             ((df[c_mand] == time_v) & (df[c_visi] == time_m))].tail(5)
+    
+    if not h2h.empty:
+        for _, row in h2h.iterrows():
+            st.write(f"📅 {row[c_data]} | {row[c_mand]} {int(row[c_gm_ft])} x {int(row[c_gv_ft])} {row[c_visi]}")
+    else:
+        st.info("Nenhum confronto direto recente encontrado.")
