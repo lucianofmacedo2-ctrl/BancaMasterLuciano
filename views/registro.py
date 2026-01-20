@@ -1,30 +1,39 @@
 import streamlit as st
-from database import salvar_aposta
-from datetime import datetime
+import pandas as pd
+from database import carregar_apostas
 
-def mostrar_registro(df_base):
-    st.title("📝 Registrar Entrada")
+def mostrar_historico():
+    st.title("📂 Gestão e Histórico")
+    df = carregar_apostas()
     
-    with st.form("form_registro"):
-        c1, c2 = st.columns(2)
-        liga = c1.selectbox("Liga", df_base['Liga'].unique())
-        times = df_base[df_base['Liga'] == liga]['Mandande'].unique()
-        
-        m = c1.selectbox("Mandante", times)
-        v = c2.selectbox("Visitante", [t for t in times if t != m])
-        
-        mercado = c1.selectbox("Mercado", ["Gols", "Cantos", "Vencedor"])
-        linha = c2.text_input("Linha / Seleção")
-        
-        odd = c1.number_input("Odd", min_value=1.01, value=1.90)
-        stake = c2.number_input("Stake (R$)", min_value=1.0, value=10.0)
-        
-        if st.form_submit_button("Registrar Aposta"):
-            nova = {
-                'data': datetime.now().strftime("%d/%m/%Y"),
-                'mandante': m, 'visitante': v, 'mercado': mercado,
-                'linha': linha, 'odd': odd, 'stake': stake,
-                'resultado': 'Aberto', 'lucro_prejuizo': 0.0
-            }
-            salvar_aposta(nova)
-            st.success("Aposta registrada!")
+    if df.empty:
+        st.info("Nenhuma aposta registrada.")
+        return
+
+    tab1, tab2 = st.tabs(["⏳ Pendentes", "📅 Todas as Entradas"])
+
+    with tab1:
+        df_ab = df[df['resultado'] == "Aberto"].copy()
+        for idx, row in df_ab.iterrows():
+            with st.expander(f"⚽ {row['mandante']} x {row['visitante']}"):
+                res = st.selectbox("Resultado", ["Aberto", "Green", "Red", "Half Green", "Half Red", "Void"], key=idx)
+                if st.button("Salvar Resultado", key=f"btn_{idx}"):
+                    s, o = float(row['stake']), float(row['odd'])
+                    if res == "Green": lucro = s * (o - 1)
+                    elif res == "Red": lucro = -s
+                    elif res == "Half Green": lucro = (s * (o - 1)) / 2
+                    elif res == "Half Red": lucro = -s / 2
+                    else: lucro = 0
+                    
+                    df.at[idx, 'resultado'] = res
+                    df.at[idx, 'lucro_prejuizo'] = lucro
+                    df.to_csv('apostas_registradas.csv', index=False)
+                    st.rerun()
+
+    with tab2:
+        def color_res(val):
+            color = '#2ecc71' if 'Green' in str(val) else ('#e74c3c' if 'Red' in str(val) else 'white')
+            return f'color: {color}; font-weight: bold'
+
+        st.dataframe(df.sort_index(ascending=False).style.applymap(color_res, subset=['resultado']).format(precision=2), use_container_width=True)
+        st.metric("Lucro Acumulado", f"R$ {df['lucro_prejuizo'].sum():.2f}")
