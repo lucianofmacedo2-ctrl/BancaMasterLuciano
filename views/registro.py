@@ -1,34 +1,30 @@
 import streamlit as st
-from database import supabase, carregar_bancas, calcular_lucro_real
+from database import salvar_aposta
 from datetime import datetime
 
-def mostrar_registro(df_csv):
-    st.title("📝 Nova Entrada")
-    df_b = carregar_bancas()
+def mostrar_registro(df_base):
+    st.title("📝 Registrar Entrada")
     
-    if df_b.empty:
-        st.warning("Crie uma banca primeiro.")
-        return
-
-    with st.form("form_aposta"):
-        banca = st.selectbox("Selecione a Banca", df_b['nome'])
+    with st.form("form_registro"):
         c1, c2 = st.columns(2)
-        mandante = c1.text_input("Mandante")
-        visitante = c2.text_input("Visitante")
+        liga = c1.selectbox("Liga", df_base['Liga'].unique())
+        times = df_base[df_base['Liga'] == liga]['Mandande'].unique()
         
-        c3, c4, c5 = st.columns(3)
-        mercado = c3.text_input("Mercado")
-        odd = c4.number_input("Odd", 1.01, value=1.90)
-        stake = c5.number_input("Stake", 1.0, value=50.0)
+        m = c1.selectbox("Mandante", times)
+        v = c2.selectbox("Visitante", [t for t in times if t != m])
         
-        res_ini = st.selectbox("Resultado", ["Pendente", "Green", "Red", "Meio Green", "Meio Red"])
+        mercado = c1.selectbox("Mercado", ["Gols", "Cantos", "Vencedor"])
+        linha = c2.text_input("Linha / Seleção")
         
-        if st.form_submit_button("SALVAR APOSTA"):
-            b_id = int(df_b[df_b['nome'] == banca]['id'].iloc[0])
-            lucro = calcular_lucro_real(res_ini, odd, stake)
-            supabase.table("apostas").insert({
-                "banca_id": b_id, "mandante": mandante, "visitante": visitante,
-                "mercado": mercado, "odd": odd, "stake": stake, 
-                "resultado": res_ini, "lucro": lucro, "data": str(datetime.now().date())
-            }).execute()
+        odd = c1.number_input("Odd", min_value=1.01, value=1.90)
+        stake = c2.number_input("Stake (R$)", min_value=1.0, value=10.0)
+        
+        if st.form_submit_button("Registrar Aposta"):
+            nova = {
+                'data': datetime.now().strftime("%d/%m/%Y"),
+                'mandante': m, 'visitante': v, 'mercado': mercado,
+                'linha': linha, 'odd': odd, 'stake': stake,
+                'resultado': 'Aberto', 'lucro_prejuizo': 0.0
+            }
+            salvar_aposta(nova)
             st.success("Aposta registrada!")
