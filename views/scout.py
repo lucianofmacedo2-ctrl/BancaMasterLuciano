@@ -6,6 +6,10 @@ import numpy as np
 
 def calcular_tabela_classificacao(df_liga):
     """Gera a tabela de classificação baseada nos resultados do CSV"""
+    # Normalização preventiva dentro da função
+    if 'Mandante' in df_liga.columns:
+        df_liga = df_liga.rename(columns={'Mandante': 'Mandande'})
+        
     stats = {}
     for _, row in df_liga.iterrows():
         m, v = row['Mandande'], row['Visitante']
@@ -49,7 +53,9 @@ def calcular_stats_completas(serie):
 def calcular_wdl(df_games, time_nome):
     v, e, d = 0, 0, 0
     for _, row in df_games.iterrows():
-        sou_m = row['Mandande'] == time_nome
+        # Verifica se a coluna está como Mandante ou Mandande
+        col_m = 'Mandande' if 'Mandande' in row else 'Mandante'
+        sou_m = row[col_m] == time_nome
         meus = row['Gols_Mandante_FT'] if sou_m else row['Gols_Visitante_FT']
         adv = row['Gols_Visitante_FT'] if sou_m else row['Gols_Mandante_FT']
         if meus > adv: v += 1
@@ -99,7 +105,11 @@ def calcular_probabilidades_mercado(df):
 def mostrar_scout(df):
     st.markdown("""<style>.stDataFrame div[data-testid="stTable"] { text-align: center; } [data-testid="stMetricValue"] { text-align: center; }</style>""", unsafe_allow_html=True)
     st.title("🚀 Scout Profissional & Inteligência de Mercado")
+    
+    # Normalização Global das colunas
     df.columns = [c.strip() for c in df.columns]
+    if 'Mandante' in df.columns:
+        df = df.rename(columns={'Mandante': 'Mandande'})
 
     # --- FILTROS ---
     c1, c2 = st.columns(2)
@@ -110,7 +120,7 @@ def mostrar_scout(df):
     df_season = df_liga[df_liga['Temporada'] == temp_sel].copy()
     df_season['Data'] = pd.to_datetime(df_season['Data'], dayfirst=True, errors='coerce')
 
-    # --- NOVO: POSIÇÃO NA CLASSIFICAÇÃO ---
+    # --- CÁLCULO DA TABELA ---
     st.divider()
     tabela_ranking = calcular_tabela_classificacao(df_season)
     tab_casa = tabela_ranking[['Time', 'P_Casa', 'J_Casa']].sort_values(by='P_Casa', ascending=False).reset_index(drop=True)
