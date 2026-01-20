@@ -45,15 +45,13 @@ def mostrar_registro(df_csv):
             if st.button("Adicionar Mercado"):
                 if salvar_auxiliar('Mercado', novo_m): st.rerun()
             
-            # Opção de excluir mercado
             df_m = carregar_auxiliares()
             lista_m = df_m[df_m['Tipo'] == 'Mercado']['Nome'].tolist()
             if lista_m:
                 m_excluir = st.selectbox("Excluir Mercado", ["Selecione..."] + lista_m, key="del_m")
-                if m_excluir != "Selecione...":
-                    if st.button("❌ Remover Mercado"):
-                        excluir_auxiliar('Mercado', m_excluir)
-                        st.rerun()
+                if m_excluir != "Selecione..." and st.button("❌ Remover Mercado"):
+                    excluir_auxiliar('Mercado', m_excluir)
+                    st.rerun()
 
         with c_aux2:
             st.markdown("**Métodos**")
@@ -61,15 +59,13 @@ def mostrar_registro(df_csv):
             if st.button("Adicionar Método"):
                 if salvar_auxiliar('Metodo', novo_met): st.rerun()
                 
-            # Opção de excluir método
             df_met = carregar_auxiliares()
             lista_met = df_met[df_met['Tipo'] == 'Metodo']['Nome'].tolist()
             if lista_met:
                 met_excluir = st.selectbox("Excluir Método", ["Selecione..."] + lista_met, key="del_met")
-                if met_excluir != "Selecione...":
-                    if st.button("❌ Remover Método"):
-                        excluir_auxiliar('Metodo', met_excluir)
-                        st.rerun()
+                if met_excluir != "Selecione..." and st.button("❌ Remover Método"):
+                    excluir_auxiliar('Metodo', met_excluir)
+                    st.rerun()
 
     st.divider()
 
@@ -92,21 +88,23 @@ def mostrar_registro(df_csv):
     # --- FORMULÁRIO DE REGISTRO ---
     st.subheader("📋 Detalhes da Aposta")
     with st.form("form_final_aposta", clear_on_submit=True):
-        f1, f2, f3 = st.columns(3)
+        f1, f2, f3, f4 = st.columns(4) # Aumentei para 4 colunas
         
         with f1:
             data_aposta = st.date_input("Data", datetime.now())
             banca_sel = st.selectbox("Banca", df_bancas["Nome da Banca"].tolist())
-            linha = st.text_input("Linha (Ex: -1.0, +0.5)")
 
         with f2:
             mercados_finais = sorted(df_aux[df_aux['Tipo'] == 'Mercado']['Nome'].tolist())
-            metodos_finais = sorted(df_aux[df_aux['Tipo'] == 'Metodo']['Nome'].tolist())
-            
-            mercado_reg = st.selectbox("Mercado", mercados_finais if mercados_finais else ["Cadastre um mercado acima"])
-            metodo_reg = st.selectbox("Método", metodos_finais if metodos_finais else ["Cadastre um método acima"])
+            mercado_reg = st.selectbox("Mercado", mercados_finais if mercados_finais else ["Vazio"])
+            linha = st.text_input("Linha (Ex: -1.0, +0.5)")
             
         with f3:
+            metodos_finais = sorted(df_aux[df_aux['Tipo'] == 'Metodo']['Nome'].tolist())
+            metodo_reg = st.selectbox("Método", metodos_finais if metodos_finais else ["Vazio"])
+            status_reg = st.selectbox("Status", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
+            
+        with f4:
             stake = st.number_input("Stake (R$)", min_value=0.0, step=10.0)
             odd = st.number_input("Odd", min_value=1.01, step=0.05)
             
@@ -116,8 +114,21 @@ def mostrar_registro(df_csv):
 
         if btn_final:
             if not mercados_finais or not metodos_finais or stake <= 0:
-                st.error("Certifique-se de ter cadastrado Mercado/Método e inserido a Stake.")
+                st.error("Erro: Verifique se cadastrou Mercado/Método e se a Stake é maior que zero.")
             else:
+                # Cálculo automático do resultado financeiro baseado no status
+                resultado_fin = 0.0
+                if status_reg == "Green":
+                    resultado_fin = stake * (odd - 1)
+                elif status_reg == "Meio Green":
+                    resultado_fin = (stake * (odd - 1)) / 2
+                elif status_reg == "Red":
+                    resultado_fin = -stake
+                elif status_reg == "Meio Red":
+                    resultado_fin = -stake / 2
+                elif status_reg == "Devolvida" or status_reg == "Aberta":
+                    resultado_fin = 0.0
+
                 nova_aposta = {
                     "Data": data_aposta.strftime('%Y-%m-%d'),
                     "Banca": banca_sel,
@@ -128,9 +139,9 @@ def mostrar_registro(df_csv):
                     "Metodo": metodo_reg,
                     "Stake": stake,
                     "Odd": odd,
-                    "Obs": obs,
-                    "Status": "Pendente",
-                    "Resultado": 0.0
+                    "Status": status_reg,
+                    "Resultado": resultado_fin,
+                    "Obs": obs
                 }
                 
                 # Salvar Apostas
@@ -139,5 +150,5 @@ def mostrar_registro(df_csv):
                 df_apostas = pd.concat([df_apostas, pd.DataFrame([nova_aposta])], ignore_index=True)
                 df_apostas.to_csv(PATH_APOSTAS, index=False)
                 
-                st.success(f"Aposta salva com sucesso!")
+                st.success(f"Aposta registrada como {status_reg}!")
                 st.rerun()
