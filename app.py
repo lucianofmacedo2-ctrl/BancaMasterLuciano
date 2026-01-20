@@ -3,24 +3,25 @@ import pandas as pd
 from views import scout, registro, historico, dashboard, bancas
 import styles
 
-st.set_page_config(page_title="Banca Master Luciano", layout="wide", page_icon="⚽")
+st.set_page_config(page_title="Master Luciano - Banca", layout="wide", page_icon="⚽")
 
-# Aplica o CSS customizado
+# Aplica o visual profissional
 styles.apply_styles()
 
 def carregar_dados():
     try:
         df = pd.read_csv('dados_25_26.csv')
-        df.columns = [c.strip() for c in df.columns] # Remove espaços extras
+        df.columns = [c.strip() for c in df.columns] # Remove espaços extras das colunas
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar o arquivo CSV: {e}")
+        st.error(f"Erro ao carregar o arquivo: {e}")
         return pd.DataFrame()
 
 df_csv = carregar_dados()
 
 st.sidebar.title("🏆 Master Luciano")
-banca_inicial = st.sidebar.number_input("Banca Inicial (R$)", value=1000.0)
+# Recupera a banca configurada
+banca_inicial = st.sidebar.number_input("Banca Inicial (R$)", value=1000.0, step=50.0)
 
 menu = st.sidebar.radio("Navegação", ["📊 Dashboard", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"])
 
