@@ -19,18 +19,12 @@ def carregar_tudo():
         return pd.DataFrame(), pd.DataFrame()
 
 def mostrar_dashboard():
-    # --- CSS PARA ESCURECER AS MÉTRICAS ---
+    # --- CSS PARA CORES ESCURAS ---
     st.markdown("""
         <style>
-            /* Altera a cor do valor da métrica para um azul escuro/marinho */
-            [data-testid="stMetricValue"] {
-                color: #003366 !important;
-                font-weight: bold;
-            }
-            /* Altera o rótulo da métrica para cinza escuro */
-            [data-testid="stMetricLabel"] {
-                color: #333333 !important;
-            }
+            [data-testid="stMetricValue"] { color: #002b5c !important; font-weight: bold; font-size: 28px; }
+            [data-testid="stMetricLabel"] { color: #1a1a1a !important; font-weight: 500; }
+            .stSubheader { color: #002b5c !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -41,13 +35,15 @@ def mostrar_dashboard():
         st.warning("Cadastre uma banca para ver os gráficos.")
         return
 
+    if not df_ap.empty:
+        df_ap['data'] = pd.to_datetime(df_ap['data']).dt.tz_localize(None) # Remove timezone para evitar conflitos
+    
     # --- FILTROS ---
     c_f1, c_f2 = st.columns(2)
     with c_f1:
         banca_sel = st.selectbox("Filtrar por Banca", ["Todas"] + df_ba["nome"].tolist())
     
     if not df_ap.empty:
-        df_ap['data'] = pd.to_datetime(df_ap['data'])
         meses_disponiveis = df_ap['data'].dt.strftime('%m/%Y').unique().tolist()
         meses_disponiveis.sort(reverse=True)
     else:
@@ -67,65 +63,80 @@ def mostrar_dashboard():
     if mes_sel != "Todos":
         df_f = df_f[df_f['data'].dt.strftime('%m/%Y') == mes_sel]
 
+    # --- NOVA LÓGICA DE TEMPO ATIVO ---
+    hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    if not df_f.empty:
+        # Pega a data da primeira aposta feita no período filtrado
+        data_inicio_operacoes = df_f['data'].min().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        if mes_sel != "Todos":
+            m_idx, a_idx = map(int, mes_sel.split('/'))
+            # Se for o mês atual, conta do início das operações até hoje
+            if hoje.month == m_idx and hoje.year == a_idx:
+                dias_passados = (hoje - data_inicio_operacoes).days + 1
+                ultimo_dia_mes = calendar.monthrange(a_idx, m_idx)[1]
+                # Dias restantes até o fim do mês civil
+                data_fim_mes = datetime(a_idx, m_idx, ultimo_dia_mes)
+                dias_restantes = (data_fim_mes - hoje).days
+            else:
+                # Se for um mês passado, conta da primeira aposta até o fim daquele mês
+                ultimo_dia_mes = calendar.monthrange(a_idx, m_idx)[1]
+                data_fim_mes = datetime(a_idx, m_idx, ultimo_dia_mes)
+                dias_passados = (data_fim_mes - data_inicio_operacoes).days + 1
+                dias_restantes = 0
+        else:
+            dias_passados = (df_f['data'].max() - data_inicio_operacoes).days + 1
+            dias_restantes = 0
+    else:
+        dias_passados = 1
+        dias_restantes = 0
+
     # --- CÁLCULOS ---
     total_apostas = len(df_f)
     lucro_total = df_f['lucro'].sum() if not df_f.empty else 0
     greens = df_f[df_f['status'].str.contains('Green', na=False)]
-    win_rate = (len(greens) / total_apostas) if total_apostas > 0 else 0
+    win_rate = (len(greens) / total_apostas * 100) if total_apostas > 0 else 0
     odd_media_greens = greens['odd'].mean() if not greens.empty else 0
     
-    # Média de Apostas por Dia
-    if mes_sel != "Todos":
-        m_idx, a_idx = map(int, mes_sel.split('/'))
-        hoje = date.today()
-        if hoje.month == m_idx and hoje.year == a_idx:
-            dias_corridos = hoje.day
-        else:
-            dias_corridos = calendar.monthrange(a_idx, m_idx)[1]
-    else:
-        dias_corridos = (df_f['data'].max() - df_f['data'].min()).days + 1 if not df_f.empty else 1
-    
-    apostas_por_dia = total_apostas / dias_corridos if dias_corridos > 0 else 0
+    # Média de Apostas por Dia Ativo (ex: 16 apostas / 3 dias)
+    apostas_por_dia = total_apostas / dias_passados if dias_passados > 0 else 0
 
-    # --- MÉTRICAS LINHA 1 ---
+    # --- MÉTRICAS ---
     c1, c2, c3 = st.columns(3)
     c1.metric("Saldo Atualizado", f"R$ {s_ini + lucro_total:.2f}")
     c2.metric("Lucro Líquido", f"R$ {lucro_total:.2f}")
-    c3.metric("Win Rate", f"{win_rate*100:.1f}%")
+    c3.metric("Win Rate", f"{win_rate:.1f}%")
 
-    # --- MÉTRICAS LINHA 2 ---
-    st.write("")
+    st.write("") 
     c4, c5, c6 = st.columns(3)
     c4.metric("Qtd Apostas", f"{total_apostas}")
     c5.metric("Média Apostas/Dia", f"{apostas_por_dia:.1f}")
     c6.metric("Odd Média (Greens)", f"{odd_media_greens:.2f}")
 
-    # --- PROJEÇÃO MATEMÁTICA ---
-    st.divider()
-    if mes_sel != "Todos" and not df_f.empty:
-        ultimo_dia = calendar.monthrange(a_idx, m_idx)[1]
-        dias_restantes = ultimo_dia - dias_corridos
+    # --- PROJEÇÃO FINAL ---
+    if mes_sel != "Todos" and dias_restantes > 0 and not df_f.empty:
+        st.divider()
+        st.subheader(f"🔮 Projeção Baseada no Ritmo Atual ({dias_passados} dias ativos)")
         
-        # Valor médio de cada aposta (stake média)
-        stake_media = df_f['valor_aposta'].mean() if 'valor_aposta' in df_f.columns else 0
+        lucro_diario = lucro_total / dias_passados
+        lucro_projetado_adicional = lucro_diario * dias_restantes
+        banca_final_projetada = (s_ini + lucro_total) + lucro_projetado_adicional
         
-        # Projeção baseada em: Volume Diário * Dias Restantes * Probabilidade de Green * (Odd-1)
-        # Simplificando pelo lucro médio real atual:
-        lucro_diario_real = lucro_total / dias_corridos
-        projecao_final = (s_ini + lucro_total) + (lucro_diario_real * dias_restantes)
-        
-        st.subheader(f"🔮 Projeção para o fim de {mes_sel}")
-        cp1, cp2 = st.columns(2)
-        cp1.metric("Banca Final Estimada", f"R$ {projecao_final:.2f}")
-        cp2.metric("Lucro Adicional Estimado", f"R$ {lucro_diario_real * dias_restantes:.2f}")
-    
+        pj1, pj2, pj3 = st.columns(3)
+        pj1.metric("Banca Final Esperada", f"R$ {banca_final_projetada:.2f}")
+        pj2.metric("Lucro Extra Estimado", f"R$ {lucro_projetado_adicional:.2f}")
+        pj3.metric("Entradas Estimadas", f"{int(apostas_por_dia * dias_restantes)} apostas")
+        st.caption(f"A projeção assume que manterá a média de {apostas_por_dia:.1f} apostas/dia até o dia {ultimo_dia_mes}.")
+
     # --- GRÁFICOS ---
     if not df_f.empty:
+        st.divider()
         df_ev = df_f.sort_values('data')
         df_ev['Evolução'] = s_ini + df_ev['lucro'].cumsum()
-        st.plotly_chart(px.line(df_ev, x='data', y='Evolução', title="Curva de Patrimônio"), use_container_width=True)
+        st.plotly_chart(px.line(df_ev, x='data', y='Evolução', title="Curva de Património"), use_container_width=True)
 
         df_met = df_f.groupby('metodo')['lucro'].sum().reset_index()
         st.plotly_chart(px.bar(df_met, x='metodo', y='lucro', color='lucro', title="Lucro por Método", color_continuous_scale="RdYlGn"), use_container_width=True)
     else:
-        st.info("Aguardando registros para gerar os gráficos.")
+        st.info("Sem dados para o período selecionado.")
