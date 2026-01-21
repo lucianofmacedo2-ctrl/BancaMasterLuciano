@@ -85,14 +85,15 @@ def mostrar_scout(df):
     temp_sel = c2.selectbox("Temporada", sorted(df_liga['Temporada'].unique(), reverse=True))
     
     df_season = df_liga[df_liga['Temporada'] == temp_sel].copy()
+    df_season['Data'] = pd.to_datetime(df_season['Data'], dayfirst=True, errors='coerce')
     times = sorted(df_season['Mandande'].unique())
     
     c3, c4 = st.columns(2)
     m_sel = c3.selectbox("Mandante (Casa)", times)
     v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
 
-    df_m_home = df_season[df_season['Mandande'] == m_sel].tail(10)
-    df_v_away = df_season[df_season['Visitante'] == v_sel].tail(10)
+    df_m_home = df_season[df_season['Mandande'] == m_sel].sort_values('Data', ascending=False).head(10)
+    df_v_away = df_season[df_season['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
     # 1. MÉDIAS (BARRAS)
     st.divider()
@@ -122,7 +123,29 @@ def mostrar_scout(df):
                     f"🎯 Chutes / Gol: {(ch.sum()/gf.sum() if gf.sum()>0 else 0):.2f}")
 
     # 3. TABS
-    t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
+    t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
+
+    with t1:
+        cf1, cf2 = st.columns(2)
+        with cf1:
+            st.markdown(f"**{m_sel} (Casa)**")
+            for _, r in df_m_home.iterrows():
+                res = "✅" if r['Gols_Mandante_FT'] > r['Gols_Visitante_FT'] else ("🟧" if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT'] else "❌")
+                dt = r['Data'].strftime('%d/%m/%y') if pd.notnull(r['Data']) else "N/D"
+                st.write(f"{res} {dt} vs {r['Visitante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
+        with cf2:
+            st.markdown(f"**{v_sel} (Fora)**")
+            for _, r in df_v_away.iterrows():
+                res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT'] else "❌")
+                dt = r['Data'].strftime('%d/%m/%y') if pd.notnull(r['Data']) else "N/D"
+                st.write(f"{res} {dt} vs {r['Mandande']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
+
+    with t2:
+        h2h = df_liga[((df_liga['Mandande'] == m_sel) & (df_liga['Visitante'] == v_sel)) | ((df_liga['Mandande'] == v_sel) & (df_liga['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
+        if not h2h.empty:
+            st.dataframe(h2h[['Data', 'Mandande', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True)
+        else:
+            st.info("Nenhum confronto direto encontrado nesta liga/temporada.")
 
     with t3:
         mapa = {
