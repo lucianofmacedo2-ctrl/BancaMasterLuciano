@@ -148,7 +148,7 @@ def mostrar_scout(df):
         with cf2:
             st.markdown(f"**{v_sel} (Fora)**")
             for _, r in df_v_away.iterrows():
-                res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT'] else "❌")
+                res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Visitante_FT'] == r['Gols_Visitante_FT'] else "❌")
                 dt = r['Data'].strftime('%d/%m/%y') if pd.notnull(r['Data']) else "N/D"
                 st.write(f"{res} {dt} vs {r['Mandande']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
 
@@ -160,6 +160,22 @@ def mostrar_scout(df):
             st.info("Nenhum confronto direto histórico encontrado.")
 
     with t3:
+        # --- INCLUSÃO DO TEXTO EXPLICATIVO ---
+        with st.expander("💡 Entenda como analisar estas métricas (Média, DP e CV%)", expanded=False):
+            st.markdown("""
+            Para uma análise profissional de apostas, não olhamos apenas a média. Entenda o porquê:
+            
+            1. **Média:** Indica a tendência central (ex: quantos gols o time faz por jogo).
+            2. **DP (Desvio Padrão):** Indica a variação. 
+               - *Exemplo:* Se a média é 2.00 e o DP é 0.50, o time é muito regular. Se o DP for 2.50, o time oscila muito (pode fazer 5 gols num jogo e 0 em outros quatro).
+            3. **CV% (Coeficiente de Variação):** É a porcentagem de risco/oscilação.
+               - **Abaixo de 25%:** Time muito constante. Excelente para previsões.
+               - **Entre 25% e 50%:** Oscilação moderada.
+               - **Acima de 50%:** Alta imprevisibilidade. A média não é confiável para este mercado.
+            
+            **Dica Pro:** Procure mercados onde o **CV% seja baixo**. Isso indica que o padrão do time se repete com frequência!
+            """)
+        
         mapa = {
             "Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"),
             "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"),
