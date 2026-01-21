@@ -1,85 +1,60 @@
-import streamlit as st
 import requests
+from bs4 import BeautifulSoup
 import pandas as pd
-from datetime import datetime, timedelta
 
-# --- CONFIGURAÇÃO DA API ---
-API_KEY = "4059988260c0d57f4f27fed78f7aead1"
-HEADERS = {
-    'x-rapidapi-host': "v3.football.api-sports.io",
-    'x-rapidapi-key': API_KEY
-}
+def raspar_jogos_ogol(url):
+    # Definimos um 'User-Agent' para o site não bloquear a requisição imediatamente
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    }
 
-@st.cache_data(ttl=3600)
-def buscar_jogos_do_dia(data_str):
-    url = "https://v3.football.api-sports.io/fixtures"
-    params = {"date": data_str}
     try:
-        response = requests.get(url, headers=HEADERS, params=params)
-        return response.json().get('response', [])
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            print(f"Erro ao aceder ao site: {response.status_code}")
+            return []
+
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # O oGol costuma organizar os jogos em tabelas ou divs com a classe 'zzstats'
+        # Esta parte precisa ser ajustada conforme a estrutura exata do HTML no momento
+        jogos = []
+        
+        # Procuramos as linhas da tabela de jogos (ajuste os seletores se necessário)
+        tabela = soup.find('table', class_='zztable')
+        if not tabela:
+            print("Não foi possível encontrar a tabela de jogos.")
+            return []
+
+        for linha in tabela.find_all('tr')[1:]: # Pula o cabeçalho
+            colunas = linha.find_all('td')
+            if len(colunas) >= 4:
+                hora = colunas[0].get_text(strip=True)
+                competicao = colunas[1].get_text(strip=True)
+                # O oGol muitas vezes coloca os times em links ou spans
+                time_casa = colunas[2].get_text(strip=True)
+                time_fora = colunas[4].get_text(strip=True) # Geralmente o 5º elemento
+
+                jogos.append({
+                    "Hora": hora,
+                    "Competição": competicao,
+                    "Mandante": time_casa,
+                    "Visitante": time_fora
+                })
+        
+        return jogos
+
     except Exception as e:
-        st.error(f"Erro na API: {e}")
+        print(f"Ocorreu um erro: {e}")
         return []
 
-def mostrar_jogos():
-    st.title("📅 Agenda de Jogos")
-    
-    # --- ATALHOS DE DATA ---
-    st.markdown("### Selecione o Período")
-    c_data1, c_data2, c_data3, c_data4 = st.columns(4)
-    
-    # Criamos botões que definem a data no session_state
-    if "data_consulta" not in st.session_state:
-        st.session_state.data_consulta = datetime.now()
+# URL que você forneceu
+url_ogol = "https://www.ogol.com.br/futebol/proximos-jogos?jogo_data_year=2026&jogo_data_month=1&jogo_data_day=22"
+lista_jogos = raspar_jogos_ogol(url_ogol)
 
-    if c_data1.button("📅 Hoje"):
-        st.session_state.data_consulta = datetime.now()
-    if c_data2.button("⏩ Amanhã"):
-        st.session_state.data_consulta = datetime.now() + timedelta(days=1)
-    if c_data3.button("⏭️ Depois"):
-        st.session_state.data_consulta = datetime.now() + timedelta(days=2)
-    with c_data4:
-        # Calendário manual para qualquer data
-        st.session_state.data_consulta = st.date_input("Outra data", st.session_state.data_consulta)
-
-    data_formatada = st.session_state.data_consulta.strftime('%Y-%m-%d')
-    st.info(f"Exibindo jogos de: **{st.session_state.data_consulta.strftime('%d/%m/%Y')}**")
-
-    # Botão para forçar atualização
-    if st.sidebar.button("🔄 Limpar Cache API"):
-        st.cache_data.clear()
-        st.rerun()
-
-    jogos_lista = buscar_jogos_do_dia(data_formatada)
-
-    if not jogos_lista:
-        st.warning("Nenhum jogo encontrado para esta data ou limite da API atingido.")
-        return
-
-    # Filtro de Ligas para facilitar a busca
-    ligas_disponiveis = sorted(list(set([j['league']['name'] for j in jogos_lista])))
-    ligas_finais = st.multiselect("Filtrar por Ligas específicas", ligas_disponiveis)
-
-    # Listagem
-    for j in jogos_lista:
-        liga_nome = j['league']['name']
-        if ligas_finais and liga_nome not in ligas_finais:
-            continue
-            
-        home = j['teams']['home']['name']
-        away = j['teams']['away']['name']
-        hora = datetime.fromtimestamp(j['fixture']['timestamp']).strftime('%H:%M')
-        
-        with st.container(border=True):
-            c1, c2, c3 = st.columns([1, 4, 1])
-            with c1:
-                st.write(f"**{hora}**")
-                st.caption(j['fixture']['status']['short'])
-            with c2:
-                st.markdown(f"**{home} vs {away}**")
-                st.caption(f"🏆 {liga_nome} ({j['league']['country']})")
-            with c3:
-                if st.button("📊 Scout", key=f"api_{j['fixture']['id']}"):
-                    st.session_state.time_casa_scout = home
-                    st.session_state.time_fora_scout = away
-                    st.success("Times enviados!")
+# Exibe os resultados
+if lista_jogos:
+    df = pd.DataFrame(lista_jogos)
+    print(df)
+else:
+    print("Nenhum dado capturado.")
