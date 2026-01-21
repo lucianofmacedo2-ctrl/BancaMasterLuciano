@@ -3,7 +3,8 @@ import pandas as pd
 import os
 import shutil
 from datetime import datetime
-from views import scout, registro, historico, dashboard, bancas
+# Importamos o novo módulo 'jogos' além dos outros
+from views import scout, registro, historico, dashboard, bancas, jogos
 import styles
 
 # --- FUNÇÃO DE BACKUP AUTOMÁTICO ---
@@ -51,18 +52,27 @@ df_csv = carregar_dados_csv()
 
 st.sidebar.title("🏆 Master Luciano")
 
-menu = st.sidebar.radio("Navegação", ["📊 Dashboard", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"])
+# Adicionamos "📅 Jogos" na lista de Navegação
+menu = st.sidebar.radio("Navegação", ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"])
 
 if menu == "📊 Dashboard":
     dashboard.mostrar_dashboard() 
+
+elif menu == "📅 Jogos":
+    # Chamada para o novo módulo que usa a API Football
+    jogos.mostrar_jogos()
+
 elif menu == "🔎 Scout":
     if not df_csv.empty:
         scout.mostrar_scout(df_csv)
     else:
         st.error("Arquivo 'dados_25_26.csv' não encontrado para o Scout.")
+
 elif menu == "📝 Registro":
     registro.mostrar_registro(df_csv)
+
 elif menu == "📂 Histórico":
     historico.mostrar_historico()
+
 elif menu == "🏦 Bancas":
     bancas.mostrar_bancas()
