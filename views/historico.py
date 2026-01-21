@@ -1,90 +1,103 @@
 import streamlit as st
 import pandas as pd
-import os
+from supabase import create_client
+import time
 
-PATH_APOSTAS = "data/historico_apostas.csv"
+# --- CONFIGURAÇÃO SUPABASE ---
+URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
+KEY = "sb_publishable_pM5xDBpqZzo7h5SQqiFcfQ_ixbbydIB"
+supabase = create_client(URL, KEY)
+
+def carregar_dados():
+    try:
+        # Busca todas as apostas do Supabase
+        res = supabase.table("apostas").select("*").execute()
+        df = pd.DataFrame(res.data)
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar histórico: {e}")
+        return pd.DataFrame()
 
 def mostrar_historico():
-    st.title("📂 Histórico e Atualização")
+    st.title("📜 Histórico de Apostas")
+    
+    df = carregar_dados()
 
-    if not os.path.exists(PATH_APOSTAS):
-        st.info("Nenhuma aposta registrada ainda.")
+    if df.empty:
+        st.info("Nenhuma aposta encontrada no histórico.")
         return
 
-    df = pd.read_csv(PATH_APOSTAS)
+    # --- PARTE 1: ATUALIZAÇÃO DE STATUS ---
+    st.subheader("🔄 Atualizar Resultado da Aposta")
     
-    # Se existirem apostas antigas sem ID, preenchemos com 'Antiga'
-    if "ID" not in df.columns:
-        df.insert(0, "ID", "Antiga")
+    # Criando uma descrição amigável para o selectbox usando as novas colunas
+    # mandante vs visitante | mercado
+    df['Descricao_Busca'] = (
+        df['id'].astype(str) + " | " + 
+        df['mandante'] + " x " + df['visitante'] + " | " + 
+        df['mercado']
+    )
+    
+    apostas_abertas = df[df['status'] == "Aberta"]
 
-    st.subheader("Lista Geral de Apostas")
-    st.dataframe(df, use_container_width=True)
+    if not apostas_abertas.empty:
+        with st.expander("Clique aqui para resolver apostas em aberto"):
+            escolha = st.selectbox("Selecione a aposta:", apostas_abertas['Descricao_Busca'].tolist())
+            novo_status = st.selectbox("Novo Status:", ["Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
+            
+            if st.button("Confirmar Atualização"):
+                id_aposta = int(escolha.split(" | ")[0])
+                
+                # Pegar dados da aposta para recalcular o lucro
+                aposta_info = df[df['id'] == id_aposta].iloc[0]
+                stake = aposta_info['stake']
+                odd = aposta_info['odd']
+                
+                # Cálculo do novo lucro
+                lucro_novo = 0.0
+                if novo_status == "Green": lucro_novo = stake * (odd - 1)
+                elif novo_status == "Meio Green": lucro_novo = (stake * (odd - 1)) / 2
+                elif novo_status == "Red": lucro_novo = -stake
+                elif novo_status == "Meio Red": lucro_novo = -stake / 2
+
+                try:
+                    # Atualiza no Supabase
+                    supabase.table("apostas").update({
+                        "status": novo_status,
+                        "lucro": float(lucro_novo)
+                    }).eq("id", id_aposta).execute()
+                    
+                    st.success(f"Aposta {id_aposta} atualizada para {novo_status}!")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao atualizar: {e}")
+    else:
+        st.write("✅ Todas as apostas estão resolvidas.")
 
     st.divider()
 
-    # --- SISTEMA DE ATUALIZAÇÃO ---
-    st.subheader("🔄 Atualizar Resultado da Aposta")
+    # --- PARTE 2: TABELA GERAL ---
+    st.subheader("📋 Todas as Entradas")
     
-    # Criar coluna temporária para identificar com clareza no Selectbox
-    df['Descricao_Busca'] = df['ID'].astype(str) + " | " + df['Jogo'] + " | " + df['Mercado']
+    # Selecionando e renomeando colunas para ficar bonito na tabela
+    df_exibicao = df[[
+        'data', 'banca_nome', 'liga', 'mandante', 'visitante', 
+        'mercado', 'linha', 'metodo', 'stake', 'odd', 'status', 'lucro'
+    ]].copy()
     
-    escolha = st.selectbox("Selecione qual aposta deseja atualizar:", df['Descricao_Busca'].tolist())
+    # Formatação visual
+    st.dataframe(
+        df_exibicao.sort_values(by='data', ascending=False),
+        use_container_width=True,
+        hide_index=True
+    )
 
-    if escolha:
-        # Localiza o índice da aposta
-        idx = df[df['Descricao_Busca'] == escolha].index[0]
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            # Pega o status atual para vir pré-selecionado
-            status_atual = df.at[idx, 'Status']
-            lista_status = ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"]
-            try:
-                idx_status = lista_status.index(status_atual)
-            except:
-                idx_status = 0
-                
-            novo_status = st.selectbox("Novo Status", lista_status, index=idx_status)
-        
-        with col2:
-            nova_odd = st.number_input("Odd Final", value=float(df.at[idx, 'Odd']), step=0.01)
-            
-        with col3:
-            nova_stake = st.number_input("Stake Utilizada", value=float(df.at[idx, 'Stake']), step=1.0)
-
-        if st.button("Salvar Alterações"):
-            # Recálculo Matemático Profissional
-            resultado_fin = 0.0
-            if novo_status == "Green": 
-                resultado_fin = nova_stake * (nova_odd - 1)
-            elif novo_status == "Meio Green": 
-                resultado_fin = (nova_stake * (nova_odd - 1)) / 2
-            elif novo_status == "Red": 
-                resultado_fin = -nova_stake
-            elif novo_status == "Meio Red": 
-                resultado_fin = -nova_stake / 2
-            elif novo_status == "Devolvida":
-                resultado_fin = 0.0
-            
-            # Aplica no DataFrame
-            df.at[idx, 'Status'] = novo_status
-            df.at[idx, 'Odd'] = nova_odd
-            df.at[idx, 'Stake'] = nova_stake
-            df.at[idx, 'Resultado'] = resultado_fin
-            
-            # Remove coluna auxiliar e salva
-            df_final = df.drop(columns=['Descricao_Busca'])
-            df_final.to_csv(PATH_APOSTAS, index=False)
-            
-            st.success("Aposta atualizada com sucesso!")
-            st.rerun()
-
-    # --- EXCLUSÃO ---
-    with st.expander("🗑️ Zona de Exclusão"):
-        if st.button("❌ Remover esta aposta permanentemente"):
-            df_excluir = df[df['Descricao_Busca'] != escolha]
-            df_excluir = df_excluir.drop(columns=['Descricao_Busca'])
-            df_excluir.to_csv(PATH_APOSTAS, index=False)
-            st.warning("Aposta excluída.")
+    # --- PARTE 3: EXCLUSÃO ---
+    with st.expander("🗑️ Excluir Registro"):
+        id_deletar = st.selectbox("Selecione o ID para deletar permanentemente:", df['Descricao_Busca'].tolist())
+        if st.button("Remover Aposta", type="primary"):
+            id_real = int(id_deletar.split(" | ")[0])
+            supabase.table("apostas").delete().eq("id", id_real).execute()
+            st.warning(f"Registro {id_real} removido.")
             st.rerun()
