@@ -10,81 +10,73 @@ URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
 KEY = "sb_publishable_pM5xDBpqZzo7h5SQqiFcfQ_ixbbydIB"
 supabase = create_client(URL, KEY)
 
-# --- CONFIGURAÇÃO DE CAMINHOS LOCAIS ---
+# Caminho local (mantido para backup se você quiser)
 PATH_APOSTAS = "data/historico_apostas.csv"
-PATH_AUX = "data/config_auxiliares.csv"
-PATH_BANCAS = "data/bancas_cadastradas.csv"
 
-def carregar_auxiliares():
-    if os.path.exists(PATH_AUX):
-        return pd.read_csv(PATH_AUX)
-    return pd.DataFrame(columns=["Tipo", "Nome"])
-
-def salvar_auxiliar(tipo, nome):
-    df = carregar_auxiliares()
-    nome = nome.strip()
-    if nome != "" and nome not in df[df['Tipo'] == tipo]['Nome'].values:
-        nova_linha = pd.DataFrame({"Tipo": [tipo], "Nome": [nome]})
-        df = pd.concat([df, nova_linha], ignore_index=True)
-        df.to_csv(PATH_AUX, index=False)
-        return True
-    return False
-
-def excluir_auxiliar(tipo, nome):
-    df = carregar_auxiliares()
-    df = df[~((df['Tipo'] == tipo) & (df['Nome'] == nome))]
-    df.to_csv(PATH_AUX, index=False)
+def carregar_aux(tipo):
+    try:
+        res = supabase.table("config_auxiliares").select("nome").eq("tipo", tipo).execute()
+        return sorted([item['nome'] for item in res.data])
+    except: return []
 
 def mostrar_registro(df_csv):
     st.title("📝 Registro de Aposta")
     
-    if not os.path.exists(PATH_BANCAS):
-        st.warning("⚠️ Você precisa cadastrar uma Banca primeiro na tela de Bancas!")
+    # 1. Busca bancas da nuvem
+    try:
+        res_b = supabase.table("bancas").select("nome").execute()
+        lista_bancas = [b['nome'] for b in res_b.data]
+    except: lista_bancas = []
+
+    if not lista_bancas:
+        st.warning("⚠️ Cadastre uma Banca primeiro na tela de Bancas!")
         return
 
+    # 2. Gerenciar Mercados e Métodos (IGUAL À SUA ANTIGA, MAS NA NUVEM)
     with st.expander("⚙️ Gerenciar Mercados e Métodos", expanded=False):
         c_aux1, c_aux2 = st.columns(2)
         with c_aux1:
             st.markdown("**📁 Mercados**")
             novo_m = st.text_input("Novo Mercado", key="add_m")
             if st.button("Adicionar Mercado"):
-                if salvar_auxiliar('Mercado', novo_m):
-                    st.success("Mercado adicionado!")
+                if novo_m:
+                    supabase.table("config_auxiliares").insert({"tipo": "Mercado", "nome": novo_m}).execute()
+                    st.success("Adicionado!")
                     time.sleep(0.5)
                     st.rerun()
-            lista_m = carregar_auxiliares()[carregar_auxiliares()['Tipo'] == 'Mercado']['Nome'].tolist()
+            
+            lista_m = carregar_aux("Mercado")
             if lista_m:
-                m_excluir = st.selectbox("Excluir Mercado", ["Selecione..."] + sorted(lista_m))
+                m_excluir = st.selectbox("Excluir Mercado", ["Selecione..."] + lista_m)
                 if m_excluir != "Selecione..." and st.button("❌ Remover Mercado"):
-                    excluir_auxiliar('Mercado', m_excluir)
+                    supabase.table("config_auxiliares").delete().eq("tipo", "Mercado").eq("nome", m_excluir).execute()
                     st.rerun()
 
         with c_aux2:
             st.markdown("**🎯 Métodos**")
             novo_met = st.text_input("Novo Método", key="add_met")
             if st.button("Adicionar Método"):
-                if salvar_auxiliar('Metodo', novo_met):
-                    st.success("Método adicionado!")
+                if novo_met:
+                    supabase.table("config_auxiliares").insert({"tipo": "Metodo", "nome": novo_met}).execute()
+                    st.success("Adicionado!")
                     time.sleep(0.5)
                     st.rerun()
-            lista_met = carregar_auxiliares()[carregar_auxiliares()['Tipo'] == 'Metodo']['Nome'].tolist()
+            
+            lista_met = carregar_aux("Metodo")
             if lista_met:
-                met_excluir = st.selectbox("Excluir Método", ["Selecione..."] + sorted(lista_met))
+                met_excluir = st.selectbox("Excluir Método", ["Selecione..."] + lista_met)
                 if met_excluir != "Selecione..." and st.button("❌ Remover Método"):
-                    excluir_auxiliar('Metodo', met_excluir)
+                    supabase.table("config_auxiliares").delete().eq("tipo", "Metodo").eq("nome", met_excluir).execute()
                     st.rerun()
 
     st.divider()
-    fora_csv = st.checkbox("🏟️ Jogo fora do CSV? (Entrada Manual)")
-    df_bancas = pd.read_csv(PATH_BANCAS)
-    df_aux = carregar_auxiliares()
     
+    # 3. Seleção de Jogo (Igual à antiga)
+    fora_csv = st.checkbox("🏟️ Jogo fora do CSV? (Entrada Manual)")
     col_j1, col_j2, col_j3 = st.columns(3)
 
     if fora_csv:
-        liga_final = col_j1.text_input("Liga (Manual)")
-        mandante_final = col_j2.text_input("Mandante (Manual)")
-        visitante_final = col_j3.text_input("Visitante (Manual)")
+        liga_final, mandante_final, visitante_final = col_j1.text_input("Liga"), col_j2.text_input("Mandante"), col_j3.text_input("Visitante")
     else:
         liga_sel = col_j1.selectbox("1. Selecione a Liga", sorted(df_csv['Liga'].unique()))
         df_filtrado = df_csv[df_csv['Liga'] == liga_sel]
@@ -93,68 +85,57 @@ def mostrar_registro(df_csv):
         visitante_final = col_j3.selectbox("3. Visitante", [t for t in times if t != mandante_final])
         liga_final = liga_sel
 
+    # 4. Formulário (Igual à antiga)
     st.subheader("📋 Detalhes da Aposta")
     with st.form("form_final_aposta", clear_on_submit=True):
         f1, f2, f3, f4 = st.columns(4)
-        with f1:
-            data_aposta = st.date_input("Data", datetime.now())
-            banca_sel = st.selectbox("Banca", df_bancas["Nome da Banca"].tolist())
-        with f2:
-            mercados_finais = sorted(df_aux[df_aux['Tipo'] == 'Mercado']['Nome'].tolist())
-            mercado_reg = st.selectbox("Mercado", mercados_finais if mercados_finais else ["Vazio"])
-            # 'Linha' não existe na sua tabela Supabase, usaremos como parte da Obs ou Mercado se desejar
-            linha = st.text_input("Linha (Ex: -1.0)")
-        with f3:
-            metodos_finais = sorted(df_aux[df_aux['Tipo'] == 'Metodo']['Nome'].tolist())
-            metodo_reg = st.selectbox("Método", metodos_finais if metodos_finais else ["Vazio"])
-            status_reg = st.selectbox("Status (Resultado)", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
-        with f4:
-            stake = st.number_input("Stake (R$)", min_value=0.0, step=10.0)
-            odd = st.number_input("Odd", min_value=1.01, step=0.05)
+        data_ap = f1.date_input("Data", datetime.now())
+        banca_sel = f1.selectbox("Banca", lista_bancas)
         
+        mercados_lista = carregar_aux("Mercado")
+        mercado_reg = f2.selectbox("Mercado", mercados_lista if mercados_lista else ["Vazio"])
+        linha = f2.text_input("Linha (Ex: -1.0)")
+        
+        metodos_lista = carregar_aux("Metodo")
+        metodo_reg = f3.selectbox("Método", metodos_lista if metodos_lista else ["Vazio"])
+        status_reg = f3.selectbox("Status", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
+        
+        stake = f4.number_input("Stake", min_value=0.0, step=10.0)
+        odd = f4.number_input("Odd", min_value=1.0, step=0.1)
         obs = st.text_input("Observação")
-        btn_final = st.form_submit_button("🚀 Registrar Aposta")
-
-        if btn_final:
+        
+        if st.form_submit_button("🚀 Registrar Aposta"):
             if not liga_final or not mandante_final or not visitante_final:
-                st.error("Erro: Preencha os dados do jogo!")
+                st.error("Preencha os dados do jogo!")
             else:
-                # Cálculo do Lucro (Financeiro)
-                lucro_calc = 0.0
-                if status_reg == "Green": lucro_calc = stake * (odd - 1)
-                elif status_reg == "Meio Green": lucro_calc = (stake * (odd - 1)) / 2
-                elif status_reg == "Red": lucro_calc = -stake
-                elif status_reg == "Meio Red": lucro_calc = -stake / 2
+                # Cálculo financeiro
+                lucro = 0.0
+                if status_reg == "Green": lucro = stake * (odd - 1)
+                elif status_reg == "Meio Green": lucro = (stake * (odd - 1)) / 2
+                elif status_reg == "Red": lucro = -stake
+                elif status_reg == "Meio Red": lucro = -stake / 2
 
-                # Mapeamento exato para as colunas da sua tabela Supabase
-                dados_supabase = {
-                    "data": data_aposta.strftime('%Y-%m-%d'),
-                    "liga": liga_final,
-                    "mandante": mandante_final,
-                    "visitante": visitante_final,
-                    "mercado": mercado_reg,
-                    "resultado": status_reg, # Green/Red/etc
-                    "odd": float(odd),
-                    "stake": float(stake),
-                    "banca_id": banca_sel, # Ou ID numérico se você tiver
-                    "manual": fora_csv,
-                    "lucro": float(lucro_calc),
-                    "metodo": metodo_reg,
-                    "obs": f"{obs} | Linha: {linha}" if linha else obs
+                dados = {
+                    "data": data_ap.strftime('%Y-%m-%d'),
+                    "liga": liga_final, "mandante": mandante_final, "visitante": visitante_final,
+                    "mercado": mercado_reg, "linha": linha, "metodo": metodo_reg,
+                    "stake": float(stake), "odd": float(odd), "status": status_reg,
+                    "lucro": float(lucro), "banca_nome": banca_sel, "obs": obs
                 }
                 
                 try:
-                    supabase.table("apostas").insert(dados_supabase).execute()
-                    st.success("✅ Salvo no Supabase!")
+                    # Salva na Nuvem
+                    supabase.table("apostas").insert(dados).execute()
                     
-                    # Backup Local CSV
+                    # Salva no Local (Backup CSV)
                     if not os.path.exists("data"): os.makedirs("data")
-                    df_apostas = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
-                    df_apostas = pd.concat([df_apostas, pd.DataFrame([dados_supabase])], ignore_index=True)
-                    df_apostas.to_csv(PATH_APOSTAS, index=False)
+                    df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
+                    df_local = pd.concat([df_local, pd.DataFrame([dados])], ignore_index=True)
+                    df_local.to_csv(PATH_APOSTAS, index=False)
                     
                     st.balloons()
-                    time.sleep(1.5)
+                    st.success("✅ Aposta Registrada em todo lugar!")
+                    time.sleep(1)
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erro Supabase: {e}")
+                    st.error(f"Erro ao salvar: {e}")
