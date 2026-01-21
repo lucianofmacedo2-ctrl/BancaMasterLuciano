@@ -42,15 +42,13 @@ def calcular_tabela_classificacao(df_liga):
 
 def calcular_stats_completas(serie):
     if serie.empty or serie.isnull().all():
-        return {"Média": 0.0, "Mediana": 0.0, "Moda": 0.0, "DP": 0.0, "CV%": 0.0}
+        return {"Média": 0.0, "Mediana": 0.0, "DP": 0.0, "CV%": 0.0}
     s = serie.dropna()
     media = s.mean()
     mediana = s.median()
-    try: moda = s.mode()[0] if not s.mode().empty else 0.0
-    except: moda = 0.0
     desvio = s.std() if len(s) > 1 else 0.0
     cv = (desvio / media * 100) if media > 0 else 0.0
-    return {"Média": media, "Mediana": mediana, "Moda": moda, "DP": desvio, "CV%": cv}
+    return {"Média": media, "Mediana": mediana, "DP": desvio, "CV%": cv}
 
 def extrair_eficiencia(df_jogos, mando="casa"):
     if df_jogos.empty: return 0, 0, 0
@@ -131,14 +129,19 @@ def mostrar_scout(df):
 
     col_info1, col_info2 = st.columns(2)
     with col_info1:
-        pos_m = tabela[tabela['Time'] == m_sel].index[0] + 1 rescue 0
-        st.info(f"🏆 {m_sel}: {pos_m}º Lugar\n\n🧤 CS: {cs_m} | 🚫 FTS: {fts_m} | 🎯 Ch/Gol: {ch_g_m:.1f}")
+        try:
+            pos_m = tabela[tabela['Time'] == m_sel].index[0] + 1
+            st.info(f"🏆 {m_sel}: {pos_m}º Lugar\n\n🧤 CS: {cs_m} | 🚫 FTS: {fts_m} | 🎯 Ch/Gol: {ch_g_m:.1f}")
+        except: st.warning(f"Sem dados de tabela para {m_sel}")
+        
     with col_info2:
-        pos_v = tabela[tabela['Time'] == v_sel].index[0] + 1 rescue 0
-        st.info(f"🏆 {v_sel}: {pos_v}º Lugar\n\n🧤 CS: {cs_v} | 🚫 FTS: {fts_v} | 🎯 Ch/Gol: {ch_g_v:.1f}")
+        try:
+            pos_v = tabela[tabela['Time'] == v_sel].index[0] + 1
+            st.info(f"🏆 {v_sel}: {pos_v}º Lugar\n\n🧤 CS: {cs_v} | 🚫 FTS: {fts_v} | 🎯 Ch/Gol: {ch_g_v:.1f}")
+        except: st.warning(f"Sem dados de tabela para {v_sel}")
 
-    # 3. TABS (Últimos Jogos, H2H, Stats Completas, Minutos)
-    tab1, tab2, tab3, tab4 = st.tabs(["🕒 Forma Recente", "⚔️ Confronto Direto", "📊 Stats Detalhadas", "⏰ Minutos dos Gols"])
+    # 3. TABS
+    tab1, tab2, tab3, tab4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
 
     with tab1:
         col_f1, col_f2 = st.columns(2)
@@ -155,10 +158,12 @@ def mostrar_scout(df):
 
     with tab2:
         h2h = df_liga[((df_liga['Mandande'] == m_sel) & (df_liga['Visitante'] == v_sel)) | ((df_liga['Mandande'] == v_sel) & (df_liga['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
-        st.dataframe(h2h[['Data', 'Mandande', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True)
+        if not h2h.empty:
+            st.dataframe(h2h[['Data', 'Mandande', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True)
+        else:
+            st.write("Nenhum confronto direto encontrado.")
 
     with tab3:
-        # Recuperando a lógica de Stats Completas (Média, DP, CV%)
         metricas = {"Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"), "Cantos": ("Cantos_Mandante", "Cantos_Visitante")}
         for label, (col_m, col_v) in metricas.items():
             st.write(f"**{label}**")
@@ -169,16 +174,16 @@ def mostrar_scout(df):
             v_col.dataframe(df_st_v.style.format("{:.2f}"))
 
     with tab4:
-        # Recuperando a análise de minutos
         faixas_m = ["0-15_Mandante", "16-30_Mandante", "31-45+_Mandante", "46-60_Mandante", "61-75_Mandante", "76-90+_Mandante"]
         faixas_v = ["0-15_Visitante", "16-30_Visitante", "31-45+_Visitante", "46-60_Visitante", "61-75_Visitante", "76-90+_Visitante"]
         labels = ["0-15'", "16-30'", "31-45'", "46-60'", "61-75'", "76-90'"]
-        st.write(f"**Gols por minuto - {m_sel} (Casa)**")
-        st.dataframe(pd.DataFrame([df_m_home[faixas_m].sum().values], columns=labels, index=["Gols"]), use_container_width=True)
-        st.write(f"**Gols por minuto - {v_sel} (Fora)**")
-        st.dataframe(pd.DataFrame([df_v_away[faixas_v].sum().values], columns=labels, index=["Gols"]), use_container_width=True)
+        try:
+            st.write(f"**Gols por minuto - {m_sel} (Casa)**")
+            st.dataframe(pd.DataFrame([df_m_home[faixas_m].sum().values], columns=labels, index=["Gols"]), use_container_width=True)
+            st.write(f"**Gols por minuto - {v_sel} (Fora)**")
+            st.dataframe(pd.DataFrame([df_v_away[faixas_v].sum().values], columns=labels, index=["Gols"]), use_container_width=True)
+        except: st.warning("Colunas de minutos não encontradas no CSV.")
 
-    # 4. PROBABILIDADES NO RODAPÉ
     st.divider()
     st.subheader("🎯 Frequência de Mercados")
     cp1, cp2 = st.columns(2)
