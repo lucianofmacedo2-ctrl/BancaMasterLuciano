@@ -5,6 +5,7 @@ import numpy as np
 # --- 1. FUNÇÕES DE APOIO E CÁLCULO ---
 
 def render_stat_row(label, val_home, val_away):
+    """Gera a linha visual estilo barra de comparação (Painel de Pressão)"""
     col1, col2, col3 = st.columns([1, 2, 1])
     total = (val_home or 0) + (val_away or 0)
     p_home = (val_home / total) if total > 0 else 0.5
@@ -17,6 +18,7 @@ def render_stat_row(label, val_home, val_away):
         st.markdown(f"<p style='text-align: left; font-size: 18px; font-weight: bold; margin:0;'>{val_away:.2f}</p>", unsafe_allow_html=True)
 
 def calcular_tabela_classificacao(df_liga):
+    """Calcula a tabela de classificação (Geral, Casa e Fora)"""
     stats = {}
     for _, row in df_liga.iterrows():
         m, v = row['Mandande'], row['Visitante']
@@ -39,6 +41,7 @@ def calcular_tabela_classificacao(df_liga):
     return df_tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
 
 def calcular_stats_completas(serie_f, serie_s):
+    """Calcula Média, DP e CV% para Marcados, Sofridos e Total"""
     def get_metrics(s):
         s = pd.to_numeric(s, errors='coerce').fillna(0)
         m = s.mean()
@@ -54,6 +57,7 @@ def calcular_stats_completas(serie_f, serie_s):
     }).T
 
 def calcular_probabilidades_mercado(df):
+    """Calcula a frequência dos mercados HT, ST e FT"""
     if df.empty: return pd.DataFrame()
     n = len(df)
     tg_ht, tg_ft = df['Total_Gols_HT'], df['Total_Gols_FT']
@@ -61,7 +65,9 @@ def calcular_probabilidades_mercado(df):
     gm_ht, gv_ht = df['Gols_Mandante_HT'], df['Gols_Visitante_HT']
     gm_st, gv_st = (df['Gols_Mandante_FT'] - gm_ht), (df['Gols_Visitante_FT'] - gv_ht)
     def perc(cond): return (len(df[cond]) / n) * 100
+    
     mercados = []
+    # Loop para gerar 0.5 a 3.5 e BTTS para cada tempo
     for pref, stot, sm, sv in [("HT", tg_ht, gm_ht, gv_ht), ("ST", tg_st, gm_st, gv_st), ("FT", tg_ft, df['Gols_Mandante_FT'], df['Gols_Visitante_FT'])]:
         for g in [0.5, 1.5, 2.5, 3.5]:
             mercados.append({"Mercado": f"{g} {pref}", "% Batido": perc(stot >= g)})
@@ -71,16 +77,21 @@ def calcular_probabilidades_mercado(df):
 # --- 2. INTERFACE PRINCIPAL ---
 
 def mostrar_scout(df):
-    st.markdown("""<style>
-        div[data-testid="stDataFrame"] td { text-align: center !important; }
-        div[data-testid="stDataFrame"] th { text-align: center !important; }
-    </style>""", unsafe_allow_html=True)
+    # INJEÇÃO DE CSS PARA CENTRALIZAR TUDO
+    st.markdown("""
+        <style>
+            div[data-testid="stDataFrame"] td { text-align: center !important; }
+            div[data-testid="stDataFrame"] th { text-align: center !important; }
+            .stMetric { text-align: center !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
     st.title("🚀 Scout Profissional")
     df.columns = [c.strip() for c in df.columns]
 
+    # FILTROS
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Liga", sorted(df['Liga'].unique()))
+    liga_sel = c1.selectbox("Selecione a Liga", sorted(df['Liga'].unique()))
     df_liga = df[df['Liga'] == liga_sel].copy()
     temp_sel = c2.selectbox("Temporada", sorted(df_liga['Temporada'].unique(), reverse=True))
     
@@ -92,10 +103,11 @@ def mostrar_scout(df):
     m_sel = c3.selectbox("Mandante (Casa)", times)
     v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
 
+    # BASES DE DADOS (Últimos 10 jogos)
     df_m_home = df_season[df_season['Mandande'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_away = df_season[df_season['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
-    # 1. MÉDIAS (BARRAS)
+    # 1. MÉDIAS VISUAIS (BARRAS)
     st.divider()
     with st.container(border=True):
         st.caption("🔥 Volume de Jogo (Últimos 10 Jogos Casa/Fora)")
@@ -122,7 +134,7 @@ def mostrar_scout(df):
                     f"🧤 Clean Sheets: {len(gs[gs==0])} | 🚫 Falhou em Marcar: {len(gf[gf==0])}\n\n"
                     f"🎯 Chutes / Gol: {(ch.sum()/gf.sum() if gf.sum()>0 else 0):.2f}")
 
-    # 3. TABS
+    # 3. TABS (CONTEÚDO)
     t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
 
     with t1:
@@ -145,7 +157,7 @@ def mostrar_scout(df):
         if not h2h.empty:
             st.dataframe(h2h[['Data', 'Mandande', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True)
         else:
-            st.info("Nenhum confronto direto encontrado nesta liga/temporada.")
+            st.info("Nenhum confronto direto histórico encontrado.")
 
     with t3:
         mapa = {
@@ -175,6 +187,7 @@ def mostrar_scout(df):
             df_min.loc["TOTAL"] = df_min.sum()
             st.dataframe(df_min, use_container_width=True)
 
+    # 4. MERCADOS
     st.divider()
     st.subheader("🎯 Frequência de Mercados")
     cp1, cp2 = st.columns(2)
