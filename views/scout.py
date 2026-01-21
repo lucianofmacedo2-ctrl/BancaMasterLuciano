@@ -45,10 +45,8 @@ def calcular_stats_completas(serie_f, serie_s):
         dp = s.std() if len(s) > 1 else 0.0
         cv = (dp / m * 100) if m > 0 else 0.0
         return {"Média": m, "DP": dp, "CV%": cv}
-    
     sf = pd.to_numeric(serie_f, errors='coerce').fillna(0)
     ss = pd.to_numeric(serie_s, errors='coerce').fillna(0)
-    
     return pd.DataFrame({
         "Marcados": get_metrics(sf),
         "Sofridos": get_metrics(ss),
@@ -62,31 +60,25 @@ def calcular_probabilidades_mercado(df):
     tg_st = tg_ft - tg_ht
     gm_ht, gv_ht = df['Gols_Mandante_HT'], df['Gols_Visitante_HT']
     gm_st, gv_st = (df['Gols_Mandante_FT'] - gm_ht), (df['Gols_Visitante_FT'] - gv_ht)
-    
     def perc(cond): return (len(df[cond]) / n) * 100
-    
     mercados = []
-    for prefixo, serie_total, s_m, s_v in [("HT", tg_ht, gm_ht, gv_ht), ("ST", tg_st, gm_st, gv_st), ("FT", tg_ft, df['Gols_Mandante_FT'], df['Gols_Visitante_FT'])]:
-        mercados.append({"Mercado": f"0.5 {prefixo}", "% Batido": perc(serie_total >= 0.5)})
-        mercados.append({"Mercado": f"1.5 {prefixo}", "% Batido": perc(serie_total >= 1.5)})
-        mercados.append({"Mercado": f"2.5 {prefixo}", "% Batido": perc(serie_total >= 2.5)})
-        mercados.append({"Mercado": f"3.5 {prefixo}", "% Batido": perc(serie_total >= 3.5)})
-        mercados.append({"Mercado": f"BTTS {prefixo}", "% Batido": perc((s_m > 0) & (s_v > 0))})
-    
+    for pref, stot, sm, sv in [("HT", tg_ht, gm_ht, gv_ht), ("ST", tg_st, gm_st, gv_st), ("FT", tg_ft, df['Gols_Mandante_FT'], df['Gols_Visitante_FT'])]:
+        for g in [0.5, 1.5, 2.5, 3.5]:
+            mercados.append({"Mercado": f"{g} {pref}", "% Batido": perc(stot >= g)})
+        mercados.append({"Mercado": f"BTTS {pref}", "% Batido": perc((sm > 0) & (sv > 0))})
     return pd.DataFrame(mercados)
 
 # --- 2. INTERFACE PRINCIPAL ---
 
 def mostrar_scout(df):
-    # CSS para centralizar tabelas
     st.markdown("""<style>
         div[data-testid="stDataFrame"] td { text-align: center !important; }
         div[data-testid="stDataFrame"] th { text-align: center !important; }
     </style>""", unsafe_allow_html=True)
 
     st.title("🚀 Scout Profissional")
-    
-    # Filtros
+    df.columns = [c.strip() for c in df.columns]
+
     c1, c2 = st.columns(2)
     liga_sel = c1.selectbox("Liga", sorted(df['Liga'].unique()))
     df_liga = df[df['Liga'] == liga_sel].copy()
@@ -133,13 +125,11 @@ def mostrar_scout(df):
     t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
 
     with t3:
-        # Nomes corrigidos conforme seu CSV
         mapa = {
             "Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"),
             "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"),
             "Escanteios": ("Cantos_Mandante", "Cantos_Visitante"),
-            "Chutes ao Gol": ("Chutes_Gol_Mandante", "Chutes_Gol_Visitante"),
-            "Finalizações": ("FinalizaÃ§Ãµes_Totais_Mandante", "FinalizaÃ§Ãµes_Totais_Visitante")
+            "Chutes ao Gol": ("Chutes_Gol_Mandante", "Chutes_Gol_Visitante")
         }
         for label, (cm, cv) in mapa.items():
             st.subheader(label)
@@ -158,7 +148,6 @@ def mostrar_scout(df):
             cols_f = [f"0-15_{mando}", f"16-30_{mando}", f"31-45+_{mando}", f"46-60_{mando}", f"61-75_{mando}", f"76-90+_{mando}"]
             cols_s = [f"0-15_{adv}", f"16-30_{adv}", f"31-45+_{adv}", f"46-60_{adv}", f"61-75_{adv}", f"76-90+_{adv}"]
             labels = ["0-15", "16-30", "31-45", "46-60", "61-75", "76-90"]
-            
             df_min = pd.DataFrame([df_j[cols_f].sum().values, df_j[cols_s].sum().values], columns=labels, index=["Marcados", "Sofridos"])
             df_min.loc["TOTAL"] = df_min.sum()
             st.dataframe(df_min, use_container_width=True)
