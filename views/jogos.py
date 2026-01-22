@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# Links dos arquivos
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
 ARQUIVO_HISTORICO = 'dados_25_26.csv'
 
 def carregar_historico():
     try:
-        df = pd.read_csv(ARQUIVO_HISTORICO)
+        df = pd.read_csv(ARQUIVO_HISTORICO, sep=None, engine='python')
         df.columns = [c.strip() for c in df.columns]
         return df
     except:
@@ -29,65 +28,59 @@ def mostrar_jogos():
         </style>
     """, unsafe_allow_html=True)
 
-    # 1. CARREGAR DADOS
-    df_hist = carregar_historico()
-    
+    # 1. CARREGAR AGENDA (COM DETECÇÃO AUTOMÁTICA DE SEPARADOR)
     @st.cache_data(ttl=60)
     def carregar_agenda(url):
         try:
-            # Forçamos a leitura da coluna Data como texto para evitar erros de conversão automática
-            df = pd.read_csv(url, sep=None, engine='python', dtype={'Data': str})
+            # O sep=None faz o pandas descobrir se é vírgula ou ponto e vírgula sozinho
+            df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8')
             df.columns = [c.strip() for c in df.columns]
-            # Remove espaços de todas as colunas de texto
-            df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
             return df
-        except:
+        except Exception as e:
+            st.error(f"Erro ao baixar CSV: {e}")
             return pd.DataFrame()
 
     df_agenda = carregar_agenda(URL_AGENDA)
 
     if df_agenda.empty:
-        st.error("Não foi possível carregar a Lista_Jogos.csv. Verifique o arquivo no GitHub.")
         return
 
-    # 2. CONFIGURAR DATAS DOS BOTÕES
-    # Garantimos o formato 01/01/2026 (com zeros à esquerda)
-    hoje_dt = datetime.now().date()
-    amanha_dt = hoje_dt + timedelta(days=1)
-    depois_dt = hoje_dt + timedelta(days=2)
+    # Verificação de segurança: Se a coluna 'Data' não existe, tentamos limpar os nomes novamente
+    if 'Data' not in df_agenda.columns:
+        st.error(f"Erro Crítico: Coluna 'Data' não encontrada. Colunas detectadas: {list(df_agenda.columns)}")
+        return
 
+    # 2. CONFIGURAR DATAS
+    hoje_dt = datetime.now().date()
     if 'data_sel' not in st.session_state:
         st.session_state.data_sel = hoje_dt.strftime('%d/%m/%Y')
 
     cols_btn = st.columns(3)
-    if cols_btn[0].button("📅 Hoje", use_container_width=True): 
-        st.session_state.data_sel = hoje_dt.strftime('%d/%m/%Y')
-    if cols_btn[1].button("📅 Amanhã", use_container_width=True): 
-        st.session_state.data_sel = amanha_dt.strftime('%d/%m/%Y')
-    if cols_btn[2].button("📅 Depois", use_container_width=True): 
-        st.session_state.data_sel = depois_dt.strftime('%d/%m/%Y')
+    datas = [hoje_dt, hoje_dt + timedelta(days=1), hoje_dt + timedelta(days=2)]
+    labels = ["📅 Hoje", "📅 Amanhã", "📅 Depois"]
+
+    for i in range(3):
+        if cols_btn[i].button(labels[i], use_container_width=True):
+            st.session_state.data_sel = datas[i].strftime('%d/%m/%Y')
 
     st.info(f"Mostrando jogos de: **{st.session_state.data_sel}**")
 
-    # 3. FILTRAR E EXIBIR
-    # Filtro rigoroso: removemos qualquer espaço extra antes de comparar
+    # 3. FILTRAR JOGOS
+    # Convertemos a coluna para string e limpamos espaços para garantir o match
+    df_agenda['Data'] = df_agenda['Data'].astype(str).str.strip()
     df_dia = df_agenda[df_agenda['Data'] == st.session_state.data_sel]
 
     if df_dia.empty:
         st.warning(f"Nenhum jogo encontrado para {st.session_state.data_sel}.")
-        # Ajuda para debug: mostra quais datas existem no seu CSV
-        with st.expander("Ver datas disponíveis no CSV"):
+        with st.expander("Clique para ver as datas disponíveis no seu arquivo"):
             st.write(df_agenda['Data'].unique())
     else:
-        times_no_dia = []
+        # EXIBIÇÃO DOS JOGOS
         for liga in df_dia['Liga'].unique():
             df_l = df_dia[df_dia['Liga'] == liga]
-            rodada = df_l['Rodada'].iloc[0] if 'Rodada' in df_l.columns else "-"
-            
-            st.markdown(f"<div class='header-liga'>🏆 {liga} <span class='sub-rodada'>— Rodada {rodada}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='header-liga'>🏆 {liga}</div>", unsafe_allow_html=True)
             
             for idx, row in df_l.iterrows():
-                times_no_dia.extend([row['Mandante'], row['Visitante']])
                 c1, c2, c3 = st.columns([4, 2.5, 1.5])
                 with c1:
                     st.markdown(f"<div class='linha-jogo'><span class='hora-texto'>{row['Hora']}</span><span class='times-texto'>{row['Mandante']} vs {row['Visitante']}</span></div>", unsafe_allow_html=True)
@@ -100,9 +93,3 @@ def mostrar_jogos():
                         st.session_state.time_fora_scout = row['Visitante']
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
-
-        # 4. RANKING (MANTIDO)
-        if not df_hist.empty and times_no_dia:
-            st.divider()
-            st.subheader(f"📊 Top Performance - Jogos de {st.session_state.data_sel}")
-            # ... (resto do código do ranking permanece igual)
