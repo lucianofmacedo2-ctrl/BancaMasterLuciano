@@ -97,8 +97,8 @@ def mostrar_jogos():
                         m_cantos = (df_m['Cantos_Mandante'].mean() + df_m['Cantos_Visitante'].mean()) + \
                                    (df_v['Cantos_Mandante'].mean() + df_v['Cantos_Visitante'].mean())
 
-                        if m_gols > 4.5: alerta_gol = " 🔥⚽"
-                        if m_cantos > 14.5: alerta_canto = " 🔥🚩"
+                        if m_gols > 5.0: alerta_gol = " 🔥⚽"
+                        if m_cantos > 15.0: alerta_canto = " 🔥🚩"
 
                 c1, c2, c3 = st.columns([4, 2.5, 1.5])
                 with c1:
