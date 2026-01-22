@@ -21,7 +21,7 @@ def calcular_tabela_classificacao(df_liga):
     """Calcula a tabela de classificação (Geral, Casa e Fora)"""
     stats = {}
     for _, row in df_liga.iterrows():
-        m, v = row['Mandande'], row['Visitante']
+        m, v = row['Mandante'], row['Visitante']
         gm, gv = row['Gols_Mandante_FT'], row['Gols_Visitante_FT']
         for t in [m, v]:
             if t not in stats:
@@ -99,7 +99,7 @@ def mostrar_scout(df):
     # Busca a liga do time mandante selecionado para pré-filtrar a liga
     default_liga_index = 0
     if time_vindo_jogos_m:
-        liga_do_time = df[df['Mandande'] == time_vindo_jogos_m]['Liga'].unique()
+        liga_do_time = df[df['Mandante'] == time_vindo_jogos_m]['Liga'].unique()
         if len(liga_do_time) > 0:
             lista_ligas = sorted(df['Liga'].unique())
             if liga_do_time[0] in lista_ligas:
@@ -112,7 +112,7 @@ def mostrar_scout(df):
     
     df_season = df_liga[df_liga['Temporada'] == temp_sel].copy()
     df_season['Data'] = pd.to_datetime(df_season['Data'], dayfirst=True, errors='coerce')
-    times = sorted(df_season['Mandande'].unique())
+    times = sorted(df_season['Mandante'].unique())
     
     # Define os índices padrão nos selectboxes de times
     idx_m = 0
@@ -130,7 +130,7 @@ def mostrar_scout(df):
     # --- FIM DA INTEGRAÇÃO (O RESTANTE DO CÓDIGO É IDENTICO AO ORIGINAL) ---
 
     # BASES DE DADOS (Últimos 10 jogos)
-    df_m_home = df_season[df_season['Mandande'] == m_sel].sort_values('Data', ascending=False).head(10)
+    df_m_home = df_season[df_season['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_away = df_season[df_season['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
     # 1. MÉDIAS VISUAIS (BARRAS)
@@ -176,12 +176,12 @@ def mostrar_scout(df):
             for _, r in df_v_away.iterrows():
                 res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Visitante_FT'] == r['Gols_Visitante_FT'] else "❌")
                 dt = r['Data'].strftime('%d/%m/%y') if pd.notnull(r['Data']) else "N/D"
-                st.write(f"{res} {dt} vs {r['Mandande']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
+                st.write(f"{res} {dt} vs {r['Mandante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
 
     with t2:
-        h2h = df_liga[((df_liga['Mandande'] == m_sel) & (df_liga['Visitante'] == v_sel)) | ((df_liga['Mandande'] == v_sel) & (df_liga['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
+        h2h = df_liga[((df_liga['Mandante'] == m_sel) & (df_liga['Visitante'] == v_sel)) | ((df_liga['Mandante'] == v_sel) & (df_liga['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
         if not h2h.empty:
-            st.dataframe(h2h[['Data', 'Mandande', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True)
+            st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True)
         else:
             st.info("Nenhum confronto direto histórico encontrado.")
 
@@ -235,3 +235,4 @@ def mostrar_scout(df):
     with cp2:
         st.write(f"**{v_sel}**")
         st.dataframe(calcular_probabilidades_mercado(df_v_away).style.format({"% Batido": "{:.2f}%"}).background_gradient(cmap="RdYlGn", subset=['% Batido']), use_container_width=True)
+
