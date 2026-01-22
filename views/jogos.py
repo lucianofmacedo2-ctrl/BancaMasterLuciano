@@ -1,11 +1,13 @@
 import streamlit as st
 import pandas as pd
 
+# Link RAW para o seu CSV na raiz do repositório
 URL_CSV = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
 
 def mostrar_jogos():
     st.title("📅 Agenda de Jogos")
 
+    # --- CSS PARA O LAYOUT DOS JOGOS ---
     st.markdown("""
         <style>
         .header-liga {
@@ -37,27 +39,36 @@ def mostrar_jogos():
     try:
         @st.cache_data(ttl=60)
         def carregar_dados_csv(url):
+            # Tenta ler com separadores comuns (ponto-e-vírgula do Excel BR e vírgula)
             for sep in [';', ',']:
                 try:
                     df = pd.read_csv(url, sep=sep, encoding='utf-8')
                     if 'Liga' in df.columns: return df
-                except: continue
+                except:
+                    continue
+            # Se falhar, tenta com encoding Latin-1
             return pd.read_csv(url, sep=';', encoding='latin-1')
 
         df = carregar_dados_csv(URL_CSV)
+        
+        # Limpar espaços invisíveis nos nomes das colunas
         df.columns = df.columns.str.strip()
 
         if df.empty:
             st.warning("O arquivo 'Lista_Jogos.csv' está vazio.")
             return
 
+        # Obter ligas únicas
         ligas = df['Liga'].unique()
 
         for liga in ligas:
+            # Cabeçalho da Liga
             st.markdown(f"<div class='header-liga'><h4>🏆 {liga}</h4></div>", unsafe_allow_html=True)
+            
             df_liga = df[df['Liga'] == liga]
             
             for index, row in df_liga.iterrows():
+                # Layout de 3 colunas: Dados | Odds | Botão
                 col_dados, col_odds, col_btn = st.columns([4, 2.5, 1.5])
                 
                 with col_dados:
@@ -72,6 +83,7 @@ def mostrar_jogos():
                     o1 = row.get('Odd Mandante', '-')
                     ox = row.get('Odd Empate', '-')
                     o2 = row.get('Odd Visitante', '-')
+                    
                     st.markdown(f"""
                         <div style='display: flex; gap: 5px; padding-top: 8px;'>
                             <div class='odd-box'>{o1}</div>
@@ -81,20 +93,22 @@ def mostrar_jogos():
                     """, unsafe_allow_html=True)
                 
                 with col_btn:
-                    st.write("") 
-                    if st.button("Analisar 🔍", key=f"btn_{index}", use_container_width=True):
-                        # SALVA OS TIMES PARA O SCOUT
+                    st.write("") # Espaçador para alinhamento
+                    # BOTÃO DE ANÁLISE COM REDIRECIONAMENTO
+                    if st.button("Analisar 🔍", key=f"btn_nav_{index}", use_container_width=True):
+                        # 1. Salva os nomes dos times no Session State
                         st.session_state.time_casa_scout = row['Mandante']
                         st.session_state.time_fora_scout = row['Visitante']
                         
-                        # MUDA A PÁGINA NO MENU LATERAL
+                        # 2. Altera a página ativa para coincidir exatamente com o menu do app.py
                         st.session_state.menu_ativo = "🔎 Scout"
                         
-                        # RECARREGA O APP JÁ NA PÁGINA NOVA
+                        # 3. Força a atualização imediata
                         st.rerun()
 
     except Exception as e:
-        st.error("Erro ao carregar a agenda.")
+        st.error("Erro ao carregar a agenda de jogos.")
+        st.info("Verifique se as colunas Mandante, Visitante, Liga e Hora existem no seu CSV.")
 
 if __name__ == "__main__":
     mostrar_jogos()
