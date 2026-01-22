@@ -4,81 +4,105 @@ import pandas as pd
 URL_RAW = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/refs/heads/main/jogos_do_dia.csv"
 
 def mostrar_jogos():
-    # --- ESTILO CSS CORRIGIDO (ADAPTÁVEL) ---
+    # --- CSS PARA LAYOUT IGUAL À IMAGEM ---
     st.markdown("""
         <style>
-        /* Removido a cor fixa branca para os nomes se adaptarem ao tema */
-        .titulo-jogo {
-            font-size: 22px !important;
-            font-weight: bold !important;
-            line-height: 1.2;
-            margin: 5px 0px;
+        .jogo-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+            background-color: transparent;
         }
-        .info-liga {
-            font-size: 13px !important;
-            color: #888888;
-            text-transform: uppercase;
+        .time-texto {
+            font-size: 18px !important;
             font-weight: 500;
+            margin: 0 10px;
         }
-        .hora-jogo {
-            font-size: 20px !important;
+        .hora-texto {
+            font-size: 16px;
+            color: #28a745;
             font-weight: bold;
-            color: #28a745; /* Verde padrão que funciona em ambos os fundos */
+            min-width: 60px;
         }
-        .odd-box {
-            background-color: rgba(128, 128, 128, 0.1); /* Fundo levemente cinza transparente */
-            padding: 8px;
-            border-radius: 8px;
+        .data-texto {
+            font-size: 12px;
+            color: #888;
+            min-width: 50px;
+        }
+        .odd-item {
+            display: inline-block;
+            width: 45px;
+            background-color: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+            border: 1px solid #28a745;
+            border-radius: 4px;
             text-align: center;
-            border: 1px solid rgba(128, 128, 128, 0.2);
+            padding: 5px 0;
+            font-weight: bold;
+            font-size: 14px;
+            margin-left: 5px;
+        }
+        .vs-texto {
+            color: #888;
+            font-size: 14px;
+        }
+        /* Ajuste para o botão sumir e parecer apenas um clique na linha */
+        .stButton button {
+            background-color: transparent !important;
+            border: 1px solid rgba(128, 128, 128, 0.3) !important;
+            height: 35px;
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.title("📅 Agenda de Jogos")
-    st.markdown("---")
 
     try:
         @st.cache_data(ttl=60)
-        def carregar_dados_github(url):
+        def carregar_dados(url):
             return pd.read_csv(url, encoding='utf-8')
 
-        df = carregar_dados_github(URL_RAW)
+        df = carregar_dados(URL_RAW)
 
-        for index, row in df.iterrows():
-            with st.container(border=True):
-                col_tempo, col_confronto, col_acao = st.columns([1.2, 3, 2])
+        # Agrupar por competição para criar cabeçalhos como na imagem
+        competicoes = df['competicao'].unique()
 
-                with col_tempo:
-                    st.markdown(f"<p class='hora-jogo'>{row['hora']}</p>", unsafe_allow_html=True)
-                    st.caption(f"📅 {row['data']}")
-                    st.markdown(f"<p class='info-liga'>{row['competicao']}</p>", unsafe_allow_html=True)
-
-                with col_confronto:
-                    # Usando divs simples para o texto respeitar a cor padrão do Streamlit
-                    st.markdown(f"<div class='titulo-jogo'>{row['mandante']}</div>", unsafe_allow_html=True)
-                    st.markdown("<div style='font-size: 14px; opacity: 0.6;'>vs</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='titulo-jogo'>{row['visitante']}</div>", unsafe_allow_html=True)
-
-                with col_acao:
+        for comp in competicoes:
+            st.markdown(f"### 🏆 {comp}")
+            df_comp = df[df['competicao'] == comp]
+            
+            for index, row in df_comp.iterrows():
+                # Criamos o layout de linha única
+                col1, col2, col3, col4 = st.columns([1, 4, 2, 1.5])
+                
+                with col1:
+                    st.markdown(f"<span class='data-texto'>{row['data']}</span> <span class='hora-texto'>{row['hora']}</span>", unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown(f"<span class='time-texto'>{row['mandante']}</span> <span class='vs-texto'>vs</span> <span class='time-texto'>{row['visitante']}</span>", unsafe_allow_html=True)
+                
+                with col3:
                     if str(row['odd_1']) != "-":
                         st.markdown(f"""
-                            <div class='odd-box'>
-                                <span style='font-size: 11px; opacity: 0.8;'>ODDS</span><br>
-                                <b style='color: #e67e22;'>{row['odd_1']} &nbsp; {row['odd_x']} &nbsp; {row['odd_2']}</b>
+                            <div style='display: flex;'>
+                                <div class='odd-item'>{row['odd_1']}</div>
+                                <div class='odd-item'>{row['odd_x']}</div>
+                                <div class='odd-item'>{row['odd_2']}</div>
                             </div>
                         """, unsafe_allow_html=True)
                     else:
-                        st.write(f"📌 {row['fase']}")
-                    
-                    st.write("") # Espaço
-                    if st.button("📊 Analisar", key=f"analisar_{index}", use_container_width=True):
+                        st.caption(row['fase'])
+                
+                with col4:
+                    if st.button("Analisar", key=f"btn_{index}", use_container_width=True):
                         st.session_state.time_casa_scout = row['mandante']
                         st.session_state.time_fora_scout = row['visitante']
-                        st.toast(f"Times enviados: {row['mandante']}!", icon="⚽")
+                        st.toast(f"Carregando {row['mandante']}...")
 
     except Exception as e:
-        st.error("Erro ao carregar a agenda.")
+        st.error("Erro ao carregar layout.")
 
 if __name__ == "__main__":
     mostrar_jogos()
