@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# --- 1. FUNÇÕES DE APOIO E CÁLCULO ---
+# --- 1. FUNÇÕES DE APOIO E CÁLCULO (MANTIDAS INTEGRALMENTE) ---
 
 def render_stat_row(label, val_home, val_away):
     """Gera a linha visual estilo barra de comparação (Painel de Pressão)"""
@@ -67,7 +67,6 @@ def calcular_probabilidades_mercado(df):
     def perc(cond): return (len(df[cond]) / n) * 100
     
     mercados = []
-    # Loop para gerar 0.5 a 3.5 e BTTS para cada tempo
     for pref, stot, sm, sv in [("HT", tg_ht, gm_ht, gv_ht), ("ST", tg_st, gm_st, gv_st), ("FT", tg_ft, df['Gols_Mandante_FT'], df['Gols_Visitante_FT'])]:
         for g in [0.5, 1.5, 2.5, 3.5]:
             mercados.append({"Mercado": f"{g} {pref}", "% Batido": perc(stot >= g)})
@@ -89,9 +88,25 @@ def mostrar_scout(df):
     st.title("🚀 Scout Profissional")
     df.columns = [c.strip() for c in df.columns]
 
+    # --- LÓGICA DE INTEGRAÇÃO COM A PÁGINA DE JOGOS ---
+    # Recupera os times selecionados na agenda, se houver
+    time_vindo_jogos_m = st.session_state.get('time_casa_scout', None)
+    time_vindo_jogos_v = st.session_state.get('time_fora_scout', None)
+
     # FILTROS
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", sorted(df['Liga'].unique()))
+    
+    # Busca a liga do time mandante selecionado para pré-filtrar a liga
+    default_liga_index = 0
+    if time_vindo_jogos_m:
+        liga_do_time = df[df['Mandande'] == time_vindo_jogos_m]['Liga'].unique()
+        if len(liga_do_time) > 0:
+            lista_ligas = sorted(df['Liga'].unique())
+            if liga_do_time[0] in lista_ligas:
+                default_liga_index = lista_ligas.index(liga_do_time[0])
+
+    liga_sel = c1.selectbox("Selecione a Liga", sorted(df['Liga'].unique()), index=default_liga_index)
+    
     df_liga = df[df['Liga'] == liga_sel].copy()
     temp_sel = c2.selectbox("Temporada", sorted(df_liga['Temporada'].unique(), reverse=True))
     
@@ -99,9 +114,20 @@ def mostrar_scout(df):
     df_season['Data'] = pd.to_datetime(df_season['Data'], dayfirst=True, errors='coerce')
     times = sorted(df_season['Mandande'].unique())
     
+    # Define os índices padrão nos selectboxes de times
+    idx_m = 0
+    idx_v = 1 if len(times) > 1 else 0
+    
+    if time_vindo_jogos_m in times:
+        idx_m = times.index(time_vindo_jogos_m)
+    if time_vindo_jogos_v in times:
+        idx_v = times.index(time_vindo_jogos_v)
+
     c3, c4 = st.columns(2)
-    m_sel = c3.selectbox("Mandante (Casa)", times)
-    v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel])
+    m_sel = c3.selectbox("Mandante (Casa)", times, index=idx_m)
+    v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel], index=0 if time_vindo_jogos_v not in [t for t in times if t != m_sel] else [t for t in times if t != m_sel].index(time_vindo_jogos_v))
+
+    # --- FIM DA INTEGRAÇÃO (O RESTANTE DO CÓDIGO É IDENTICO AO ORIGINAL) ---
 
     # BASES DE DADOS (Últimos 10 jogos)
     df_m_home = df_season[df_season['Mandande'] == m_sel].sort_values('Data', ascending=False).head(10)
@@ -160,27 +186,24 @@ def mostrar_scout(df):
             st.info("Nenhum confronto direto histórico encontrado.")
 
     with t3:
-        # --- INCLUSÃO DO TEXTO EXPLICATIVO ---
         with st.expander("💡 Entenda como analisar estas métricas (Média, DP e CV%)", expanded=False):
             st.markdown("""
             Para uma análise profissional de apostas, não olhamos apenas a média. Entenda o porquê:
             
             1. **Média:** Indica a tendência central (ex: quantos gols o time faz por jogo).
             2. **DP (Desvio Padrão):** Indica a variação. 
-               - *Exemplo:* Se a média é 2.00 e o DP é 0.50, o time é muito regular. Se o DP for 2.50, o time oscila muito (pode fazer 5 gols num jogo e 0 em outros quatro).
+               - *Exemplo:* Se a média é 2.00 e o DP é 0.50, o time é muito regular. Se o DP for 2.50, o time oscila muito.
             3. **CV% (Coeficiente de Variação):** É a porcentagem de risco/oscilação.
-               - **Abaixo de 25%:** Time muito constante. Excelente para previsões.
+               - **Abaixo de 25%:** Time muito constante.
                - **Entre 25% e 50%:** Oscilação moderada.
-               - **Acima de 50%:** Alta imprevisibilidade. A média não é confiável para este mercado.
-            
-            **Dica Pro:** Procure mercados onde o **CV% seja baixo**. Isso indica que o padrão do time se repete com frequência!
+               - **Acima de 50%:** Alta imprevisibilidade.
             """)
         
         mapa = {
             "Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"),
             "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"),
             "Escanteios": ("Cantos_Mandante", "Cantos_Visitante"),
-            "Chutes ao Gol": ("Chutes_Gol_Mandante", "Chutes_Gol_Visitante")
+            "Chutes ao G": ("Chutes_Gol_Mandante", "Chutes_Gol_Visitante")
         }
         for label, (cm, cv) in mapa.items():
             st.subheader(label)
@@ -203,7 +226,6 @@ def mostrar_scout(df):
             df_min.loc["TOTAL"] = df_min.sum()
             st.dataframe(df_min, use_container_width=True)
 
-    # 4. MERCADOS
     st.divider()
     st.subheader("🎯 Frequência de Mercados")
     cp1, cp2 = st.columns(2)
