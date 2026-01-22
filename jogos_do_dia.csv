@@ -1,1 +1,43 @@
-
+data,hora,fase,competicao,mandante,visitante,odd_1,odd_x,odd_2
+21/01,21:30,SF,Copinha 2026,Grêmio,Cruzeiro,-,-,-
+21/01,21:15,1/32,Copa Argentina 2026,Argentinos Juniors,Ferrocarril Midland,-,-,-
+21/01,21:00,R3,Costa Rica Clausura,San Carlos,Puntarenas FC,2.62,3.10,2.60
+21/01,23:00,R3,Costa Rica Clausura,Cartaginés,Alajuelense,2.90,2.90,2.35
+21/01,21:30,F,Supercopa Colombia,Santa Fe,Junior Barranquilla,1.80,3.25,4.75
+21/01,21:30,R13,Guadalupe,SC Baie Mahault,Stade Lamentinois,-,-,-
+21/01,22:00,R1,Guatemala,Deportivo Malacateco,Dep. Marquense,-,-,-
+21/01,21:00,1F,México Fem.,Necaxa,Pumas,-,-,-
+21/01,21:00,1F,México Fem.,Toluca,Tigres,-,-,-
+21/01,22:00,1F,México Fem.,Santos Laguna,Club León,-,-,-
+21/01,22:06,1F,México Fem.,Chivas,Querétaro,-,-,-
+21/01,23:00,1F,México Fem.,Monterrey,Cruz Azul,-,-,-
+21/01,21:00,JA,Amistoso,Peñarol,Colo-Colo,-,-,-
+21/01,21:00,R1,Nicarágua,Rancho Santana,Diriangén FC,-,-,-
+21/01,21:00,R1,Ilhas Turcas,Beaches FC,Cheshire Hall,-,-,-
+22/01,14:45,FG,Europa League,Plzen,FC Porto,4.20,3.60,1.90
+22/01,17:00,FG,Europa League,SC Braga,Nottingham Forest,2.62,3.40,2.62
+22/01,17:00,2,Argentino,Aldosivi,Defensa y Justicia,2.65,2.75,3.10
+22/01,20:00,1,Argentino,Unión,Platense,2.05,2.75,4.33
+22/01,20:00,2,Argentino,Banfield,Huracán,2.85,2.65,2.85
+22/01,14:45,FG,Europa League,Feyenoord,Sturm Graz,1.42,5.00,7.00
+22/01,14:45,FG,Europa League,PAOK,Real Betis,2.55,3.60,2.62
+22/01,14:45,FG,Europa League,Fenerbahçe,Aston Villa,2.50,3.50,2.75
+22/01,14:45,FG,Europa League,Malmö,Crvena Zvezda,3.50,3.75,2.00
+22/01,14:45,FG,Europa League,Bologna,Celtic,1.61,4.10,5.00
+22/01,14:45,FG,Europa League,SC Freiburg,Maccabi Tel Aviv,1.17,7.00,17.00
+22/01,14:45,FG,Europa League,Brann,Midtjylland,3.00,3.60,2.25
+22/01,14:45,FG,Europa League,Young Boys,Lyon,4.20,4.20,1.73
+22/01,17:00,FG,Europa League,Red Bull Salzburg,FC Basel,2.38,3.80,2.70
+22/01,17:00,FG,Europa League,Ferencváros,Panathinaikos,2.30,3.40,3.10
+22/01,17:00,FG,Europa League,Nice,Go Ahead Eagles,1.90,4.00,3.60
+22/01,17:00,FG,Europa League,FC Utrecht,Genk,2.70,3.40,2.60
+22/01,17:00,FG,Europa League,Roma,Stuttgart,2.05,3.75,3.40
+22/01,17:00,FG,Europa League,Rangers,Ludogorets Razgrad,1.95,3.70,3.60
+22/01,17:00,FG,Europa League,Celta de Vigo,Lille,2.30,3.50,3.10
+22/01,17:00,FG,Europa League,Dinamo Zagreb,FCSB,1.61,4.00,5.25
+22/01,12:15,R17,Saudita,Al-Taawoun,Al-Hazm,1.67,3.40,4.50
+22/01,14:30,R17,Saudita,Al-Qadisiyah,Al-Ittihad,2.25,3.60,2.70
+22/01,14:30,R17,Saudita,Al-Hilal,Al-Fayha,1.18,6.00,12.00
+22/01,17:00,R28,Inglaterra 3,Lincoln City,Burton Albion,1.53,3.70,6.25
+22/01,10:00,R17,Tunísia,Club Africain,Étoile du Sahel,-,-,-
+22/01,15:00,R15,Egito,Ismaily,El Mokawloon,-,-,-
