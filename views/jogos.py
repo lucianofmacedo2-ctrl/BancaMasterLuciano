@@ -1,60 +1,65 @@
-import requests
-from bs4 import BeautifulSoup
+import streamlit as st
 import pandas as pd
 
-def raspar_jogos_ogol(url):
-    # Definimos um 'User-Agent' para o site não bloquear a requisição imediatamente
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-    }
+# Substitua o link abaixo pelo link RAW do seu arquivo no GitHub
+# Para obter: Abra o csv no GitHub -> Clique em "Raw" -> Copie a URL do navegador
+URL_RAW = "https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPOSITORIO/main/jogos_do_dia.csv"
+
+def mostrar_jogos():
+    st.header("📅 Agenda de Jogos")
+    st.markdown("---")
 
     try:
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            print(f"Erro ao aceder ao site: {response.status_code}")
-            return []
+        # 1. Carregar os dados (adicionamos cache para não sobrecarregar o GitHub)
+        @st.cache_data(ttl=600)  # Atualiza a cada 10 minutos
+        def carregar_dados_github(url):
+            return pd.read_csv(url)
 
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # O oGol costuma organizar os jogos em tabelas ou divs com a classe 'zzstats'
-        # Esta parte precisa ser ajustada conforme a estrutura exata do HTML no momento
-        jogos = []
-        
-        # Procuramos as linhas da tabela de jogos (ajuste os seletores se necessário)
-        tabela = soup.find('table', class_='zztable')
-        if not tabela:
-            print("Não foi possível encontrar a tabela de jogos.")
-            return []
+        df = carregar_dados_github(URL_RAW)
 
-        for linha in tabela.find_all('tr')[1:]: # Pula o cabeçalho
-            colunas = linha.find_all('td')
-            if len(colunas) >= 4:
-                hora = colunas[0].get_text(strip=True)
-                competicao = colunas[1].get_text(strip=True)
-                # O oGol muitas vezes coloca os times em links ou spans
-                time_casa = colunas[2].get_text(strip=True)
-                time_fora = colunas[4].get_text(strip=True) # Geralmente o 5º elemento
+        if df.empty:
+            st.warning("Nenhum jogo listado no arquivo para hoje.")
+            return
 
-                jogos.append({
-                    "Hora": hora,
-                    "Competição": competicao,
-                    "Mandante": time_casa,
-                    "Visitante": time_fora
-                })
-        
-        return jogos
+        # 2. Exibir cada jogo em um card organizado
+        for index, row in df.iterrows():
+            with st.container(border=True):
+                col_info, col_times, col_odds, col_btn = st.columns([1.5, 3, 2, 1.5])
+
+                with col_info:
+                    st.caption(f"🏆 {row['competicao']}")
+                    st.write(f"🕒 **{row['hora']}**")
+                    st.caption(f"📅 {row['data']}")
+
+                with col_times:
+                    st.markdown(f"**{row['mandante']}**")
+                    st.markdown(f"**{row['visitante']}**")
+
+                with col_odds:
+                    if str(row['odd_1']) != "-":
+                        st.caption("Probabilidades")
+                        st.code(f"1: {row['odd_1']} | X: {row['odd_x']} | 2: {row['odd_2']}", language=None)
+                    else:
+                        st.caption("Fase")
+                        st.write(row['fase'])
+
+                with col_btn:
+                    st.write("") # Espaçador
+                    if st.button("Analisar 🔍", key=f"analisar_{index}", use_container_width=True):
+                        # 3. Salva os times no session_state para o scout.py ler
+                        st.session_state.time_casa_scout = row['mandante']
+                        st.session_state.time_fora_scout = row['visitante']
+                        
+                        st.success("Enviado!")
+                        # Se você quiser que ele mude de aba automaticamente, use:
+                        # st.rerun() 
 
     except Exception as e:
-        print(f"Ocorreu um erro: {e}")
-        return []
+        st.error("Erro ao carregar agenda do GitHub.")
+        st.info("Verifique se o arquivo 'jogos_do_dia.csv' existe e se o link RAW está correto.")
+        if st.checkbox("Mostrar erro técnico"):
+            st.write(e)
 
-# URL que você forneceu
-url_ogol = "https://www.ogol.com.br/futebol/proximos-jogos?jogo_data_year=2026&jogo_data_month=1&jogo_data_day=22"
-lista_jogos = raspar_jogos_ogol(url_ogol)
-
-# Exibe os resultados
-if lista_jogos:
-    df = pd.DataFrame(lista_jogos)
-    print(df)
-else:
-    print("Nenhum dado capturado.")
+# Chamada da função para testar o arquivo individualmente se necessário
+if __name__ == "__main__":
+    mostrar_jogos()
