@@ -90,7 +90,7 @@ def mostrar_registro(df_csv):
         else:
             liga = col_j1.selectbox("Selecione a Liga", sorted(df_csv['Liga'].unique()), key=f"liga_{i}")
             df_filtrado = df_csv[df_csv['Liga'] == liga]
-            times = sorted(pd.concat([df_filtrado['Mandande'], df_filtrado['Visitante']]).unique())
+            times = sorted(pd.concat([df_filtrado['Mandante'], df_filtrado['Visitante']]).unique())
             mandante = col_j2.selectbox("Mandante", times, key=f"man_{i}")
             visitante = col_j3.selectbox("Visitante", [t for t in times if t != mandante], key=f"vis_{i}")
         
@@ -167,3 +167,4 @@ def mostrar_registro(df_csv):
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
+
