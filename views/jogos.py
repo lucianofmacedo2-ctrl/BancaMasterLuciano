@@ -18,13 +18,15 @@ def mostrar_jogos():
     st.title("📅 Agenda de Jogos")
 
     # --- LEGENDA PARA VENDA ---
-    with st.expander("💡 Radar de Valor Profissional (Média Cruzada)", expanded=True):
+    with st.expander("💡 Entenda os Sinais de Alerta (Radar de Valor)", expanded=True):
         st.markdown("""
-        Nosso algoritmo utiliza **Média Cruzada** (Ataque vs Defesa) para identificar super tendências:
-        * 🔥⚽ **Fogo + Gol**: Expectativa superior a **4.0 Gols** no confronto.
-        * 🔥🚩 **Fogo + Canto**: Expectativa superior a **13.0 Escanteios** no confronto.
+        No **Banca Master Luciano**, nosso algoritmo identifica automaticamente os melhores jogos para operar:
+        * 🔥⚽ **Fogo + Gol**: Jogo com tendência altíssima de **Over 2.5 Gols** (Soma das médias > 3.0).
+        * 🔥🚩 **Fogo + Canto**: Jogo com tendência altíssima de **Over 9.5 Cantos** (Soma das médias > 12.0).
+        * 🔍 **Analisar**: Clique para ver o scout detalhado de cada equipe.
         """)
     
+    # 1. CARREGAR DADOS
     df_hist = carregar_historico()
     
     @st.cache_data(ttl=60)
@@ -37,12 +39,15 @@ def mostrar_jogos():
         except: return pd.DataFrame()
 
     df_agenda = carregar_agenda(URL_AGENDA)
-    if df_agenda.empty or 'Data' not in df_agenda.columns: return
 
-    # LÓGICA DE DATAS
+    if df_agenda.empty or 'Data' not in df_agenda.columns:
+        return
+
+    # 2. LÓGICA DE DATAS
     hoje_dt = datetime.now().date()
-    def formatar_data_busca(dt): return [dt.strftime('%d/%m/%Y'), dt.strftime('%d/%m/%y')]
-    
+    def formatar_data_busca(dt):
+        return [dt.strftime('%d/%m/%Y'), dt.strftime('%d/%m/%y')]
+
     if 'data_sel_formatos' not in st.session_state:
         st.session_state.data_sel_formatos = formatar_data_busca(hoje_dt)
         st.session_state.data_exibicao = hoje_dt.strftime('%d/%m/%Y')
@@ -50,7 +55,7 @@ def mostrar_jogos():
     cols_btn = st.columns(3)
     datas_opcoes = [hoje_dt, hoje_dt + timedelta(days=1), hoje_dt + timedelta(days=2)]
     labels = ["📅 Hoje", "📅 Amanhã", "📅 Depois"]
-    
+
     for i in range(3):
         if cols_btn[i].button(labels[i], use_container_width=True):
             st.session_state.data_sel_formatos = formatar_data_busca(datas_opcoes[i])
@@ -58,10 +63,11 @@ def mostrar_jogos():
 
     st.info(f"Mostrando jogos de: **{st.session_state.data_exibicao}**")
 
+    # 3. FILTRAGEM E EXIBIÇÃO COM ALERTA DE VALOR
     df_dia = df_agenda[df_agenda['Data'].isin(st.session_state.data_sel_formatos)]
 
     if df_dia.empty:
-        st.warning("Nenhum jogo encontrado para esta data.")
+        st.warning(f"Nenhum jogo encontrado para {st.session_state.data_exibicao}.")
     else:
         times_no_dia = []
         for liga in df_dia['Liga'].unique():
@@ -69,53 +75,51 @@ def mostrar_jogos():
             st.markdown(f"#### 🏆 {liga}")
             
             for idx, row in df_l.iterrows():
-                m, v = row['Mandante'], row['Visitante']
-                times_no_dia.extend([m, v])
+                mandante, visitante = row['Mandante'], row['Visitante']
+                times_no_dia.extend([mandante, visitante])
                 
-                alerta_gol, alerta_canto = "", ""
+                # --- Lógica de Alertas ---
+                alerta_gol = ""
+                alerta_canto = ""
                 
                 if not df_hist.empty:
-                    # Filtra histórico específico do mando
-                    hist_m_casa = df_hist[df_hist['Mandante'] == m]
-                    hist_v_fora = df_hist[df_hist['Visitante'] == v]
+                    # Estatísticas Mandante (Casa)
+                    df_m = df_hist[df_hist['Mandante'] == mandante]
+                    # Estatísticas Visitante (Fora)
+                    df_v = df_hist[df_hist['Visitante'] == visitante]
                     
-                    if len(hist_m_casa) >= 2 and len(hist_v_fora) >= 2:
-                        # --- CÁLCULO CRUZADO DE GOLS ---
-                        # (O que m faz em casa + o que v sofre fora) / 2
-                        exp_m_faz = (hist_m_casa['Gols_Mandante_FT'].mean() + hist_v_fora['Gols_Mandante_FT'].mean()) / 2
-                        # (O que v faz fora + o que m sofre em casa) / 2
-                        exp_v_faz = (hist_v_fora['Gols_Visitante_FT'].mean() + hist_m_casa['Gols_Visitante_FT'].mean()) / 2
+                    if not df_m.empty and not df_v.empty:
+                        # Média de Gols Combinada (Mandante casa + Visitante fora)
+                        m_gols = (df_m['Gols_Mandante_FT'].mean() + df_m['Gols_Visitante_FT'].mean()) + \
+                                 (df_v['Gols_Mandante_FT'].mean() + df_v['Gols_Visitante_FT'].mean())
                         
-                        if (exp_m_faz + exp_v_faz) > 3.0: 
-                            alerta_gol = " 🔥⚽"
+                        # Média de Cantos Combinada
+                        m_cantos = (df_m['Cantos_Mandante'].mean() + df_m['Cantos_Visitante'].mean()) + \
+                                   (df_v['Cantos_Mandante'].mean() + df_v['Cantos_Visitante'].mean())
 
-                        # --- CÁLCULO CRUZADO DE CANTOS ---
-                        # (Cantos que m faz em casa + Cantos que v cede fora) / 2
-                        exp_c_m = (hist_m_casa['Cantos_Mandante'].mean() + hist_v_fora['Cantos_Mandante'].mean()) / 2
-                        # (Cantos que v faz fora + Cantos que m cede em casa) / 2
-                        exp_c_v = (hist_v_fora['Cantos_Visitante'].mean() + hist_m_casa['Cantos_Visitante'].mean()) / 2
-                        
-                        if (exp_c_m + exp_c_v) > 11.0: 
-                            alerta_canto = " 🔥🚩"
+                        if m_gols > 3.0: alerta_gol = " 🔥⚽"
+                        if m_cantos > 12.0: alerta_canto = " 🔥🚩"
 
                 c1, c2, c3 = st.columns([4, 2.5, 1.5])
                 with c1:
-                    st.write(f"**{row['Hora']}** | {m} vs {v}{alerta_gol}{alerta_canto}")
+                    st.write(f"**{row['Hora']}** | {mandante} vs {visitante}{alerta_gol}{alerta_canto}")
                 with c2:
                     st.write(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')}")
                 with c3:
                     if st.button("Analisar 🔍", key=f"btn_ag_{idx}", use_container_width=True):
-                        st.session_state.time_casa_scout, st.session_state.time_fora_scout = m, v
+                        st.session_state.time_casa_scout = mandante
+                        st.session_state.time_fora_scout = visitante
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-        # --- RANKINGS TOP 5 ABAIXO DA LISTA ---
+        # 4. RANKING TOP 5 (MANTIDO)
         if not df_hist.empty and times_no_dia:
             st.divider()
             st.subheader(f"📊 Top Performance - {st.session_state.data_exibicao}")
             
             times_dia_unicos = list(set(times_no_dia))
             rank_data = []
+
             for t in times_dia_unicos:
                 jogos_t = df_hist[(df_hist['Mandante'] == t) | (df_hist['Visitante'] == t)]
                 if not jogos_t.empty:
@@ -123,11 +127,11 @@ def mostrar_jogos():
                     rank_data.append({
                         "Time": t,
                         "Gols Marcados": (df_hist[df_hist['Mandante'] == t]['Gols_Mandante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Visitante_FT'].sum()) / total_j,
-                        "Gols Sofridos": (df_hist[df_hist['Mandante'] == t]['Gols_Visitante_FT'].sum() + df_hist[df_hist['Mandante'] == t]['Gols_Visitante_FT'].sum()) / total_j,
+                        "Gols Sofridos": (df_hist[df_hist['Mandante'] == t]['Gols_Visitante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Mandante_FT'].sum()) / total_j,
                         "Cantos Marcados": (df_hist[df_hist['Mandante'] == t]['Cantos_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Visitante'].sum()) / total_j,
-                        "Cantos Sofridos": (df_hist[df_hist['Mandante'] == t]['Cantos_Visitante'].sum() + df_hist[df_hist['Mandante'] == t]['Cantos_Mandante'].sum()) / total_j,
+                        "Cantos Sofridos": (df_hist[df_hist['Mandante'] == t]['Cantos_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Mandante'].sum()) / total_j,
                         "Chutes Marcados": (df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Visitante'].sum()) / total_j,
-                        "Chutes Sofridos": (df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Visitante'].sum() + df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Mandante'].sum()) / total_j
+                        "Chutes Sofridos": (df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Mandante'].sum()) / total_j
                     })
             
             if rank_data:
