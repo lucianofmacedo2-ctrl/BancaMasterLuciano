@@ -4,29 +4,63 @@ import pandas as pd
 URL_RAW = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/refs/heads/main/jogos_do_dia.csv"
 
 def mostrar_jogos():
-    st.title("📅 Agenda de Jogos por Liga")
-    st.markdown("---")
+    st.title("📅 Agenda de Jogos")
 
-    # Estilo CSS para melhorar a aparência das tabelas e botões
+    # --- CSS REFINADO E FINO ---
     st.markdown("""
         <style>
-        .stTable {
-            font-size: 16px !important;
-        }
+        /* Cabeçalho da Liga mais fino */
         .header-liga {
-            background-color: #1E1E1E;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 20px;
-            border-left: 5px solid #28a745;
-            color: white;
-        }
-        .odd-verde {
-            color: #28a745;
-            font-weight: bold;
-            background-color: rgba(40, 167, 69, 0.1);
-            padding: 2px 6px;
+            background-color: rgba(128, 128, 128, 0.1);
+            padding: 5px 12px;
             border-radius: 4px;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            border-left: 4px solid #28a745;
+        }
+        .header-liga h4 {
+            margin: 0;
+            font-size: 16px !important;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        /* Linha do jogo mais compacta */
+        .linha-jogo {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 0px;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+        }
+        .hora-texto {
+            font-size: 14px;
+            font-weight: bold;
+            color: #28a745;
+            margin-right: 15px;
+        }
+        .times-texto {
+            font-size: 15px;
+            font-weight: 500;
+        }
+        .vs-sep {
+            color: #888;
+            font-size: 12px;
+            margin: 0 8px;
+        }
+        .odd-container {
+            display: flex;
+            gap: 4px;
+        }
+        .odd-box {
+            background-color: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+            border: 1px solid rgba(40, 167, 69, 0.3);
+            border-radius: 3px;
+            width: 42px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 2px 0;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -39,52 +73,50 @@ def mostrar_jogos():
         df = carregar_dados(URL_RAW)
 
         if df.empty:
-            st.info("Nenhum jogo disponível no momento.")
+            st.info("Nenhum jogo disponível.")
             return
 
-        # 1. Obter lista de ligas únicas e ordenar
-        ligas = sorted(df['competicao'].unique())
+        # Agrupar por liga
+        ligas = df['competicao'].unique()
 
         for liga in ligas:
-            # Criar um container visual para a Liga
-            st.markdown(f"<div class='header-liga'><h3>🏆 {liga}</h3></div>", unsafe_allow_html=True)
+            # Cabeçalho Fino
+            st.markdown(f"<div class='header-liga'><h4>🏆 {liga}</h4></div>", unsafe_allow_html=True)
             
-            # Filtrar jogos apenas desta liga
-            df_liga = df[df['competicao'] == liga].copy()
+            df_liga = df[df['competicao'] == liga]
             
-            # Preparar as colunas para exibição na tabela
-            for index, row in df_liga.iterrows():
-                # Criar uma linha com colunas para simular a tabela
-                col_data, col_confronto, col_odds, col_acao = st.columns([1.5, 4, 2, 1.5])
+            for _, row in df_liga.iterrows():
+                # Criando as colunas para o layout horizontal
+                col_dados, col_odds = st.columns([4, 1.5])
                 
-                with col_data:
-                    st.write(f"🕒 **{row['hora']}**")
-                    st.caption(f"{row['data']}")
-                
-                with col_confronto:
-                    # Exibe Mandante vs Visitante em uma linha
-                    st.markdown(f"**{row['mandante']}** <span style='color:gray'>vs</span> **{row['visitante']}**", unsafe_allow_html=True)
-                    st.caption(f"Fase: {row['fase']}")
+                with col_dados:
+                    # Hora + Confronto na mesma linha
+                    st.markdown(f"""
+                        <div class='linha-jogo'>
+                            <div>
+                                <span class='hora-texto'>{row['hora']}</span>
+                                <span class='times-texto'>{row['mandante']}</span>
+                                <span class='vs-sep'>vs</span>
+                                <span class='times-texto'>{row['visitante']}</span>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
                 
                 with col_odds:
+                    # Quadrinhos de Odds alinhados à direita
                     if str(row['odd_1']) != "-":
-                        # Exibe as odds formatadas
-                        st.markdown(f"<span class='odd-verde'>{row['odd_1']}</span> | <span class='odd-verde'>{row['odd_x']}</span> | <span class='odd-verde'>{row['odd_2']}</span>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                            <div class='odd-container'>
+                                <div class='odd-box'>{row['odd_1']}</div>
+                                <div class='odd-box'>{row['odd_x']}</div>
+                                <div class='odd-box'>{row['odd_2']}</div>
+                            </div>
+                        """, unsafe_allow_html=True)
                     else:
-                        st.write("-")
-                
-                with col_acao:
-                    # Botão de ação
-                    if st.button("Analisar", key=f"btn_{index}", use_container_width=True):
-                        st.session_state.time_casa_scout = row['mandante']
-                        st.session_state.time_fora_scout = row['visitante']
-                        st.toast(f"Análise de {row['mandante']} enviada!", icon="⚽")
-            
-            st.markdown("---") # Linha divisória entre ligas
+                        st.markdown(f"<div style='text-align:right; font-size:12px; color:#888;'>{row['fase']}</div>", unsafe_allow_html=True)
 
     except Exception as e:
-        st.error("Erro ao carregar e organizar as tabelas.")
-        st.exception(e)
+        st.error("Erro ao carregar agenda.")
 
 if __name__ == "__main__":
     mostrar_jogos()
