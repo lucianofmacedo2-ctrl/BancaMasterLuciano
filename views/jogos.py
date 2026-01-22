@@ -8,7 +8,6 @@ ARQUIVO_HISTORICO = 'dados_25_26.csv'
 
 def carregar_historico():
     try:
-        # utf-8-sig remove o caractere invisível \ufeff automaticamente
         df = pd.read_csv(ARQUIVO_HISTORICO, sep=None, engine='python', encoding='utf-8-sig')
         df.columns = [c.strip() for c in df.columns]
         return df
@@ -26,7 +25,6 @@ def mostrar_jogos():
         try:
             df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8-sig')
             df.columns = [c.strip() for c in df.columns]
-            # Limpa espaços em branco de todas as colunas de texto
             df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
             return df
         except: 
@@ -35,15 +33,11 @@ def mostrar_jogos():
     df_agenda = carregar_agenda(URL_AGENDA)
 
     if df_agenda.empty or 'Data' not in df_agenda.columns:
-        if not df_agenda.empty:
-            st.error(f"Coluna 'Data' não encontrada. Detectadas: {list(df_agenda.columns)}")
         return
 
-    # 2. LÓGICA DE DATAS (Suporta ano com 2 ou 4 dígitos: 26 ou 2026)
+    # 2. LÓGICA DE DATAS
     hoje_dt = datetime.now().date()
-    
     def formatar_data_busca(dt):
-        # Retorna lista com formatos dd/mm/yyyy e dd/mm/yy
         return [dt.strftime('%d/%m/%Y'), dt.strftime('%d/%m/%y')]
 
     if 'data_sel_formatos' not in st.session_state:
@@ -61,7 +55,7 @@ def mostrar_jogos():
 
     st.info(f"Mostrando jogos de: **{st.session_state.data_exibicao}**")
 
-    # 3. FILTRAGEM E EXIBIÇÃO DA LISTA
+    # 3. FILTRAGEM E EXIBIÇÃO COM ALERTA DE VALOR
     df_dia = df_agenda[df_agenda['Data'].isin(st.session_state.data_sel_formatos)]
 
     if df_dia.empty:
@@ -73,42 +67,53 @@ def mostrar_jogos():
             st.markdown(f"#### 🏆 {liga}")
             
             for idx, row in df_l.iterrows():
-                times_no_dia.extend([row['Mandante'], row['Visitante']])
+                mandante = row['Mandante']
+                visitante = row['Visitante']
+                times_no_dia.extend([mandante, visitante])
+                
+                # --- Lógica do Alerta de Valor (Over 2.5) ---
+                alerta_emoji = ""
+                if not df_hist.empty:
+                    # Média do Mandante (em casa)
+                    jogos_m = df_hist[df_hist['Mandante'] == mandante]
+                    media_m = (jogos_m['Gols_Mandante_FT'].mean() + jogos_m['Gols_Visitante_FT'].mean()) if not jogos_m.empty else 0
+                    
+                    # Média do Visitante (fora)
+                    jogos_v = df_hist[df_hist['Visitante'] == visitante]
+                    media_v = (jogos_v['Gols_Mandante_FT'].mean() + jogos_v['Gols_Visitante_FT'].mean()) if not jogos_v.empty else 0
+                    
+                    # Se a soma das médias for > 2.7 (ajustado para ser mais criterioso)
+                    if (media_m + media_v) > 2.7:
+                        alerta_emoji = " 🔥"
+
                 c1, c2, c3 = st.columns([4, 2.5, 1.5])
                 with c1:
-                    st.write(f"**{row['Hora']}** | {row['Mandante']} vs {row['Visitante']}")
+                    # Exibe o emoji de fogo se o jogo tiver valor
+                    st.write(f"**{row['Hora']}** | {mandante} vs {visitante}{alerta_emoji}")
                 with c2:
                     st.write(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')}")
                 with c3:
                     if st.button("Analisar 🔍", key=f"btn_ag_{idx}", use_container_width=True):
-                        st.session_state.time_casa_scout = row['Mandante']
-                        st.session_state.time_fora_scout = row['Visitante']
+                        st.session_state.time_casa_scout = mandante
+                        st.session_state.time_fora_scout = visitante
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-        # 4. RANKING TOP 5 PERFORMANCE (LAYOUT SIMÉTRICO)
+        # 4. RANKINGS (MANTIDOS)
         if not df_hist.empty and times_no_dia:
             st.divider()
-            st.subheader(f"📊 Top Performance - Jogos de {st.session_state.data_exibicao}")
-            st.caption("Médias baseadas no histórico da temporada 2025/26")
-
+            st.subheader(f"📊 Top Performance - {st.session_state.data_exibicao}")
+            
             times_dia_unicos = list(set(times_no_dia))
             rank_data = []
 
             for t in times_dia_unicos:
-                # Busca jogos onde o time participou (Mandante ou Visitante)
                 jogos_t = df_hist[(df_hist['Mandante'] == t) | (df_hist['Visitante'] == t)]
-                
                 if not jogos_t.empty:
-                    # Cálculo de Gols
                     gm = df_hist[df_hist['Mandante'] == t]['Gols_Mandante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Visitante_FT'].sum()
                     gs = df_hist[df_hist['Mandante'] == t]['Gols_Visitante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Mandante_FT'].sum()
-                    
-                    # Cálculo de Cantos
                     cm = df_hist[df_hist['Mandante'] == t]['Cantos_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Visitante'].sum()
                     cs = df_hist[df_hist['Mandante'] == t]['Cantos_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Mandante'].sum()
-                    
-                    # Cálculo de Chutes ao Gol
                     chm = df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Visitante'].sum()
                     chs = df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Mandante'].sum()
                     
@@ -122,33 +127,20 @@ def mostrar_jogos():
             
             if rank_data:
                 df_rank = pd.DataFrame(rank_data)
-
-                # BLOCO GOLS
-                st.markdown("#### ⚽ Gols")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Marcados (Top 5)**")
-                    st.dataframe(df_rank.sort_values("Gols Marcados", ascending=False).head(5)[["Time", "Gols Marcados"]], hide_index=True, use_container_width=True)
-                with col2:
-                    st.write("**Sofridos (Top 5)**")
-                    st.dataframe(df_rank.sort_values("Gols Sofridos", ascending=False).head(5)[["Time", "Gols Sofridos"]], hide_index=True, use_container_width=True)
-
-                # BLOCO CANTOS
-                st.markdown("#### 🚩 Escanteios")
-                col3, col4 = st.columns(2)
-                with col3:
-                    st.write("**Marcados (Top 5)**")
-                    st.dataframe(df_rank.sort_values("Cantos Marcados", ascending=False).head(5)[["Time", "Cantos Marcados"]], hide_index=True, use_container_width=True)
-                with col4:
-                    st.write("**Sofridos (Top 5)**")
-                    st.dataframe(df_rank.sort_values("Cantos Sofridos", ascending=False).head(5)[["Time", "Cantos Sofridos"]], hide_index=True, use_container_width=True)
-
-                # BLOCO CHUTES
-                st.markdown("#### 🎯 Chutes ao Gol")
-                col5, col6 = st.columns(2)
-                with col5:
-                    st.write("**Marcados (Top 5)**")
-                    st.dataframe(df_rank.sort_values("Chutes Marcados", ascending=False).head(5)[["Time", "Chutes Marcados"]], hide_index=True, use_container_width=True)
-                with col6:
-                    st.write("**Sofridos (Top 5)**")
-                    st.dataframe(df_rank.sort_values("Chutes Sofridos", ascending=False).head(5)[["Time", "Chutes Sofridos"]], hide_index=True, use_container_width=True)
+                
+                # --- LAYOUT SIMÉTRICO ---
+                categorias = [
+                    ("⚽ Gols", "Gols Marcados", "Gols Sofridos"),
+                    ("🚩 Escanteios", "Cantos Marcados", "Cantos Sofridos"),
+                    ("🎯 Chutes ao Gol", "Chutes Marcados", "Chutes Sofridos")
+                ]
+                
+                for titulo, col_m, col_s in categorias:
+                    st.markdown(f"#### {titulo}")
+                    ca, cb = st.columns(2)
+                    with ca:
+                        st.write("**Marcados (Top 5)**")
+                        st.dataframe(df_rank.sort_values(col_m, ascending=False).head(5)[["Time", col_m]], hide_index=True, use_container_width=True)
+                    with cb:
+                        st.write("**Sofridos (Top 5)**")
+                        st.dataframe(df_rank.sort_values(col_s, ascending=False).head(5)[["Time", col_s]], hide_index=True, use_container_width=True)
