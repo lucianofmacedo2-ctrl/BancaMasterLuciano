@@ -16,6 +16,15 @@ def carregar_historico():
 
 def mostrar_jogos():
     st.title("📅 Agenda de Jogos")
+
+    # --- LEGENDA PARA VENDA ---
+    with st.expander("💡 Entenda os Sinais de Alerta (Radar de Valor)", expanded=True):
+        st.markdown("""
+        No **Banca Master Luciano**, nosso algoritmo identifica automaticamente os melhores jogos para operar:
+        * 🔥⚽ **Fogo + Gol**: Jogo com tendência altíssima de **Over 2.5 Gols** (Soma das médias > 3.0).
+        * 🔥🚩 **Fogo + Canto**: Jogo com tendência altíssima de **Over 9.5 Cantos** (Soma das médias > 12.0).
+        * 🔍 **Analisar**: Clique para ver o scout detalhado de cada equipe.
+        """)
     
     # 1. CARREGAR DADOS
     df_hist = carregar_historico()
@@ -27,8 +36,7 @@ def mostrar_jogos():
             df.columns = [c.strip() for c in df.columns]
             df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
             return df
-        except: 
-            return pd.DataFrame()
+        except: return pd.DataFrame()
 
     df_agenda = carregar_agenda(URL_AGENDA)
 
@@ -67,29 +75,34 @@ def mostrar_jogos():
             st.markdown(f"#### 🏆 {liga}")
             
             for idx, row in df_l.iterrows():
-                mandante = row['Mandante']
-                visitante = row['Visitante']
+                mandante, visitante = row['Mandante'], row['Visitante']
                 times_no_dia.extend([mandante, visitante])
                 
-                # --- Lógica do Alerta de Valor (Over 2.5) ---
-                alerta_emoji = ""
+                # --- Lógica de Alertas ---
+                alerta_gol = ""
+                alerta_canto = ""
+                
                 if not df_hist.empty:
-                    # Média do Mandante (em casa)
-                    jogos_m = df_hist[df_hist['Mandante'] == mandante]
-                    media_m = (jogos_m['Gols_Mandante_FT'].mean() + jogos_m['Gols_Visitante_FT'].mean()) if not jogos_m.empty else 0
+                    # Estatísticas Mandante (Casa)
+                    df_m = df_hist[df_hist['Mandante'] == mandante]
+                    # Estatísticas Visitante (Fora)
+                    df_v = df_hist[df_hist['Visitante'] == visitante]
                     
-                    # Média do Visitante (fora)
-                    jogos_v = df_hist[df_hist['Visitante'] == visitante]
-                    media_v = (jogos_v['Gols_Mandante_FT'].mean() + jogos_v['Gols_Visitante_FT'].mean()) if not jogos_v.empty else 0
-                    
-                    # Se a soma das médias for > 2.7 (ajustado para ser mais criterioso)
-                    if (media_m + media_v) > 2.7:
-                        alerta_emoji = " 🔥"
+                    if not df_m.empty and not df_v.empty:
+                        # Média de Gols Combinada (Mandante casa + Visitante fora)
+                        m_gols = (df_m['Gols_Mandante_FT'].mean() + df_m['Gols_Visitante_FT'].mean()) + \
+                                 (df_v['Gols_Mandante_FT'].mean() + df_v['Gols_Visitante_FT'].mean())
+                        
+                        # Média de Cantos Combinada
+                        m_cantos = (df_m['Cantos_Mandante'].mean() + df_m['Cantos_Visitante'].mean()) + \
+                                   (df_v['Cantos_Mandante'].mean() + df_v['Cantos_Visitante'].mean())
+
+                        if m_gols > 3.0: alerta_gol = " 🔥⚽"
+                        if m_cantos > 12.0: alerta_canto = " 🔥🚩"
 
                 c1, c2, c3 = st.columns([4, 2.5, 1.5])
                 with c1:
-                    # Exibe o emoji de fogo se o jogo tiver valor
-                    st.write(f"**{row['Hora']}** | {mandante} vs {visitante}{alerta_emoji}")
+                    st.write(f"**{row['Hora']}** | {mandante} vs {visitante}{alerta_gol}{alerta_canto}")
                 with c2:
                     st.write(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')}")
                 with c3:
@@ -99,7 +112,7 @@ def mostrar_jogos():
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-        # 4. RANKINGS (MANTIDOS)
+        # 4. RANKING TOP 5 (MANTIDO)
         if not df_hist.empty and times_no_dia:
             st.divider()
             st.subheader(f"📊 Top Performance - {st.session_state.data_exibicao}")
@@ -110,37 +123,24 @@ def mostrar_jogos():
             for t in times_dia_unicos:
                 jogos_t = df_hist[(df_hist['Mandante'] == t) | (df_hist['Visitante'] == t)]
                 if not jogos_t.empty:
-                    gm = df_hist[df_hist['Mandante'] == t]['Gols_Mandante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Visitante_FT'].sum()
-                    gs = df_hist[df_hist['Mandante'] == t]['Gols_Visitante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Mandante_FT'].sum()
-                    cm = df_hist[df_hist['Mandante'] == t]['Cantos_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Visitante'].sum()
-                    cs = df_hist[df_hist['Mandante'] == t]['Cantos_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Mandante'].sum()
-                    chm = df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Visitante'].sum()
-                    chs = df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Mandante'].sum()
-                    
                     total_j = len(jogos_t)
                     rank_data.append({
                         "Time": t,
-                        "Gols Marcados": gm / total_j, "Gols Sofridos": gs / total_j,
-                        "Cantos Marcados": cm / total_j, "Cantos Sofridos": cs / total_j,
-                        "Chutes Marcados": chm / total_j, "Chutes Sofridos": chs / total_j
+                        "Gols Marcados": (df_hist[df_hist['Mandante'] == t]['Gols_Mandante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Visitante_FT'].sum()) / total_j,
+                        "Gols Sofridos": (df_hist[df_hist['Mandante'] == t]['Gols_Visitante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Mandante_FT'].sum()) / total_j,
+                        "Cantos Marcados": (df_hist[df_hist['Mandante'] == t]['Cantos_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Visitante'].sum()) / total_j,
+                        "Cantos Sofridos": (df_hist[df_hist['Mandante'] == t]['Cantos_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Mandante'].sum()) / total_j,
+                        "Chutes Marcados": (df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Visitante'].sum()) / total_j,
+                        "Chutes Sofridos": (df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Mandante'].sum()) / total_j
                     })
             
             if rank_data:
                 df_rank = pd.DataFrame(rank_data)
-                
-                # --- LAYOUT SIMÉTRICO ---
-                categorias = [
-                    ("⚽ Gols", "Gols Marcados", "Gols Sofridos"),
-                    ("🚩 Escanteios", "Cantos Marcados", "Cantos Sofridos"),
-                    ("🎯 Chutes ao Gol", "Chutes Marcados", "Chutes Sofridos")
-                ]
-                
-                for titulo, col_m, col_s in categorias:
-                    st.markdown(f"#### {titulo}")
+                categorias = [("⚽ Gols", "Gols Marcados", "Gols Sofridos"), 
+                              ("🚩 Escanteios", "Cantos Marcados", "Cantos Sofridos"),
+                              ("🎯 Chutes ao Gol", "Chutes Marcados", "Chutes Sofridos")]
+                for tit, cm, cs in categorias:
+                    st.markdown(f"#### {tit}")
                     ca, cb = st.columns(2)
-                    with ca:
-                        st.write("**Marcados (Top 5)**")
-                        st.dataframe(df_rank.sort_values(col_m, ascending=False).head(5)[["Time", col_m]], hide_index=True, use_container_width=True)
-                    with cb:
-                        st.write("**Sofridos (Top 5)**")
-                        st.dataframe(df_rank.sort_values(col_s, ascending=False).head(5)[["Time", col_s]], hide_index=True, use_container_width=True)
+                    with ca: st.dataframe(df_rank.sort_values(cm, ascending=False).head(5)[["Time", cm]], hide_index=True, use_container_width=True)
+                    with cb: st.dataframe(df_rank.sort_values(cs, ascending=False).head(5)[["Time", cs]], hide_index=True, use_container_width=True)
