@@ -6,7 +6,7 @@ from datetime import datetime
 from views import scout, registro, historico, dashboard, bancas, jogos
 import styles
 
-# --- FUNÇÃO DE BACKUP AUTOMÁTICO ---
+# --- FUNÇÃO DE BACKUP (MANTIDA) ---
 def realizar_backup():
     pasta_data = "data"
     pasta_backup = "backups"
@@ -15,10 +15,8 @@ def realizar_backup():
     data_hoje = datetime.now().strftime("%Y-%m-%d")
     arquivo_zip = os.path.join(pasta_backup, f"backup_{data_hoje}")
     if not os.path.exists(arquivo_zip + ".zip"):
-        try:
-            shutil.make_archive(arquivo_zip, 'zip', pasta_data)
-        except Exception as e:
-            print(f"Erro no backup: {e}")
+        try: shutil.make_archive(arquivo_zip, 'zip', pasta_data)
+        except Exception as e: print(f"Erro no backup: {e}")
 
 realizar_backup()
 
@@ -37,40 +35,40 @@ df_csv = carregar_dados_csv()
 
 st.sidebar.title("🏆 Master Luciano")
 
-# --- LÓGICA DE NAVEGAÇÃO AUTOMÁTICA ---
+# --- LÓGICA DE NAVEGAÇÃO REFORÇADA ---
 opcoes_menu = ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"]
 
-# Inicializa a página ativa como Dashboard se não existir
+# Inicializa se for a primeira vez
 if 'menu_ativo' not in st.session_state:
     st.session_state.menu_ativo = "📊 Dashboard"
 
-# O radio agora é controlado pelo 'index' baseado na variável 'menu_ativo'
+# Encontra a posição da página atual na lista
+index_atual = opcoes_menu.index(st.session_state.menu_ativo)
+
+# O segredo: usamos o parâmetro 'index' para forçar a posição
 menu = st.sidebar.radio(
     "Navegação", 
     opcoes_menu, 
-    index=opcoes_menu.index(st.session_state.menu_ativo)
+    index=index_atual
 )
 
-# Sincroniza a variável caso o usuário clique manualmente no menu
-st.session_state.menu_ativo = menu
+# Se o usuário clicar manualmente, atualizamos a variável
+if menu != st.session_state.menu_ativo:
+    st.session_state.menu_ativo = menu
 
-if menu == "📊 Dashboard":
+# --- RENDERIZAÇÃO ---
+if st.session_state.menu_ativo == "📊 Dashboard":
     dashboard.mostrar_dashboard() 
-
-elif menu == "📅 Jogos":
+elif st.session_state.menu_ativo == "📅 Jogos":
     jogos.mostrar_jogos()
-
-elif menu == "🔎 Scout":
+elif st.session_state.menu_ativo == "🔎 Scout":
     if not df_csv.empty:
         scout.mostrar_scout(df_csv)
     else:
-        st.error("Arquivo 'dados_25_26.csv' não encontrado para o Scout.")
-
-elif menu == "📝 Registro":
+        st.error("Arquivo 'dados_25_26.csv' não encontrado.")
+elif st.session_state.menu_ativo == "📝 Registro":
     registro.mostrar_registro(df_csv)
-
-elif menu == "📂 Histórico":
+elif st.session_state.menu_ativo == "📂 Histórico":
     historico.mostrar_historico()
-
-elif menu == "🏦 Bancas":
+elif st.session_state.menu_ativo == "🏦 Bancas":
     bancas.mostrar_bancas()
