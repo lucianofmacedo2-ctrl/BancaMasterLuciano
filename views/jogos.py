@@ -86,7 +86,7 @@ def mostrar_jogos():
                         # (O que v faz fora + o que m sofre em casa) / 2
                         exp_v_faz = (hist_v_fora['Gols_Visitante_FT'].mean() + hist_m_casa['Gols_Visitante_FT'].mean()) / 2
                         
-                        if (exp_m_faz + exp_v_faz) > 3.1: 
+                        if (exp_m_faz + exp_v_faz) > 3.0: 
                             alerta_gol = " 🔥⚽"
 
                         # --- CÁLCULO CRUZADO DE CANTOS ---
@@ -95,7 +95,7 @@ def mostrar_jogos():
                         # (Cantos que v faz fora + Cantos que m cede em casa) / 2
                         exp_c_v = (hist_v_fora['Cantos_Visitante'].mean() + hist_m_casa['Cantos_Visitante'].mean()) / 2
                         
-                        if (exp_c_m + exp_c_v) > 11.2: 
+                        if (exp_c_m + exp_c_v) > 11.0: 
                             alerta_canto = " 🔥🚩"
 
                 c1, c2, c3 = st.columns([4, 2.5, 1.5])
