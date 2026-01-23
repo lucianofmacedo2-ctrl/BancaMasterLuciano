@@ -155,6 +155,7 @@ def mostrar_scout(df):
     idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
     v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v)
 
+    # --- PROGRESSO E EXPLICAÇÃO DOS ALVOS ---
     tab_geral = calcular_tabela_classificacao(df_s)
     liga_clean = str(liga_sel).upper().strip()
     
@@ -166,19 +167,17 @@ def mostrar_scout(df):
         st.markdown(f"📊 **Progresso da Competição:** Rodada **{int(rodada_atual)}** de **{info['rodadas']}** - **{pct:.1f}% concluída**")
         st.progress(min(pct/100, 1.0))
         
-        # EXPLICAÇÃO DETALHADA DOS ALVOS
         with st.expander("📖 Entenda as Posições e Alvos desta Liga"):
             st.write(f"Nesta temporada da **{liga_sel}**, a tabela é dividida da seguinte forma:")
             for alvo, faixa in info['alvos'].items():
                 if "Rebaixamento" in alvo:
-                    st.write(f"- 🛑 **{alvo}**: Do {faixa[0]}º ao {faixa[1]}º lugar (Risco de queda).")
+                    st.write(f"- 🛑 **{alvo}**: Do {faixa[0]}º ao {faixa[1]}º lugar.")
                 elif any(x in alvo for x in ["Champions", "Libertadores", "Acesso"]):
-                    st.write(f"- 🏆 **{alvo}**: Do {faixa[0]}º ao {faixa[1]}º lugar (Elite/Promoção).")
+                    st.write(f"- 🏆 **{alvo}**: Do {faixa[0]}º ao {faixa[1]}º lugar.")
                 else:
                     st.write(f"- ⚽ **{alvo}**: Do {faixa[0]}º ao {faixa[1]}º lugar.")
-    else:
-        st.warning(f"⚠️ Liga '{liga_clean}' não mapeada.")
-
+    
+    # --- CARDS CENTRAIS ---
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
@@ -213,7 +212,9 @@ def mostrar_scout(df):
         render_stat_row("CHUTES AO GOL", df_m_h['Chutes_Gol_Mandante'].mean(), df_v_a['Chutes_Gol_Visitante'].mean())
         render_stat_row("ESCANTEIOS", df_m_h['Cantos_Mandante'].mean(), df_v_a['Cantos_Visitante'].mean())
 
+    # --- ABAS DE FUNCIONALIDADES (TODAS PRESERVADAS) ---
     t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
+    
     with t1:
         cf1, cf2 = st.columns(2)
         with cf1:
@@ -226,14 +227,17 @@ def mostrar_scout(df):
             for _, r in df_v_a.iterrows():
                 res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Visitante_FT'] == r['Gols_Mandante_FT'] else "❌")
                 st.write(f"{res} {r['Data'].strftime('%d/%m')} vs {r['Mandante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
+    
     with t2:
         h2h = df_s[((df_s['Mandante'] == m_sel) & (df_s['Visitante'] == v_sel)) | ((df_s['Mandante'] == v_sel) & (df_s['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
         st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True, hide_index=True)
+    
     with t3:
         for label, (cm, cv) in {"Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"), "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"), "Cantos": ("Cantos_Mandante", "Cantos_Visitante")}.items():
             st.subheader(label); ca, cb = st.columns(2)
             with ca: st.dataframe(calcular_stats_completas(df_m_h[cm], df_m_h[cv]).style.format("{:.2f}"), use_container_width=True)
             with cb: st.dataframe(calcular_stats_completas(df_v_a[cv], df_v_a[cm]).style.format("{:.2f}"), use_container_width=True)
+    
     with t4:
         for t_n, df_j, mando in [(m_sel, df_m_h, "Mandante"), (v_sel, df_v_a, "Visitante")]:
             st.write(f"**{t_n}**"); adv = "Visitante" if mando == "Mandante" else "Mandante"
