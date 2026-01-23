@@ -96,8 +96,9 @@ def mostrar_jogos():
                 with c2:
                     st.write(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')}")
                 with c3:
-                    # Chave de botão robusta e passagem de estado
                     if st.button("Analisar 🔍", key=f"btn_ag_{idx}_{mandante[:3]}", use_container_width=True):
+                        # Passamos Liga, Mandante e Visitante para garantir precisão total
+                        st.session_state.liga_scout = row['Liga']
                         st.session_state.time_casa_scout = mandante
                         st.session_state.time_fora_scout = visitante
                         st.session_state.menu_ativo = "🔎 Scout"
