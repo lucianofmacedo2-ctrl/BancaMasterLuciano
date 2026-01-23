@@ -17,16 +17,14 @@ def carregar_historico():
 def mostrar_jogos():
     st.title("📅 Agenda de Jogos")
 
-    # --- LEGENDA PARA VENDA ---
     with st.expander("💡 Entenda os Sinais de Alerta (Radar de Valor)", expanded=True):
         st.markdown("""
         No **Banca Master Luciano**, nosso algoritmo identifica automaticamente os melhores jogos para operar:
-        * 🔥⚽ **Fogo + Gol**: Jogo com tendência altíssima de **Over 2.5 Gols** (Soma das médias > 3.0).
-        * 🔥🚩 **Fogo + Canto**: Jogo com tendência altíssima de **Over 9.5 Cantos** (Soma das médias > 12.0).
+        * 🔥⚽ **Fogo + Gol**: Jogo com tendência altíssima de **Over 2.5 Gols**.
+        * 🔥🚩 **Fogo + Canto**: Jogo com tendência altíssima de **Over 9.5 Cantos**.
         * 🔍 **Analisar**: Clique para ver o scout detalhado de cada equipe.
         """)
     
-    # 1. CARREGAR DADOS
     df_hist = carregar_historico()
     
     @st.cache_data(ttl=60)
@@ -41,9 +39,9 @@ def mostrar_jogos():
     df_agenda = carregar_agenda(URL_AGENDA)
 
     if df_agenda.empty or 'Data' not in df_agenda.columns:
+        st.error("Erro ao carregar a agenda de jogos.")
         return
 
-    # 2. LÓGICA DE DATAS
     hoje_dt = datetime.now().date()
     def formatar_data_busca(dt):
         return [dt.strftime('%d/%m/%Y'), dt.strftime('%d/%m/%y')]
@@ -64,7 +62,6 @@ def mostrar_jogos():
 
     st.info(f"Mostrando jogos de: **{st.session_state.data_exibicao}**")
 
-    # 3. FILTRAGEM E EXIBIÇÃO COM ALERTA DE VALOR
     df_dia = df_agenda[df_agenda['Data'].isin(st.session_state.data_sel_formatos)]
 
     if df_dia.empty:
@@ -79,7 +76,6 @@ def mostrar_jogos():
                 mandante, visitante = row['Mandante'], row['Visitante']
                 times_no_dia.extend([mandante, visitante])
                 
-                # --- Lógica de Alertas ---
                 alerta_gol = ""
                 alerta_canto = ""
                 
@@ -90,7 +86,6 @@ def mostrar_jogos():
                     if not df_m.empty and not df_v.empty:
                         m_gols = (df_m['Gols_Mandante_FT'].mean() + df_m['Gols_Visitante_FT'].mean()) + \
                                  (df_v['Gols_Mandante_FT'].mean() + df_v['Gols_Visitante_FT'].mean())
-                        
                         m_cantos = (df_m['Cantos_Mandante'].mean() + df_m['Cantos_Visitante'].mean()) + \
                                    (df_v['Cantos_Mandante'].mean() + df_v['Cantos_Visitante'].mean())
 
@@ -103,14 +98,12 @@ def mostrar_jogos():
                 with c2:
                     st.write(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')}")
                 with c3:
-                    # KEY ÚNICA GERADA PARA EVITAR ERROS
                     if st.button("Analisar 🔍", key=f"btn_ag_{idx}_{mandante[:3]}", use_container_width=True):
                         st.session_state.time_casa_scout = mandante
                         st.session_state.time_fora_scout = visitante
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-        # 4. RANKING TOP 5 (MANTIDO INTEGRALMENTE)
         if not df_hist.empty and times_no_dia:
             st.divider()
             st.subheader(f"📊 Top Performance - {st.session_state.data_exibicao}")
