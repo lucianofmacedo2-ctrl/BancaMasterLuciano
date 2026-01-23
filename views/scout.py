@@ -74,41 +74,58 @@ def mostrar_scout(df):
     st.markdown("""<style>div[data-testid="stDataFrame"] td { text-align: center !important; } .stMetric { text-align: center !important; }</style>""", unsafe_allow_html=True)
     st.title("🚀 Scout Profissional")
 
+    # 1. PEGAR DADOS DA SESSÃO
     t_m_v = st.session_state.get('time_casa_scout', None)
     t_v_v = st.session_state.get('time_fora_scout', None)
 
+    # 2. DEFINIR LIGA AUTOMÁTICA
     default_liga_idx = 0
+    ligas_disponiveis = sorted(df['Liga'].unique())
     if t_m_v:
+        # Busca a liga correta para o time mandante selecionado
         l_encontrada = df[df['Mandante'] == t_m_v]['Liga'].unique()
         if len(l_encontrada) > 0:
-            ligas_lista = sorted(df['Liga'].unique())
-            default_liga_idx = ligas_lista.index(l_encontrada[0])
+            if l_encontrada[0] in ligas_disponiveis:
+                default_liga_idx = ligas_disponiveis.index(l_encontrada[0])
 
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", sorted(df['Liga'].unique()), index=default_liga_idx, key="scout_liga_sel")
-    df_l = df[df['Liga'] == liga_sel].copy()
+    liga_sel = c1.selectbox("Selecione a Liga", ligas_disponiveis, index=default_liga_idx, key="liga_main")
     
-    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True), key="scout_temp_sel")
+    df_l = df[df['Liga'] == liga_sel].copy()
+    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True), key="temp_main")
+    
     df_s = df_l[df_l['Temporada'] == temp_sel].copy()
     df_s['Data'] = pd.to_datetime(df_s['Data'], dayfirst=True, errors='coerce')
     
-    times = sorted(df_s['Mandante'].unique())
+    times_da_liga = sorted(df_s['Mandante'].unique())
     
-    # CORREÇÃO NA DEFINIÇÃO DE COLUNAS E INDEX
-    c3, c4 = st.columns(2)
-    
-    idx_m = times.index(t_m_v) if t_m_v in times else 0
-    m_sel = c3.selectbox("Mandante (Casa)", times, index=idx_m, key="scout_m_sel")
-    
-    opcoes_v = [t for t in times if t != m_sel]
-    idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
-    v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v, key="scout_v_sel")
+    # 3. LÓGICA DE INDEX PARA TIMES
+    idx_m = 0
+    if t_m_v in times_da_liga:
+        idx_m = times_da_liga.index(t_m_v)
 
+    c3, c4 = st.columns(2)
+    m_sel = c3.selectbox("Mandante (Casa)", times_da_liga, index=idx_m, key="m_main")
+    
+    opcoes_v = [t for t in times_da_liga if t != m_sel]
+    idx_v = 0
+    if t_v_v in opcoes_v:
+        idx_v = opcoes_v.index(t_v_v)
+    
+    v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v, key="v_main")
+
+    # --- LIMPEZA DOS DADOS DA SESSÃO (IMPORTANTE) ---
+    # Limpamos para que, se o usuário navegar manualmente, a seleção da Agenda não "trave" o Scout
+    if t_m_v is not None:
+        st.session_state.time_casa_scout = None
+        st.session_state.time_fora_scout = None
+
+    # --- PROCESSAMENTO ---
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
     if df_m_h.empty or df_v_a.empty:
-        st.warning("Dados históricos insuficientes para este confronto.")
+        st.warning("Dados insuficientes para este confronto nesta temporada.")
         return
 
     st.divider()
@@ -175,6 +192,6 @@ def mostrar_scout(df):
 
     st.divider()
     st.subheader("🎯 Frequência de Mercados")
-    cp1, cb_m = st.columns(2)
+    cp1, cp2 = st.columns(2)
     with cp1: st.dataframe(calcular_probabilidades_mercado(df_m_h).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
-    with cb_m: st.dataframe(calcular_probabilidades_mercado(df_v_a).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
+    with cp2: st.dataframe(calcular_probabilidades_mercado(df_v_a).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
