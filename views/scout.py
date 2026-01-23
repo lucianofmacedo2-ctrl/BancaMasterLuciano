@@ -93,6 +93,25 @@ def calcular_tabela_classificacao(df_liga):
     df_tab['SG'] = df_tab['GP'] - df_tab['GC']
     return df_tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
 
+def calcular_stats_completas(serie_f, serie_s):
+    def get_metrics(s):
+        s = pd.to_numeric(s, errors='coerce').fillna(0)
+        m = s.mean(); dp = s.std() if len(s) > 1 else 0.0
+        cv = (dp / m * 100) if m > 0 else 0.0
+        return {"Média": m, "DP": dp, "CV%": cv}
+    return pd.DataFrame({"Marcados": get_metrics(serie_f), "Sofridos": get_metrics(serie_s), "Total Jogo": get_metrics(serie_f + serie_s)}).T
+
+def calcular_probabilidades_mercado(df):
+    if df.empty: return pd.DataFrame()
+    n = len(df); tg_ht, tg_ft = df['Total_Gols_HT'], df['Total_Gols_FT']
+    tg_st = tg_ft - tg_ht; gm_ht, gv_ht = df['Gols_Mandante_HT'], df['Gols_Visitante_HT']
+    def perc(cond): return (len(df[cond]) / n) * 100
+    mercados = []
+    for pref, stot, sm, sv in [("HT", tg_ht, gm_ht, gv_ht), ("ST", tg_st, (df['Gols_Mandante_FT']-gm_ht), (df['Gols_Visitante_FT']-gv_ht)), ("FT", tg_ft, df['Gols_Mandante_FT'], df['Gols_Visitante_FT'])]:
+        for g in [0.5, 1.5, 2.5, 3.5]: mercados.append({"Mercado": f"{g} {pref}", "% Batido": perc(stot >= g)})
+        mercados.append({"Mercado": f"BTTS {pref}", "% Batido": perc((sm > 0) & (sv > 0))})
+    return pd.DataFrame(mercados)
+
 def mostrar_scout(df):
     st.markdown("""<style>div[data-testid="stDataFrame"] td { text-align: center !important; } .stMetric { text-align: center !important; }</style>""", unsafe_allow_html=True)
     st.title("🚀 Scout Profissional")
@@ -138,7 +157,6 @@ def mostrar_scout(df):
     else:
         st.warning(f"⚠️ Liga '{liga_clean}' não mapeada.")
 
-    # Filtro de histórico para os cards
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
@@ -151,7 +169,6 @@ def mostrar_scout(df):
                     pos = pos_row.index[0] + 1
                     obj = get_objetivo_txt(liga_sel, pos)
                     
-                    # CÁLCULOS DAS STATS PEDIDAS
                     if mando == "Casa":
                         cs = (df_hist['Gols_Visitante_FT'] == 0).sum()
                         fsm = (df_hist['Gols_Mandante_FT'] == 0).sum()
@@ -174,7 +191,7 @@ def mostrar_scout(df):
         render_stat_row("CHUTES AO GOL", df_m_h['Chutes_Gol_Mandante'].mean(), df_v_a['Chutes_Gol_Visitante'].mean())
         render_stat_row("ESCANTEIOS", df_m_h['Cantos_Mandante'].mean(), df_v_a['Cantos_Visitante'].mean())
 
-    t1, t2 = st.tabs(["🕒 Forma Recente", "⚔️ H2H"])
+    t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
     with t1:
         cf1, cf2 = st.columns(2)
         with cf1:
@@ -190,3 +207,19 @@ def mostrar_scout(df):
     with t2:
         h2h = df_s[((df_s['Mandante'] == m_sel) & (df_s['Visitante'] == v_sel)) | ((df_s['Mandante'] == v_sel) & (df_s['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
         st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True, hide_index=True)
+    with t3:
+        for label, (cm, cv) in {"Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"), "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"), "Cantos": ("Cantos_Mandante", "Cantos_Visitante")}.items():
+            st.subheader(label); ca, cb = st.columns(2)
+            with ca: st.dataframe(calcular_stats_completas(df_m_h[cm], df_m_h[cv]).style.format("{:.2f}"), use_container_width=True)
+            with cb: st.dataframe(calcular_stats_completas(df_v_a[cv], df_v_a[cm]).style.format("{:.2f}"), use_container_width=True)
+    with t4:
+        for t_n, df_j, mando in [(m_sel, df_m_h, "Mandante"), (v_sel, df_v_a, "Visitante")]:
+            st.write(f"**{t_n}**"); adv = "Visitante" if mando == "Mandante" else "Mandante"
+            cols_f = [f"0-15_{mando}", f"16-30_{mando}", f"31-45+_{mando}", f"46-60_{mando}", f"61-75_{mando}", f"76-90+_{mando}"]
+            cols_s = [f"0-15_{adv}", f"16-30_{adv}", f"31-45+_{adv}", f"46-60_{adv}", f"61-75_{adv}", f"76-90+_{adv}"]
+            st.dataframe(pd.DataFrame([df_j[cols_f].sum().values, df_j[cols_s].sum().values], columns=["0-15","16-30","31-45","46-60","61-75","76-90"], index=["Marcados", "Sofridos"]), use_container_width=True)
+
+    st.divider(); st.subheader("🎯 Frequência de Mercados")
+    cp1, cp2 = st.columns(2)
+    with cp1: st.dataframe(calcular_probabilidades_mercado(df_m_h).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
+    with cp2: st.dataframe(calcular_probabilidades_mercado(df_v_a).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
