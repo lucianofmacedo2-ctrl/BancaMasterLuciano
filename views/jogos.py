@@ -21,8 +21,8 @@ def mostrar_jogos():
     with st.expander("💡 Entenda os Sinais de Alerta (Radar de Valor)", expanded=True):
         st.markdown("""
         No **Banca Master Luciano**, nosso algoritmo identifica automaticamente os melhores jogos para operar:
-        * 🔥⚽ **Fogo + Gol**: Jogo com tendência altíssima de **Over Gols**.
-        * 🔥🚩 **Fogo + Canto**: Jogo com tendência altíssima de **Over Cantos**.
+        * 🔥⚽ **Fogo + Gol**: Jogo com tendência altíssima de **Over 2.5 Gols** (Soma das médias > 3.0).
+        * 🔥🚩 **Fogo + Canto**: Jogo com tendência altíssima de **Over 9.5 Cantos** (Soma das médias > 12.0).
         * 🔍 **Analisar**: Clique para ver o scout detalhado de cada equipe.
         """)
     
@@ -41,7 +41,6 @@ def mostrar_jogos():
     df_agenda = carregar_agenda(URL_AGENDA)
 
     if df_agenda.empty or 'Data' not in df_agenda.columns:
-        st.error("Agenda de jogos não encontrada.")
         return
 
     # 2. LÓGICA DE DATAS
@@ -58,7 +57,7 @@ def mostrar_jogos():
     labels = ["📅 Hoje", "📅 Amanhã", "📅 Depois"]
 
     for i in range(3):
-        if cols_btn[i].button(labels[i], use_container_width=True, key=f"btn_date_nav_{i}"):
+        if cols_btn[i].button(labels[i], use_container_width=True, key=f"nav_date_{i}"):
             st.session_state.data_sel_formatos = formatar_data_busca(datas_opcoes[i])
             st.session_state.data_exibicao = datas_opcoes[i].strftime('%d/%m/%Y')
             st.rerun()
@@ -66,7 +65,7 @@ def mostrar_jogos():
     st.info(f"Mostrando jogos de: **{st.session_state.data_exibicao}**")
 
     # 3. FILTRAGEM E EXIBIÇÃO COM ALERTA DE VALOR
-    df_dia = df_agenda[df_agenda['Data'].isin(st.session_state.data_sel_formatos)].copy()
+    df_dia = df_agenda[df_agenda['Data'].isin(st.session_state.data_sel_formatos)]
 
     if df_dia.empty:
         st.warning(f"Nenhum jogo encontrado para {st.session_state.data_exibicao}.")
@@ -81,22 +80,22 @@ def mostrar_jogos():
                 times_no_dia.extend([mandante, visitante])
                 
                 # --- Lógica de Alertas ---
-                alerta_gol, alerta_canto = "", ""
+                alerta_gol = ""
+                alerta_canto = ""
                 
                 if not df_hist.empty:
                     df_m = df_hist[df_hist['Mandante'] == mandante]
                     df_v = df_hist[df_hist['Visitante'] == visitante]
                     
                     if not df_m.empty and not df_v.empty:
-                        # Média Cruzada (Ataque x Defesa)
-                        m_gols = ((df_m['Gols_Mandante_FT'].mean() + df_v['Gols_Mandante_FT'].mean())/2) + \
-                                 ((df_v['Gols_Visitante_FT'].mean() + df_m['Gols_Visitante_FT'].mean())/2)
+                        m_gols = (df_m['Gols_Mandante_FT'].mean() + df_m['Gols_Visitante_FT'].mean()) + \
+                                 (df_v['Gols_Mandante_FT'].mean() + df_v['Gols_Visitante_FT'].mean())
                         
-                        m_cantos = ((df_m['Cantos_Mandante'].mean() + df_v['Cantos_Mandante'].mean())/2) + \
-                                   ((df_v['Cantos_Visitante'].mean() + df_m['Cantos_Visitante'].mean())/2)
+                        m_cantos = (df_m['Cantos_Mandante'].mean() + df_m['Cantos_Visitante'].mean()) + \
+                                   (df_v['Cantos_Mandante'].mean() + df_v['Cantos_Visitante'].mean())
 
-                        if m_gols > 4.0: alerta_gol = " 🔥⚽"
-                        if m_cantos > 13.0: alerta_canto = " 🔥🚩"
+                        if m_gols > 5.0: alerta_gol = " 🔥⚽"
+                        if m_cantos > 15.0: alerta_canto = " 🔥🚩"
 
                 c1, c2, c3 = st.columns([4, 2.5, 1.5])
                 with c1:
@@ -104,14 +103,14 @@ def mostrar_jogos():
                 with c2:
                     st.write(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')}")
                 with c3:
-                    # CORREÇÃO: Chave única para o Scout abrir o jogo certo
-                    if st.button("Analisar 🔍", key=f"btn_analisar_{idx}_{mandante[:3]}", use_container_width=True):
+                    # KEY ÚNICA GERADA PARA EVITAR ERROS
+                    if st.button("Analisar 🔍", key=f"btn_ag_{idx}_{mandante[:3]}", use_container_width=True):
                         st.session_state.time_casa_scout = mandante
                         st.session_state.time_fora_scout = visitante
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-        # --- 4. RANKING TOP 5 (REATIVADO) ---
+        # 4. RANKING TOP 5 (MANTIDO INTEGRALMENTE)
         if not df_hist.empty and times_no_dia:
             st.divider()
             st.subheader(f"📊 Top Performance - {st.session_state.data_exibicao}")
@@ -123,7 +122,6 @@ def mostrar_jogos():
                 jogos_t = df_hist[(df_hist['Mandante'] == t) | (df_hist['Visitante'] == t)]
                 if not jogos_t.empty:
                     total_j = len(jogos_t)
-                    # Cálculos de médias para o Ranking
                     rank_data.append({
                         "Time": t,
                         "Gols Marcados": (df_hist[df_hist['Mandante'] == t]['Gols_Mandante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Visitante_FT'].sum()) / total_j,
@@ -139,13 +137,8 @@ def mostrar_jogos():
                 categorias = [("⚽ Gols", "Gols Marcados", "Gols Sofridos"), 
                               ("🚩 Escanteios", "Cantos Marcados", "Cantos Sofridos"),
                               ("🎯 Chutes ao Gol", "Chutes Marcados", "Chutes Sofridos")]
-                
                 for tit, cm, cs in categorias:
                     st.markdown(f"#### {tit}")
                     ca, cb = st.columns(2)
-                    with ca: 
-                        st.caption("Melhores Ataques")
-                        st.dataframe(df_rank.sort_values(cm, ascending=False).head(5)[["Time", cm]], hide_index=True, use_container_width=True)
-                    with cb: 
-                        st.caption("Piores Defesas")
-                        st.dataframe(df_rank.sort_values(cs, ascending=False).head(5)[["Time", cs]], hide_index=True, use_container_width=True)
+                    with ca: st.dataframe(df_rank.sort_values(cm, ascending=False).head(5)[["Time", cm]], hide_index=True, use_container_width=True)
+                    with cb: st.dataframe(df_rank.sort_values(cs, ascending=False).head(5)[["Time", cs]], hide_index=True, use_container_width=True)
