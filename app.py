@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import shutil
 from datetime import datetime
-from views import scout, registro, historico, dashboard, bancas, jogos
+from views import scout, registro, historico, dashboard, bancas, jogos, metas  # Adicionado metas aqui
 import styles
 
 # --- FUNÇÃO DE BACKUP (MANTIDA) ---
@@ -35,8 +35,9 @@ df_csv = carregar_dados_csv()
 
 st.sidebar.title("🏆 Master Luciano")
 
-# --- LÓGICA DE NAVEGAÇÃO REFORÇADA ---
-opcoes_menu = ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas"]
+# --- LÓGICA DE NAVEGAÇÃO ATUALIZADA ---
+# Adicionei "🎯 Metas" na lista abaixo
+opcoes_menu = ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas", "🎯 Metas"]
 
 # Inicializa se for a primeira vez
 if 'menu_ativo' not in st.session_state:
@@ -72,3 +73,5 @@ elif st.session_state.menu_ativo == "📂 Histórico":
     historico.mostrar_historico()
 elif st.session_state.menu_ativo == "🏦 Bancas":
     bancas.mostrar_bancas()
+elif st.session_state.menu_ativo == "🎯 Metas":  # Nova condição para carregar a página de metas
+    metas.mostrar_metas()
