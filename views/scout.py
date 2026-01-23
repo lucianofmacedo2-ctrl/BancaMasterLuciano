@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# --- DICIONÁRIO DE REGRAS DAS LIGAS (MAPEADO PELOS SEUS DADOS) ---
+# --- DICIONÁRIO DE REGRAS ---
 REGRAS_LIGAS = {
     "AUSTRALIA 1": {"times": 12, "rodadas": 26, "alvos": {"Playoff Título": [1, 6]}},
     "AUSTRIA 1": {"times": 12, "rodadas": 22, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [12, 12]}},
@@ -56,15 +56,14 @@ REGRAS_LIGAS = {
     "USA 1": {"times": 29, "rodadas": 34, "alvos": {"Playoffs": [1, 9]}},
 }
 
-# --- FUNÇÕES DE AUXÍLIO ---
-
 def get_objetivo_txt(liga, pos):
-    if liga not in REGRAS_LIGAS: return ""
-    regras = REGRAS_LIGAS[liga]["alvos"]
+    liga_clean = str(liga).upper().strip()
+    if liga_clean not in REGRAS_LIGAS: return "⚪ S/ Info de Tabela"
+    regras = REGRAS_LIGAS[liga_clean]["alvos"]
     for obj, faixa in regras.items():
         if faixa[0] <= pos <= faixa[1]:
-            cor = "🔴" if "Rebaixamento" in obj else "🟢"
-            return f"{cor} {obj}"
+            emoji = "🔴" if "Rebaixamento" in obj else "🟢"
+            return f"{emoji} {obj}"
     return "⚪ Meio de Tabela"
 
 def render_stat_row(label, val_home, val_away):
@@ -83,17 +82,13 @@ def calcular_tabela_classificacao(df_liga):
         m, v = row['Mandante'], row['Visitante']
         gm, gv = row['Gols_Mandante_FT'], row['Gols_Visitante_FT']
         for t in [m, v]:
-            if t not in stats: stats[t] = {'P':0, 'J':0, 'V':0, 'E':0, 'D':0, 'GP':0, 'GC':0, 'P_Casa':0, 'P_Fora':0}
+            if t not in stats: stats[t] = {'P':0, 'J':0, 'V':0, 'E':0, 'D':0, 'GP':0, 'GC':0}
         stats[m]['J'] += 1; stats[v]['J'] += 1
         stats[m]['GP'] += gm; stats[m]['GC'] += gv
         stats[v]['GP'] += gv; stats[v]['GC'] += gm
-        if gm > gv:
-            stats[m]['P'] += 3; stats[m]['V'] += 1; stats[m]['P_Casa'] += 3; stats[v]['D'] += 1
-        elif gm == gv:
-            stats[m]['P'] += 1; stats[v]['P'] += 1; stats[m]['E'] += 1; stats[v]['E'] += 1
-            stats[m]['P_Casa'] += 1; stats[v]['P_Fora'] += 1
-        else:
-            stats[v]['P'] += 3; stats[v]['V'] += 1; stats[v]['P_Fora'] += 3; stats[m]['D'] += 1
+        if gm > gv: stats[m]['P'] += 3; stats[m]['V'] += 1
+        elif gm == gv: stats[m]['P'] += 1; stats[v]['P'] += 1
+        else: stats[v]['P'] += 3; stats[v]['V'] += 1
     df_tab = pd.DataFrame.from_dict(stats, orient='index').reset_index().rename(columns={'index': 'Time'})
     df_tab['SG'] = df_tab['GP'] - df_tab['GC']
     return df_tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
@@ -116,8 +111,6 @@ def calcular_probabilidades_mercado(df):
         for g in [0.5, 1.5, 2.5, 3.5]: mercados.append({"Mercado": f"{g} {pref}", "% Batido": perc(stot >= g)})
         mercados.append({"Mercado": f"BTTS {pref}", "% Batido": perc((sm > 0) & (sv > 0))})
     return pd.DataFrame(mercados)
-
-# --- INTERFACE PRINCIPAL ---
 
 def mostrar_scout(df):
     st.markdown("""<style>div[data-testid="stDataFrame"] td { text-align: center !important; } .stMetric { text-align: center !important; }</style>""", unsafe_allow_html=True)
@@ -146,37 +139,35 @@ def mostrar_scout(df):
     idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
     v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v, key=f"v_sel_{t_v_v}")
 
-    if t_m_v:
-        st.session_state.liga_scout = st.session_state.time_casa_scout = st.session_state.time_fora_scout = None
-
-    # --- INFORMATIVO DE RODADA ---
+    # --- BARRA DE PROGRESSO E RODADA ---
     tab_geral = calcular_tabela_classificacao(df_s)
-    if liga_sel in REGRAS_LIGAS:
-        info = REGRAS_LIGAS[liga_sel]
+    liga_clean = str(liga_sel).upper().strip()
+    
+    st.markdown("---")
+    if liga_clean in REGRAS_LIGAS:
+        info = REGRAS_LIGAS[liga_clean]
         rodada_atual = tab_geral['J'].max()
-        pct_concluido = (rodada_atual / info['rodadas'])
-        st.write(f"📊 **Progresso da Liga:** Rodada {int(rodada_atual)} de {info['rodadas']}")
-        st.progress(min(pct_concluido, 1.0))
+        pct = (rodada_atual / info['rodadas'])
+        st.markdown(f"📊 **Progresso da Competição:** Rodada **{int(rodada_atual)}** de **{info['rodadas']}**")
+        st.progress(min(pct, 1.0))
     else:
-        st.caption("⚠️ Regras de classificação não mapeadas para esta liga.")
+        st.warning(f"⚠️ Liga '{liga_clean}' não mapeada. Verifique se o nome no CSV é idêntico à lista enviada.")
 
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
-    if df_m_h.empty or df_v_a.empty:
-        st.warning("Dados históricos insuficientes para este confronto.")
-        return
+    if not df_m_h.empty and not df_v_a.empty:
+        col_i1, col_i2 = st.columns(2)
+        for col, t_name, mando in zip([col_i1, col_i2], [m_sel, v_sel], ["Casa", "Fora"]):
+            with col:
+                pos_row = tab_geral[tab_geral['Time'] == t_name]
+                if not pos_row.empty:
+                    pos = pos_row.index[0] + 1
+                    jogos = pos_row['J'].values[0]
+                    obj = get_objetivo_txt(liga_sel, pos)
+                    st.info(f"**{t_name}** ({mando})\n\n🏆 {pos}º Lugar | {int(jogos)} Jogos\n\n🎯 {obj}")
 
     st.divider()
-    # --- CARDS DE OBJETIVO ---
-    col_i1, col_i2 = st.columns(2)
-    for col, time, mando in zip([col_i1, col_i2], [m_sel, v_sel], ["Casa", "Fora"]):
-        with col:
-            pos = tab_geral[tab_geral['Time'] == time].index[0] + 1
-            jogos_time = tab_geral[tab_geral['Time'] == time]['J'].values[0]
-            obj_label = get_objetivo_txt(liga_sel, pos)
-            st.info(f"**{time}** ({mando})\n\n🏆 {pos}º Lugar | {int(jogos_time)} Jogos\n\n🎯 {obj_label}")
-
     with st.container(border=True):
         st.caption("🔥 Médias de Volume (Últimos 10 Jogos Casa/Fora)")
         render_stat_row("GOLS MARCADOS FT", df_m_h['Gols_Mandante_FT'].mean(), df_v_a['Gols_Visitante_FT'].mean())
@@ -194,7 +185,7 @@ def mostrar_scout(df):
         with cf2:
             st.markdown(f"**{v_sel}**")
             for _, r in df_v_a.iterrows():
-                res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Visitante_FT'] == r['Gols_Mandante_FT'] else "❌")
+                res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Visitante_FT'] == r['Gols_Visitante_FT'] else "❌")
                 st.write(f"{res} {r['Data'].strftime('%d/%m')} vs {r['Mandante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
     with t2:
         h2h = df_s[((df_s['Mandante'] == m_sel) & (df_s['Visitante'] == v_sel)) | ((df_s['Mandante'] == v_sel) & (df_s['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
@@ -210,7 +201,6 @@ def mostrar_scout(df):
             cols_f = [f"0-15_{mando}", f"16-30_{mando}", f"31-45+_{mando}", f"46-60_{mando}", f"61-75_{mando}", f"76-90+_{mando}"]
             cols_s = [f"0-15_{adv}", f"16-30_{adv}", f"31-45+_{adv}", f"46-60_{adv}", f"61-75_{adv}", f"76-90+_{adv}"]
             st.dataframe(pd.DataFrame([df_j[cols_f].sum().values, df_j[cols_s].sum().values], columns=["0-15","16-30","31-45","46-60","61-75","76-90"], index=["Marcados", "Sofridos"]), use_container_width=True)
-
     st.divider(); st.subheader("🎯 Frequência de Mercados")
     cp1, cp2 = st.columns(2)
     with cp1: st.dataframe(calcular_probabilidades_mercado(df_m_h).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
