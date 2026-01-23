@@ -74,11 +74,9 @@ def mostrar_scout(df):
     st.markdown("""<style>div[data-testid="stDataFrame"] td { text-align: center !important; } .stMetric { text-align: center !important; }</style>""", unsafe_allow_html=True)
     st.title("🚀 Scout Profissional")
 
-    # Recupera times vindos da Agenda
     t_m_v = st.session_state.get('time_casa_scout', None)
     t_v_v = st.session_state.get('time_fora_scout', None)
 
-    # Seleção automática de Liga
     default_liga_idx = 0
     if t_m_v:
         l_encontrada = df[df['Mandante'] == t_m_v]['Liga'].unique()
@@ -95,21 +93,24 @@ def mostrar_scout(df):
     df_s['Data'] = pd.to_datetime(df_s['Data'], dayfirst=True, errors='coerce')
     
     times = sorted(df_s['Mandante'].unique())
-    idx_m = times.index(t_m_v) if t_m_v in times else 0
     
-    # Define Mandante e Visitante com Session State
-    m_sel = c3, c4 = st.columns(2)
+    # CORREÇÃO NA DEFINIÇÃO DE COLUNAS E INDEX
+    c3, c4 = st.columns(2)
+    
+    idx_m = times.index(t_m_v) if t_m_v in times else 0
     m_sel = c3.selectbox("Mandante (Casa)", times, index=idx_m, key="scout_m_sel")
     
     opcoes_v = [t for t in times if t != m_sel]
     idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
     v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v, key="scout_v_sel")
 
-    # BASES DE DADOS
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
-    # 1. VOLUME DE JOGO
+    if df_m_h.empty or df_v_a.empty:
+        st.warning("Dados históricos insuficientes para este confronto.")
+        return
+
     st.divider()
     with st.container(border=True):
         st.caption("🔥 Volume de Jogo (Últimos 10 Jogos Casa/Fora)")
@@ -117,7 +118,6 @@ def mostrar_scout(df):
         render_stat_row("CHUTES AO GOL", df_m_h['Chutes_Gol_Mandante'].mean(), df_v_a['Chutes_Gol_Visitante'].mean())
         render_stat_row("ESCANTEIOS", df_m_h['Cantos_Mandante'].mean(), df_v_a['Cantos_Visitante'].mean())
 
-    # 2. POSIÇÕES E EFICIÊNCIA (RESTAURADO)
     tab_geral = calcular_tabela_classificacao(df_s)
     tab_casa = tab_geral[['Time', 'P_Casa']].sort_values(by='P_Casa', ascending=False).reset_index(drop=True)
     tab_fora = tab_geral[['Time', 'P_Fora']].sort_values(by='P_Fora', ascending=False).reset_index(drop=True)
@@ -136,7 +136,6 @@ def mostrar_scout(df):
                     f"🧤 Clean Sheets: {len(gs[gs==0])} | 🚫 Falhou em Marcar: {len(gf[gf==0])}\n\n"
                     f"🎯 Chutes / Gol: {(ch.sum()/gf.sum() if gf.sum()>0 else 0):.2f}")
 
-    # 3. TABS
     t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
 
     with t1:
@@ -176,6 +175,6 @@ def mostrar_scout(df):
 
     st.divider()
     st.subheader("🎯 Frequência de Mercados")
-    cp1, cp2 = st.columns(2)
+    cp1, cb_m = st.columns(2)
     with cp1: st.dataframe(calcular_probabilidades_mercado(df_m_h).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
-    with cp2: st.dataframe(calcular_probabilidades_mercado(df_v_a).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
+    with cb_m: st.dataframe(calcular_probabilidades_mercado(df_v_a).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
