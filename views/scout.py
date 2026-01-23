@@ -74,58 +74,49 @@ def mostrar_scout(df):
     st.markdown("""<style>div[data-testid="stDataFrame"] td { text-align: center !important; } .stMetric { text-align: center !important; }</style>""", unsafe_allow_html=True)
     st.title("🚀 Scout Profissional")
 
-    # 1. PEGAR DADOS DA SESSÃO
+    # 1. RECUPERAÇÃO DE ESTADO DA AGENDA
+    l_v = st.session_state.get('liga_scout', None)
     t_m_v = st.session_state.get('time_casa_scout', None)
     t_v_v = st.session_state.get('time_fora_scout', None)
 
-    # 2. DEFINIR LIGA AUTOMÁTICA
-    default_liga_idx = 0
-    ligas_disponiveis = sorted(df['Liga'].unique())
-    if t_m_v:
-        # Busca a liga correta para o time mandante selecionado
-        l_encontrada = df[df['Mandante'] == t_m_v]['Liga'].unique()
-        if len(l_encontrada) > 0:
-            if l_encontrada[0] in ligas_disponiveis:
-                default_liga_idx = ligas_disponiveis.index(l_encontrada[0])
-
+    # 2. SELEÇÃO DA LIGA (COM CHAVE DINÂMICA)
+    ligas_list = sorted(df['Liga'].unique())
+    idx_l = ligas_list.index(l_v) if l_v in ligas_list else 0
+    
+    # A 'key' muda se o time vindo da agenda mudar, resetando o componente
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", ligas_disponiveis, index=default_liga_idx, key="liga_main")
+    liga_sel = c1.selectbox("Selecione a Liga", ligas_list, index=idx_l, key=f"liga_sel_{t_m_v}")
     
     df_l = df[df['Liga'] == liga_sel].copy()
-    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True), key="temp_main")
+    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True), key=f"temp_sel_{t_m_v}")
     
     df_s = df_l[df_l['Temporada'] == temp_sel].copy()
     df_s['Data'] = pd.to_datetime(df_s['Data'], dayfirst=True, errors='coerce')
     
-    times_da_liga = sorted(df_s['Mandante'].unique())
+    times_liga = sorted(df_s['Mandante'].unique())
     
-    # 3. LÓGICA DE INDEX PARA TIMES
-    idx_m = 0
-    if t_m_v in times_da_liga:
-        idx_m = times_da_liga.index(t_m_v)
-
+    # 3. SELEÇÃO DE TIMES (COM CHAVE DINÂMICA)
+    idx_m = times_liga.index(t_m_v) if t_m_v in times_liga else 0
+    
     c3, c4 = st.columns(2)
-    m_sel = c3.selectbox("Mandante (Casa)", times_da_liga, index=idx_m, key="m_main")
+    m_sel = c3.selectbox("Mandante (Casa)", times_liga, index=idx_m, key=f"m_sel_{t_m_v}")
     
-    opcoes_v = [t for t in times_da_liga if t != m_sel]
-    idx_v = 0
-    if t_v_v in opcoes_v:
-        idx_v = opcoes_v.index(t_v_v)
-    
-    v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v, key="v_main")
+    opcoes_v = [t for t in times_liga if t != m_sel]
+    idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
+    v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v, key=f"v_sel_{t_v_v}")
 
-    # --- LIMPEZA DOS DADOS DA SESSÃO (IMPORTANTE) ---
-    # Limpamos para que, se o usuário navegar manualmente, a seleção da Agenda não "trave" o Scout
-    if t_m_v is not None:
+    # LIMPA O ESTADO PARA PERMITIR NAVEGAÇÃO MANUAL DEPOIS
+    if t_m_v:
+        st.session_state.liga_scout = None
         st.session_state.time_casa_scout = None
         st.session_state.time_fora_scout = None
 
-    # --- PROCESSAMENTO ---
+    # --- PROCESSAMENTO DOS DADOS ---
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
     if df_m_h.empty or df_v_a.empty:
-        st.warning("Dados insuficientes para este confronto nesta temporada.")
+        st.warning("Sem dados históricos suficientes para este confronto.")
         return
 
     st.divider()
