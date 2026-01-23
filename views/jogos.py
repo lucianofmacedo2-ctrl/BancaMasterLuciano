@@ -55,7 +55,7 @@ def mostrar_jogos():
     labels = ["📅 Hoje", "📅 Amanhã", "📅 Depois"]
 
     for i in range(3):
-        if cols_btn[i].button(labels[i], use_container_width=True, key=f"nav_date_{i}"):
+        if cols_btn[i].button(labels[i], key=f"nav_date_{i}", use_container_width=True):
             st.session_state.data_sel_formatos = formatar_data_busca(datas_opcoes[i])
             st.session_state.data_exibicao = datas_opcoes[i].strftime('%d/%m/%Y')
             st.rerun()
@@ -67,14 +67,12 @@ def mostrar_jogos():
     if df_dia.empty:
         st.warning(f"Nenhum jogo encontrado para {st.session_state.data_exibicao}.")
     else:
-        times_no_dia = []
         for liga in df_dia['Liga'].unique():
             df_l = df_dia[df_dia['Liga'] == liga]
             st.markdown(f"#### 🏆 {liga}")
             
             for idx, row in df_l.iterrows():
                 mandante, visitante = row['Mandante'], row['Visitante']
-                times_no_dia.extend([mandante, visitante])
                 
                 alerta_gol = ""
                 alerta_canto = ""
@@ -98,40 +96,9 @@ def mostrar_jogos():
                 with c2:
                     st.write(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')}")
                 with c3:
+                    # Chave de botão robusta e passagem de estado
                     if st.button("Analisar 🔍", key=f"btn_ag_{idx}_{mandante[:3]}", use_container_width=True):
                         st.session_state.time_casa_scout = mandante
                         st.session_state.time_fora_scout = visitante
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
-
-        if not df_hist.empty and times_no_dia:
-            st.divider()
-            st.subheader(f"📊 Top Performance - {st.session_state.data_exibicao}")
-            
-            times_dia_unicos = list(set(times_no_dia))
-            rank_data = []
-
-            for t in times_dia_unicos:
-                jogos_t = df_hist[(df_hist['Mandante'] == t) | (df_hist['Visitante'] == t)]
-                if not jogos_t.empty:
-                    total_j = len(jogos_t)
-                    rank_data.append({
-                        "Time": t,
-                        "Gols Marcados": (df_hist[df_hist['Mandante'] == t]['Gols_Mandante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Visitante_FT'].sum()) / total_j,
-                        "Gols Sofridos": (df_hist[df_hist['Mandante'] == t]['Gols_Visitante_FT'].sum() + df_hist[df_hist['Visitante'] == t]['Gols_Mandante_FT'].sum()) / total_j,
-                        "Cantos Marcados": (df_hist[df_hist['Mandante'] == t]['Cantos_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Visitante'].sum()) / total_j,
-                        "Cantos Sofridos": (df_hist[df_hist['Mandante'] == t]['Cantos_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Cantos_Mandante'].sum()) / total_j,
-                        "Chutes Marcados": (df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Mandante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Visitante'].sum()) / total_j,
-                        "Chutes Sofridos": (df_hist[df_hist['Mandante'] == t]['Chutes_Gol_Visitante'].sum() + df_hist[df_hist['Visitante'] == t]['Chutes_Gol_Mandante'].sum()) / total_j
-                    })
-            
-            if rank_data:
-                df_rank = pd.DataFrame(rank_data)
-                categorias = [("⚽ Gols", "Gols Marcados", "Gols Sofridos"), 
-                              ("🚩 Escanteios", "Cantos Marcados", "Cantos Sofridos"),
-                              ("🎯 Chutes ao Gol", "Chutes Marcados", "Chutes Sofridos")]
-                for tit, cm, cs in categorias:
-                    st.markdown(f"#### {tit}")
-                    ca, cb = st.columns(2)
-                    with ca: st.dataframe(df_rank.sort_values(cm, ascending=False).head(5)[["Time", cm]], hide_index=True, use_container_width=True)
-                    with cb: st.dataframe(df_rank.sort_values(cs, ascending=False).head(5)[["Time", cs]], hide_index=True, use_container_width=True)
