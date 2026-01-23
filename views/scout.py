@@ -78,7 +78,7 @@ def mostrar_scout(df):
     t_m_v = st.session_state.get('time_casa_scout', None)
     t_v_v = st.session_state.get('time_fora_scout', None)
 
-    # Lógica de seleção automática de Liga
+    # Seleção automática de Liga
     default_liga_idx = 0
     if t_m_v:
         l_encontrada = df[df['Mandante'] == t_m_v]['Liga'].unique()
@@ -87,27 +87,29 @@ def mostrar_scout(df):
             default_liga_idx = ligas_lista.index(l_encontrada[0])
 
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", sorted(df['Liga'].unique()), index=default_liga_idx)
+    liga_sel = c1.selectbox("Selecione a Liga", sorted(df['Liga'].unique()), index=default_liga_idx, key="scout_liga_sel")
     df_l = df[df['Liga'] == liga_sel].copy()
     
-    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True))
+    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True), key="scout_temp_sel")
     df_s = df_l[df_l['Temporada'] == temp_sel].copy()
     df_s['Data'] = pd.to_datetime(df_s['Data'], dayfirst=True, errors='coerce')
     
     times = sorted(df_s['Mandante'].unique())
     idx_m = times.index(t_m_v) if t_m_v in times else 0
-    idx_v = times.index(t_v_v) if t_v_v in times else (1 if len(times)>1 else 0)
+    
+    # Define Mandante e Visitante com Session State
+    m_sel = c3, c4 = st.columns(2)
+    m_sel = c3.selectbox("Mandante (Casa)", times, index=idx_m, key="scout_m_sel")
+    
+    opcoes_v = [t for t in times if t != m_sel]
+    idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
+    v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v, key="scout_v_sel")
 
-    c3, c4 = st.columns(2)
-    m_sel = c3.selectbox("Mandante (Casa)", times, index=idx_m)
-    v_sel = c4.selectbox("Visitante (Fora)", [t for t in times if t != m_sel], 
-                         index=[t for t in times if t != m_sel].index(t_v_v) if t_v_v in [t for t in times if t != m_sel] else 0)
-
-    # PROCESSAMENTO DE DADOS
+    # BASES DE DADOS
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
-    # 1. VOLUME DE JOGO (BARRAS)
+    # 1. VOLUME DE JOGO
     st.divider()
     with st.container(border=True):
         st.caption("🔥 Volume de Jogo (Últimos 10 Jogos Casa/Fora)")
@@ -134,7 +136,7 @@ def mostrar_scout(df):
                     f"🧤 Clean Sheets: {len(gs[gs==0])} | 🚫 Falhou em Marcar: {len(gf[gf==0])}\n\n"
                     f"🎯 Chutes / Gol: {(ch.sum()/gf.sum() if gf.sum()>0 else 0):.2f}")
 
-    # 3. TABS DETALHADAS
+    # 3. TABS
     t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
 
     with t1:
