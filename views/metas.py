@@ -9,111 +9,113 @@ URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
 KEY = "sb_publishable_pM5xDBpqZzo7h5SQqiFcfQ_ixbbydIB"
 supabase = create_client(URL, KEY)
 
+def carregar_dados_financeiros():
+    try:
+        # Busca apostas e bancas para calcular o saldo real igual ao Dashboard
+        res_a = supabase.table("apostas").select("stake, odd, lucro, data").execute()
+        res_b = supabase.table("bancas").select("saldo_inicial").execute()
+        
+        df_ap = pd.DataFrame(res_a.data)
+        df_ba = pd.DataFrame(res_b.data)
+        
+        lucro_total = df_ap['lucro'].sum() if not df_ap.empty else 0
+        saldo_inicial_total = df_ba['saldo_inicial'].sum() if not df_ba.empty else 0
+        
+        return df_ap, (saldo_inicial_total + lucro_total)
+    except:
+        return pd.DataFrame(), 0.0
+
 def mostrar_metas():
     st.title("🎯 Gestão de Metas & Recompensas")
 
-    # --- 1. PROMOÇÃO SEMANAL (CÁLCULO AUTOMÁTICO) ---
+    # 1. CARREGAR SALDO ATUALIZADO
+    df_apostas, saldo_atualizado = carregar_dados_financeiros()
+
+    # --- BLOCO 1: PROMOÇÃO SEMANAL (AUTOMÁTICO) ---
     st.subheader("🎁 Progresso da Promoção Semanal")
-    st.caption("Considera apostas com Odd >= 2.0 feitas de Segunda a Domingo.")
+    
+    hoje = datetime.now().date()
+    segunda = hoje - timedelta(days=hoje.weekday())
+    domingo = segunda + timedelta(days=6)
 
-    try:
-        # Calcular início (segunda) e fim (domingo) da semana atual
-        hoje = datetime.now().date()
-        segunda = hoje - timedelta(days=hoje.weekday())
-        domingo = segunda + timedelta(days=6)
+    total_promo = 0.0
+    if not df_apostas.empty:
+        # Converte data para filtrar a semana
+        df_apostas['data_dt'] = pd.to_datetime(df_apostas['data']).dt.date
+        filtro_semana = df_apostas[
+            (df_apostas['data_dt'] >= segunda) & 
+            (df_apostas['data_dt'] <= domingo) & 
+            (df_apostas['odd'] >= 2.0)
+        ]
+        total_promo = filtro_semana['stake'].sum()
 
-        # Buscar apostas da semana no Supabase
-        res = supabase.table("apostas").select("stake, odd").gte("data", segunda).lte("data", domingo).execute()
-        df_semana = pd.DataFrame(res.data)
+    # Faixas da Promoção
+    recompensa = 0
+    proxima = 0
+    if total_promo < 100: 
+        recompensa, proxima = 0, 100
+    elif total_promo < 300: 
+        recompensa, proxima = 5, 300
+    elif total_promo < 750: 
+        recompensa, proxima = 15, 750
+    elif total_promo < 1500: 
+        recompensa, proxima = 50, 1500
+    else: 
+        recompensa, proxima = 100, 0
 
-        total_apostado = 0.0
-        if not df_semana.empty:
-            # Filtrar apenas apostas com Odd >= 2.0
-            total_apostado = df_semana[df_semana['odd'] >= 2.0]['stake'].sum()
-
-        # Lógica de Recompensas conforme o Print
-        recompensa = 0
-        proxima_meta = 0
-        if total_apostado < 300:
-            recompensa = 5 if total_apostado >= 100 else 0
-            proxima_meta = 300
-        elif total_apostado < 750:
-            recompensa = 15
-            proxima_meta = 750
-        elif total_apostado < 1500:
-            recompensa = 50
-            proxima_meta = 1500
-        else:
-            recompensa = 100
-            proxima_meta = 0
-
-        # Visualização da Promoção
-        col_p1, col_p2 = st.columns(2)
-        col_p1.metric("Total Apostado (Semana)", f"R$ {total_apostado:.2f}")
-        col_p2.metric("Crédito Garantido", f"R$ {recompensa:.2f}")
-
-        if proxima_meta > 0:
-            progresso_promo = min(total_apostado / proxima_meta, 1.0)
-            st.progress(progresso_promo)
-            st.write(f"Faltam **R$ {proxima_meta - total_apostado:.2f}** para o próximo nível de crédito.")
-        else:
-            st.success("🔥 Você atingiu o nível máximo de recompensa (R$ 100)!")
-
-    except Exception as e:
-        st.error(f"Erro ao calcular promoção: {e}")
+    c_p1, c_p2 = st.columns(2)
+    c_p1.metric("Volume Semanal (Odd 2+)", f"R$ {total_promo:.2f}")
+    c_p2.metric("Crédito a Receber", f"R$ {recompensa:.2f}")
+    
+    if proxima > 0:
+        st.progress(min(total_promo / proxima, 1.0))
+        st.caption(f"Faltam R$ {proxima - total_promo:.2f} para o próximo nível.")
 
     st.divider()
 
-    # --- 2. METAS PESSOAIS ---
-    st.subheader("🚀 Minhas Metas Pessoais")
-    
-    # Form para nova meta
-    with st.expander("➕ Cadastrar Nova Meta"):
-        with st.form("form_meta"):
-            t_meta = st.text_input("Título da Meta (Ex: Lucro para Viagem)")
-            v_obj = st.number_input("Valor Objetivo (R$)", min_value=1.0)
-            v_ini = st.number_input("Valor Já Conquistado (R$)", min_value=0.0)
-            if st.form_submit_button("Salvar Meta"):
+    # --- BLOCO 2: METAS PESSOAIS (BASEADAS NO SALDO REAL) ---
+    st.subheader("🚀 Minhas Metas de Patrimônio")
+    st.info(f"💰 Seu Saldo Atual em Banca: **R$ {saldo_atualizado:.2f}**")
+
+    # Criar Meta
+    with st.expander("➕ Definir Novo Objetivo Financeiro"):
+        with st.form("nova_meta"):
+            titulo = st.text_input("Nome da Meta (Ex: Dobrar a Banca)")
+            objetivo = st.number_input("Valor Alvo (R$)", min_value=1.0, value=500.0)
+            if st.form_submit_button("Cadastrar Meta"):
                 supabase.table("metas_pessoais").insert({
-                    "titulo": t_meta, "valor_objetivo": v_obj, "valor_atual": v_ini
+                    "titulo": titulo, 
+                    "valor_objetivo": objetivo,
+                    "ativa": True
                 }).execute()
                 st.rerun()
 
-    # Listagem de Metas
+    # Mostrar Metas
     res_m = supabase.table("metas_pessoais").select("*").eq("ativa", True).execute()
-    metas = res_m.data
-
-    if not metas:
-        st.info("Nenhuma meta pessoal cadastrada.")
-    else:
-        for m in metas:
-            porcentagem = min((m['valor_atual'] / m['valor_objetivo']), 1.0)
-            
-            st.markdown(f"### {m['titulo']}")
-            
-            # Gráfico de progresso visual (Gauge Chart)
-            fig = go.Figure(go.Indicator(
-                mode = "gauge+number",
-                value = m['valor_atual'],
-                domain = {'x': [0, 1], 'y': [0, 1]},
-                title = {'text': "Progresso R$"},
-                gauge = {
-                    'axis': {'range': [None, m['valor_objetivo']]},
-                    'bar': {'color': "#00ffcc"},
-                    'steps': [{'range': [0, m['valor_objetivo']], 'color': "#2b2b2b"}]
+    for m in res_m.data:
+        # Cálculo de progresso baseado no SALDO ATUALIZADO
+        progresso_percent = min((saldo_atualizado / m['valor_objetivo']) * 100, 100.0)
+        
+        st.write(f"#### {m['titulo']}")
+        
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = saldo_atualizado,
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            gauge = {
+                'axis': {'range': [None, m['valor_objetivo']]},
+                'bar': {'color': "#00ffcc"},
+                'steps': [{'range': [0, m['valor_objetivo']], 'color': "#1a1a1a"}],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': m['valor_objetivo']
                 }
-            ))
-            fig.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            }
+        ))
+        fig.update_layout(height=250, margin=dict(l=30, r=30, t=30, b=30))
+        st.plotly_chart(fig, use_container_width=True)
 
-            # Botão para atualizar progresso ou excluir
-            c_meta1, c_meta2 = st.columns([3, 1])
-            novo_v = c_meta1.number_input(f"Adicionar valor a '{m['titulo']}'", min_value=0.0, key=f"upd_{m['id']}")
-            if c_meta1.button("Atualizar", key=f"btn_{m['id']}"):
-                supabase.table("metas_pessoais").update({"valor_atual": m['valor_atual'] + novo_v}).eq("id", m['id']).execute()
-                st.rerun()
-            
-            if c_meta2.button("🗑️ Excluir", key=f"del_{m['id']}"):
-                supabase.table("metas_pessoais").delete().eq("id", m['id']).execute()
-                st.rerun()
-            st.divider()
+        if st.button(f"Remover {m['titulo']}", key=f"del_{m['id']}"):
+            supabase.table("metas_pessoais").delete().eq("id", m['id']).execute()
+            st.rerun()
