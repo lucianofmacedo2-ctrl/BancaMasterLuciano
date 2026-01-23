@@ -58,7 +58,7 @@ REGRAS_LIGAS = {
 
 def get_objetivo_txt(liga, pos):
     liga_clean = str(liga).upper().strip()
-    if liga_clean not in REGRAS_LIGAS: return "⚪ S/ Info de Tabela"
+    if liga_clean not in REGRAS_LIGAS: return "⚪ S/ Info"
     regras = REGRAS_LIGAS[liga_clean]["alvos"]
     for obj, faixa in regras.items():
         if faixa[0] <= pos <= faixa[1]:
@@ -93,25 +93,6 @@ def calcular_tabela_classificacao(df_liga):
     df_tab['SG'] = df_tab['GP'] - df_tab['GC']
     return df_tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
 
-def calcular_stats_completas(serie_f, serie_s):
-    def get_metrics(s):
-        s = pd.to_numeric(s, errors='coerce').fillna(0)
-        m = s.mean(); dp = s.std() if len(s) > 1 else 0.0
-        cv = (dp / m * 100) if m > 0 else 0.0
-        return {"Média": m, "DP": dp, "CV%": cv}
-    return pd.DataFrame({"Marcados": get_metrics(serie_f), "Sofridos": get_metrics(serie_s), "Total Jogo": get_metrics(serie_f + serie_s)}).T
-
-def calcular_probabilidades_mercado(df):
-    if df.empty: return pd.DataFrame()
-    n = len(df); tg_ht, tg_ft = df['Total_Gols_HT'], df['Total_Gols_FT']
-    tg_st = tg_ft - tg_ht; gm_ht, gv_ht = df['Gols_Mandante_HT'], df['Gols_Visitante_HT']
-    def perc(cond): return (len(df[cond]) / n) * 100
-    mercados = []
-    for pref, stot, sm, sv in [("HT", tg_ht, gm_ht, gv_ht), ("ST", tg_st, (df['Gols_Mandante_FT']-gm_ht), (df['Gols_Visitante_FT']-gv_ht)), ("FT", tg_ft, df['Gols_Mandante_FT'], df['Gols_Visitante_FT'])]:
-        for g in [0.5, 1.5, 2.5, 3.5]: mercados.append({"Mercado": f"{g} {pref}", "% Batido": perc(stot >= g)})
-        mercados.append({"Mercado": f"BTTS {pref}", "% Batido": perc((sm > 0) & (sv > 0))})
-    return pd.DataFrame(mercados)
-
 def mostrar_scout(df):
     st.markdown("""<style>div[data-testid="stDataFrame"] td { text-align: center !important; } .stMetric { text-align: center !important; }</style>""", unsafe_allow_html=True)
     st.title("🚀 Scout Profissional")
@@ -124,9 +105,9 @@ def mostrar_scout(df):
     idx_l = ligas_list.index(l_v) if l_v in ligas_list else 0
     
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", ligas_list, index=idx_l, key=f"liga_sel_{t_m_v}")
+    liga_sel = c1.selectbox("Selecione a Liga", ligas_list, index=idx_l)
     df_l = df[df['Liga'] == liga_sel].copy()
-    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True), key=f"temp_sel_{t_m_v}")
+    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True))
     
     df_s = df_l[df_l['Temporada'] == temp_sel].copy()
     df_s['Data'] = pd.to_datetime(df_s['Data'], dayfirst=True, errors='coerce')
@@ -134,12 +115,12 @@ def mostrar_scout(df):
     
     idx_m = times_liga.index(t_m_v) if t_m_v in times_liga else 0
     c3, c4 = st.columns(2)
-    m_sel = c3.selectbox("Mandante (Casa)", times_liga, index=idx_m, key=f"m_sel_{t_m_v}")
+    m_sel = c3.selectbox("Mandante (Casa)", times_liga, index=idx_m)
     opcoes_v = [t for t in times_liga if t != m_sel]
     idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
-    v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v, key=f"v_sel_{t_v_v}")
+    v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v)
 
-    # --- BARRA DE PROGRESSO E RODADA ---
+    # --- BARRA DE PROGRESSO COM % ---
     tab_geral = calcular_tabela_classificacao(df_s)
     liga_clean = str(liga_sel).upper().strip()
     
@@ -147,25 +128,39 @@ def mostrar_scout(df):
     if liga_clean in REGRAS_LIGAS:
         info = REGRAS_LIGAS[liga_clean]
         rodada_atual = tab_geral['J'].max()
-        pct = (rodada_atual / info['rodadas'])
-        st.markdown(f"📊 **Progresso da Competição:** Rodada **{int(rodada_atual)}** de **{info['rodadas']}**")
-        st.progress(min(pct, 1.0))
+        pct = (rodada_atual / info['rodadas']) * 100
+        st.markdown(f"📊 **Progresso da Competição:** Rodada **{int(rodada_atual)}** de **{info['rodadas']}** - **{pct:.1f}% concluída**")
+        st.progress(min(pct/100, 1.0))
+        
+        # Explicação das Posições
+        exp = " | ".join([f"**{k}**: {v[0]}º ao {v[1]}º" for k, v in info['alvos'].items()])
+        st.caption(f"ℹ️ **Regras da Liga:** {exp}")
     else:
-        st.warning(f"⚠️ Liga '{liga_clean}' não mapeada. Verifique se o nome no CSV é idêntico à lista enviada.")
+        st.warning(f"⚠️ Liga '{liga_clean}' não mapeada.")
 
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
     if not df_m_h.empty and not df_v_a.empty:
         col_i1, col_i2 = st.columns(2)
-        for col, t_name, mando in zip([col_i1, col_i2], [m_sel, v_sel], ["Casa", "Fora"]):
+        for col, t_name, df_t, mando in zip([col_i1, col_i2], [m_sel, v_sel], [df_m_h, df_v_a], ["Casa", "Fora"]):
             with col:
                 pos_row = tab_geral[tab_geral['Time'] == t_name]
                 if not pos_row.empty:
                     pos = pos_row.index[0] + 1
                     jogos = pos_row['J'].values[0]
                     obj = get_objetivo_txt(liga_sel, pos)
-                    st.info(f"**{t_name}** ({mando})\n\n🏆 {pos}º Lugar | {int(jogos)} Jogos\n\n🎯 {obj}")
+                    
+                    # Cálculo de Clean Sheets e BTTS (baseado nos últimos 10)
+                    cs = len(df_t[(df_t['Gols_Visitante_FT'] == 0) if mando == "Casa" else (df_t['Gols_Mandante_FT'] == 0)])
+                    fsm = len(df_t[(df_t['Gols_Mandante_FT'] == 0) if mando == "Casa" else (df_t['Gols_Visitante_FT'] == 0)])
+                    ch_gol = df_t['Chutes_Mandante' if mando == "Casa" else 'Chutes_Visitante'].mean()
+                    
+                    st.info(f"**{t_name}** ({mando}) - {pos}º Lugar\n\n🎯 {obj}")
+                    ci1, ci2, ci3 = st.columns(3)
+                    ci1.metric("Clean Sheets", f"{cs}")
+                    ci2.metric("Falhou Marcar", f"{fsm}")
+                    ci3.metric("Chutes/Jogo", f"{ch_gol:.1f}")
 
     st.divider()
     with st.container(border=True):
@@ -174,7 +169,7 @@ def mostrar_scout(df):
         render_stat_row("CHUTES AO GOL", df_m_h['Chutes_Gol_Mandante'].mean(), df_v_a['Chutes_Gol_Visitante'].mean())
         render_stat_row("ESCANTEIOS", df_m_h['Cantos_Mandante'].mean(), df_v_a['Cantos_Visitante'].mean())
 
-    t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
+    t1, t2 = st.tabs(["🕒 Forma Recente", "⚔️ H2H"])
     with t1:
         cf1, cf2 = st.columns(2)
         with cf1:
@@ -185,23 +180,8 @@ def mostrar_scout(df):
         with cf2:
             st.markdown(f"**{v_sel}**")
             for _, r in df_v_a.iterrows():
-                res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Visitante_FT'] == r['Gols_Visitante_FT'] else "❌")
+                res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Visitante_FT'] == r['Gols_Mandante_FT'] else "❌")
                 st.write(f"{res} {r['Data'].strftime('%d/%m')} vs {r['Mandante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
     with t2:
         h2h = df_s[((df_s['Mandante'] == m_sel) & (df_s['Visitante'] == v_sel)) | ((df_s['Mandante'] == v_sel) & (df_s['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
         st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True, hide_index=True)
-    with t3:
-        for label, (cm, cv) in {"Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"), "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"), "Cantos": ("Cantos_Mandante", "Cantos_Visitante")}.items():
-            st.subheader(label); ca, cb = st.columns(2)
-            with ca: st.dataframe(calcular_stats_completas(df_m_h[cm], df_m_h[cv]).style.format("{:.2f}"), use_container_width=True)
-            with cb: st.dataframe(calcular_stats_completas(df_v_a[cv], df_v_a[cm]).style.format("{:.2f}"), use_container_width=True)
-    with t4:
-        for t_n, df_j, mando in [(m_sel, df_m_h, "Mandante"), (v_sel, df_v_a, "Visitante")]:
-            st.write(f"**{t_n}**"); adv = "Visitante" if mando == "Mandante" else "Mandante"
-            cols_f = [f"0-15_{mando}", f"16-30_{mando}", f"31-45+_{mando}", f"46-60_{mando}", f"61-75_{mando}", f"76-90+_{mando}"]
-            cols_s = [f"0-15_{adv}", f"16-30_{adv}", f"31-45+_{adv}", f"46-60_{adv}", f"61-75_{adv}", f"76-90+_{adv}"]
-            st.dataframe(pd.DataFrame([df_j[cols_f].sum().values, df_j[cols_s].sum().values], columns=["0-15","16-30","31-45","46-60","61-75","76-90"], index=["Marcados", "Sofridos"]), use_container_width=True)
-    st.divider(); st.subheader("🎯 Frequência de Mercados")
-    cp1, cp2 = st.columns(2)
-    with cp1: st.dataframe(calcular_probabilidades_mercado(df_m_h).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
-    with cp2: st.dataframe(calcular_probabilidades_mercado(df_v_a).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
