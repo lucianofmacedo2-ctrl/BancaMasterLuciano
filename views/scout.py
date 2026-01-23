@@ -113,7 +113,23 @@ def calcular_probabilidades_mercado(df):
     return pd.DataFrame(mercados)
 
 def mostrar_scout(df):
-    st.markdown("""<style>div[data-testid="stDataFrame"] td { text-align: center !important; } .stMetric { text-align: center !important; }</style>""", unsafe_allow_html=True)
+    # CSS para centralizar métricas e escurecer os números
+    st.markdown("""
+    <style>
+        div[data-testid="stDataFrame"] td { text-align: center !important; }
+        [data-testid="stMetricValue"] {
+            text-align: center !important;
+            color: #000000 !important;
+            font-weight: 800 !important;
+            width: 100%;
+        }
+        [data-testid="stMetricLabel"] {
+            text-align: center !important;
+            width: 100%;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
     st.title("🚀 Scout Profissional")
 
     l_v = st.session_state.get('liga_scout', None)
@@ -139,7 +155,6 @@ def mostrar_scout(df):
     idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
     v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v)
 
-    # --- BARRA DE PROGRESSO COM % ---
     tab_geral = calcular_tabela_classificacao(df_s)
     liga_clean = str(liga_sel).upper().strip()
     
@@ -151,9 +166,16 @@ def mostrar_scout(df):
         st.markdown(f"📊 **Progresso da Competição:** Rodada **{int(rodada_atual)}** de **{info['rodadas']}** - **{pct:.1f}% concluída**")
         st.progress(min(pct/100, 1.0))
         
-        # TEXTO EXPLICATIVO
-        exp_list = [f"**{k}**: {v[0]}º ao {v[1]}º" for k, v in info['alvos'].items()]
-        st.caption(f"ℹ️ **Regras da Liga:** {' | '.join(exp_list)}")
+        # EXPLICAÇÃO DETALHADA DOS ALVOS
+        with st.expander("📖 Entenda as Posições e Alvos desta Liga"):
+            st.write(f"Nesta temporada da **{liga_sel}**, a tabela é dividida da seguinte forma:")
+            for alvo, faixa in info['alvos'].items():
+                if "Rebaixamento" in alvo:
+                    st.write(f"- 🛑 **{alvo}**: Do {faixa[0]}º ao {faixa[1]}º lugar (Risco de queda).")
+                elif any(x in alvo for x in ["Champions", "Libertadores", "Acesso"]):
+                    st.write(f"- 🏆 **{alvo}**: Do {faixa[0]}º ao {faixa[1]}º lugar (Elite/Promoção).")
+                else:
+                    st.write(f"- ⚽ **{alvo}**: Do {faixa[0]}º ao {faixa[1]}º lugar.")
     else:
         st.warning(f"⚠️ Liga '{liga_clean}' não mapeada.")
 
