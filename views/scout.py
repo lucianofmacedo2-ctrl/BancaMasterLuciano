@@ -132,35 +132,40 @@ def mostrar_scout(df):
         st.markdown(f"📊 **Progresso da Competição:** Rodada **{int(rodada_atual)}** de **{info['rodadas']}** - **{pct:.1f}% concluída**")
         st.progress(min(pct/100, 1.0))
         
-        # Explicação das Posições
-        exp = " | ".join([f"**{k}**: {v[0]}º ao {v[1]}º" for k, v in info['alvos'].items()])
-        st.caption(f"ℹ️ **Regras da Liga:** {exp}")
+        # TEXTO EXPLICATIVO
+        exp_list = [f"**{k}**: {v[0]}º ao {v[1]}º" for k, v in info['alvos'].items()]
+        st.caption(f"ℹ️ **Regras da Liga:** {' | '.join(exp_list)}")
     else:
         st.warning(f"⚠️ Liga '{liga_clean}' não mapeada.")
 
+    # Filtro de histórico para os cards
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
     if not df_m_h.empty and not df_v_a.empty:
         col_i1, col_i2 = st.columns(2)
-        for col, t_name, df_t, mando in zip([col_i1, col_i2], [m_sel, v_sel], [df_m_h, df_v_a], ["Casa", "Fora"]):
+        for col, t_name, df_hist, mando in zip([col_i1, col_i2], [m_sel, v_sel], [df_m_h, df_v_a], ["Casa", "Fora"]):
             with col:
                 pos_row = tab_geral[tab_geral['Time'] == t_name]
                 if not pos_row.empty:
                     pos = pos_row.index[0] + 1
-                    jogos = pos_row['J'].values[0]
                     obj = get_objetivo_txt(liga_sel, pos)
                     
-                    # Cálculo de Clean Sheets e BTTS (baseado nos últimos 10)
-                    cs = len(df_t[(df_t['Gols_Visitante_FT'] == 0) if mando == "Casa" else (df_t['Gols_Mandante_FT'] == 0)])
-                    fsm = len(df_t[(df_t['Gols_Mandante_FT'] == 0) if mando == "Casa" else (df_t['Gols_Visitante_FT'] == 0)])
-                    ch_gol = df_t['Chutes_Mandante' if mando == "Casa" else 'Chutes_Visitante'].mean()
-                    
-                    st.info(f"**{t_name}** ({mando}) - {pos}º Lugar\n\n🎯 {obj}")
-                    ci1, ci2, ci3 = st.columns(3)
-                    ci1.metric("Clean Sheets", f"{cs}")
-                    ci2.metric("Falhou Marcar", f"{fsm}")
-                    ci3.metric("Chutes/Jogo", f"{ch_gol:.1f}")
+                    # CÁLCULOS DAS STATS PEDIDAS
+                    if mando == "Casa":
+                        cs = (df_hist['Gols_Visitante_FT'] == 0).sum()
+                        fsm = (df_hist['Gols_Mandante_FT'] == 0).sum()
+                        ch_media = df_hist['Chutes_Gol_Mandante'].mean()
+                    else:
+                        cs = (df_hist['Gols_Mandante_FT'] == 0).sum()
+                        fsm = (df_hist['Gols_Visitante_FT'] == 0).sum()
+                        ch_media = df_hist['Chutes_Gol_Visitante'].mean()
+
+                    st.info(f"**{t_name}** ({mando})\n\n🏆 {pos}º Lugar | 🎯 {obj}")
+                    k1, k2, k3 = st.columns(3)
+                    k1.metric("Clean Sheets", cs)
+                    k2.metric("F.S.M", fsm)
+                    k3.metric("Chutes/G", f"{ch_media:.1f}")
 
     st.divider()
     with st.container(border=True):
