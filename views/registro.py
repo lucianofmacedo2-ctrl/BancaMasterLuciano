@@ -32,7 +32,82 @@ def mostrar_registro(df_csv):
         st.warning("⚠️ Cadastre uma Banca primeiro na tela de Bancas!")
         return
 
-    # 2. Gerenciar Mercados e Métodos
+    # --- NOVA FUNCIONALIDADE: REGISTRO EM MASSA VIA CSV ---
+    with st.expander("📤 REGISTRO EM MASSA (CSV)", expanded=True):
+        st.markdown("""
+        **Instruções:** Suba um arquivo CSV com as seguintes colunas:
+        `data, liga, mandante, visitante, mercado, linha, metodo, stake, odd, status, banca_nome, obs`
+        """)
+        arquivo_massa = st.file_uploader("Selecione o arquivo CSV", type=["csv"], key="uploader_csv")
+        
+        if arquivo_massa is not None:
+            try:
+                df_massa = pd.read_csv(arquivo_massa)
+                st.write("📋 Prévia dos dados para importação:", df_massa.head())
+                
+                if st.button("🚀 Confirmar Importação em Massa"):
+                    sucessos = 0
+                    erros = 0
+                    barra_progresso = st.progress(0)
+                    total_linhas = len(df_massa)
+                    
+                    for i, row in df_massa.iterrows():
+                        try:
+                            # Cálculo de lucro automático para o banco de dados
+                            stk = float(row['stake'])
+                            od = float(row['odd'])
+                            stt = str(row['status']).strip()
+                            luc = 0.0
+                            
+                            if stt == "Green": luc = stk * (od - 1)
+                            elif stt == "Meio Green": luc = (stk * (od - 1)) / 2
+                            elif stt == "Red": luc = -stk
+                            elif stt == "Meio Red": luc = -stk / 2
+                            
+                            dados_massa = {
+                                "data": str(row['data']),
+                                "liga": str(row['liga']),
+                                "mandante": str(row['mandante']),
+                                "visitante": str(row['visitante']),
+                                "mercado": str(row['mercado']),
+                                "linha": str(row['linha']),
+                                "metodo": str(row['metodo']),
+                                "stake": stk,
+                                "odd": od,
+                                "status": stt,
+                                "lucro": float(luc),
+                                "banca_nome": str(row['banca_nome']),
+                                "obs": str(row['obs']) if pd.notna(row['obs']) else ""
+                            }
+                            
+                            # 1. Salva no Supabase (Nuvem)
+                            supabase.table("apostas").insert(dados_massa).execute()
+                            
+                            # 2. Salva no Local (Backup CSV)
+                            if not os.path.exists("data"): os.makedirs("data")
+                            df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
+                            df_local = pd.concat([df_local, pd.DataFrame([dados_massa])], ignore_index=True)
+                            df_local.to_csv(PATH_APOSTAS, index=False)
+                            
+                            sucessos += 1
+                        except Exception as e:
+                            erros += 1
+                            st.error(f"Erro na linha {i+1}: {e}")
+                        
+                        barra_progresso.progress((i + 1) / total_linhas)
+                    
+                    st.success(f"✅ Importação Concluída: {sucessos} sucessos!")
+                    if erros > 0:
+                        st.warning(f"⚠️ Houve erro em {erros} registros.")
+                    
+                    time.sleep(2)
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao ler o arquivo CSV: {e}")
+
+    st.divider()
+
+    # 2. Gerenciar Mercados e Métodos (Original)
     with st.expander("⚙️ Gerenciar Mercados e Métodos", expanded=False):
         c_aux1, c_aux2 = st.columns(2)
         with c_aux1:
@@ -69,70 +144,10 @@ def mostrar_registro(df_csv):
                     supabase.table("config_auxiliares").delete().eq("tipo", "Metodo").eq("nome", met_excluir).execute()
                     st.rerun()
 
-    # --- NOVA FUNCIONALIDADE: REGISTRO EM MASSA ---
-    with st.expander("📤 Registro em Massa (CSV)", expanded=False):
-        st.markdown("Suba um arquivo CSV com as colunas: `data,liga,mandante,visitante,mercado,linha,metodo,stake,odd,status,banca_nome,obs`")
-        arquivo_massa = st.file_uploader("Selecione o arquivo CSV", type=["csv"])
-        
-        if arquivo_massa is not None:
-            df_massa = pd.read_csv(arquivo_massa)
-            st.write("Prévia dos dados:", df_massa.head())
-            
-            if st.button("Confirmar Importação"):
-                sucessos = 0
-                erros = 0
-                
-                for _, row in df_massa.iterrows():
-                    try:
-                        # Cálculo de lucro automático
-                        stk = float(row['stake'])
-                        od = float(row['odd'])
-                        stt = row['status']
-                        luc = 0.0
-                        
-                        if stt == "Green": luc = stk * (od - 1)
-                        elif stt == "Meio Green": luc = (stk * (od - 1)) / 2
-                        elif stt == "Red": luc = -stk
-                        elif stt == "Meio Red": luc = -stk / 2
-                        
-                        dados_massa = {
-                            "data": str(row['data']),
-                            "liga": str(row['liga']),
-                            "mandante": str(row['mandante']),
-                            "visitante": str(row['visitante']),
-                            "mercado": str(row['mercado']),
-                            "linha": str(row['linha']),
-                            "metodo": str(row['metodo']),
-                            "stake": stk,
-                            "odd": od,
-                            "status": stt,
-                            "lucro": float(luc),
-                            "banca_nome": str(row['banca_nome']),
-                            "obs": str(row['obs']) if pd.notna(row['obs']) else ""
-                        }
-                        
-                        # Salva no Supabase
-                        supabase.table("apostas").insert(dados_massa).execute()
-                        
-                        # Backup Local
-                        if not os.path.exists("data"): os.makedirs("data")
-                        df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
-                        df_local = pd.concat([df_local, pd.DataFrame([dados_massa])], ignore_index=True)
-                        df_local.to_csv(PATH_APOSTAS, index=False)
-                        
-                        sucessos += 1
-                    except Exception as e:
-                        erros += 1
-                        st.error(f"Erro na linha {sucessos+erros}: {e}")
-                
-                st.success(f"Importação concluída! ✅ {sucessos} sucessos, ❌ {erros} erros.")
-                time.sleep(1)
-                st.rerun()
-
     st.divider()
     
-    # 3. Seleção de Tipo e Quantidade de Jogos
-    tipo_aposta = st.radio("Tipo de Aposta", ["Simples", "Dupla", "Tripla"], horizontal=True)
+    # 3. Seleção de Tipo e Quantidade de Jogos (Original)
+    tipo_aposta = st.radio("Tipo de Aposta Manual", ["Simples", "Dupla", "Tripla"], horizontal=True)
     n_jogos = 1 if tipo_aposta == "Simples" else (2 if tipo_aposta == "Dupla" else 3)
     
     jogos_finais = []
@@ -156,8 +171,8 @@ def mostrar_registro(df_csv):
         
         jogos_finais.append({"liga": liga, "mandante": mandante, "visitante": visitante})
 
-    # 4. Formulário Financeiro Final
-    st.subheader("📋 Detalhes da Operação")
+    # 4. Formulário Financeiro Final (Original)
+    st.subheader("📋 Detalhes da Operação Manual")
     with st.form("form_final_aposta", clear_on_submit=True):
         f1, f2, f3, f4 = st.columns(4)
         data_ap = f1.date_input("Data", datetime.now())
