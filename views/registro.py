@@ -69,6 +69,66 @@ def mostrar_registro(df_csv):
                     supabase.table("config_auxiliares").delete().eq("tipo", "Metodo").eq("nome", met_excluir).execute()
                     st.rerun()
 
+    # --- NOVA FUNCIONALIDADE: REGISTRO EM MASSA ---
+    with st.expander("📤 Registro em Massa (CSV)", expanded=False):
+        st.markdown("Suba um arquivo CSV com as colunas: `data,liga,mandante,visitante,mercado,linha,metodo,stake,odd,status,banca_nome,obs`")
+        arquivo_massa = st.file_uploader("Selecione o arquivo CSV", type=["csv"])
+        
+        if arquivo_massa is not None:
+            df_massa = pd.read_csv(arquivo_massa)
+            st.write("Prévia dos dados:", df_massa.head())
+            
+            if st.button("Confirmar Importação"):
+                sucessos = 0
+                erros = 0
+                
+                for _, row in df_massa.iterrows():
+                    try:
+                        # Cálculo de lucro automático
+                        stk = float(row['stake'])
+                        od = float(row['odd'])
+                        stt = row['status']
+                        luc = 0.0
+                        
+                        if stt == "Green": luc = stk * (od - 1)
+                        elif stt == "Meio Green": luc = (stk * (od - 1)) / 2
+                        elif stt == "Red": luc = -stk
+                        elif stt == "Meio Red": luc = -stk / 2
+                        
+                        dados_massa = {
+                            "data": str(row['data']),
+                            "liga": str(row['liga']),
+                            "mandante": str(row['mandante']),
+                            "visitante": str(row['visitante']),
+                            "mercado": str(row['mercado']),
+                            "linha": str(row['linha']),
+                            "metodo": str(row['metodo']),
+                            "stake": stk,
+                            "odd": od,
+                            "status": stt,
+                            "lucro": float(luc),
+                            "banca_nome": str(row['banca_nome']),
+                            "obs": str(row['obs']) if pd.notna(row['obs']) else ""
+                        }
+                        
+                        # Salva no Supabase
+                        supabase.table("apostas").insert(dados_massa).execute()
+                        
+                        # Backup Local
+                        if not os.path.exists("data"): os.makedirs("data")
+                        df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
+                        df_local = pd.concat([df_local, pd.DataFrame([dados_massa])], ignore_index=True)
+                        df_local.to_csv(PATH_APOSTAS, index=False)
+                        
+                        sucessos += 1
+                    except Exception as e:
+                        erros += 1
+                        st.error(f"Erro na linha {sucessos+erros}: {e}")
+                
+                st.success(f"Importação concluída! ✅ {sucessos} sucessos, ❌ {erros} erros.")
+                time.sleep(1)
+                st.rerun()
+
     st.divider()
     
     # 3. Seleção de Tipo e Quantidade de Jogos
@@ -123,12 +183,11 @@ def mostrar_registro(df_csv):
                 st.error("Preencha os dados de todos os jogos!")
             else:
                 # UNIFICAÇÃO DOS DADOS PARA O BANCO DE DADOS
-                # Se for múltipla, junta os nomes com " + " ou " / "
                 liga_final = " / ".join(list(set([j['liga'] for j in jogos_finais])))
                 mandante_final = " + ".join([j['mandante'] for j in jogos_finais])
                 visitante_final = " + ".join([j['visitante'] for j in jogos_finais])
 
-                # Cálculo financeiro (Mantendo sua lógica original)
+                # Cálculo financeiro
                 lucro = 0.0
                 if status_reg == "Green": lucro = stake * (odd - 1)
                 elif status_reg == "Meio Green": lucro = (stake * (odd - 1)) / 2
@@ -167,4 +226,3 @@ def mostrar_registro(df_csv):
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar: {e}")
-
