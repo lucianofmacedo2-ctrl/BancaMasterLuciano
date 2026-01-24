@@ -14,9 +14,11 @@ def carregar_tudo():
     try:
         res_a = supabase.table("apostas").select("*").execute()
         res_b = supabase.table("bancas").select("*").execute()
-        return pd.DataFrame(res_a.data), pd.DataFrame(res_b.data)
+        # Buscando as movimentações de aporte e saque
+        res_m = supabase.table("movimentacoes").select("*").execute()
+        return pd.DataFrame(res_a.data), pd.DataFrame(res_b.data), pd.DataFrame(res_m.data)
     except:
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 def mostrar_dashboard():
     # --- CSS PARA CORES ESCURAS ---
@@ -29,7 +31,7 @@ def mostrar_dashboard():
     """, unsafe_allow_html=True)
 
     st.title("📊 Dashboard de Performance")
-    df_ap, df_ba = carregar_tudo()
+    df_ap, df_ba, df_mov = carregar_tudo()
 
     if df_ba.empty:
         st.warning("Cadastre uma banca para ver os gráficos.")
@@ -52,13 +54,34 @@ def mostrar_dashboard():
     with c_f2:
         mes_sel = st.selectbox("Filtrar por Mês", ["Todos"] + meses_disponiveis)
 
-    # --- APLICAÇÃO DOS FILTROS ---
+    # --- LÓGICA DE SALDO (INCLUINDO APORTES E SAQUES) ---
     df_f = df_ap.copy()
+    
     if banca_sel != "Todas":
+        row_banca = df_ba[df_ba["nome"] == banca_sel]
+        id_banca = row_banca["id"].iloc[0]
+        s_base = row_banca["saldo_inicial"].iloc[0]
+        
+        # Filtra apostas
         df_f = df_f[df_f['banca_nome'] == banca_sel]
-        s_ini = df_ba[df_ba["nome"] == banca_sel]["saldo_inicial"].iloc[0]
+        
+        # Calcula movimentações da banca específica
+        if not df_mov.empty:
+            movs = df_mov[df_mov['banca_id'] == id_banca]
+            aportes = movs[movs['tipo'] == 'Aporte']['valor'].sum()
+            saques = movs[movs['tipo'] == 'Saque']['valor'].sum()
+            s_ini = s_base + aportes - saques
+        else:
+            s_ini = s_base
     else:
-        s_ini = df_ba["saldo_inicial"].sum()
+        # Soma de todas as bancas + todas as movimentações
+        s_base_total = df_ba["saldo_inicial"].sum()
+        if not df_mov.empty:
+            aportes = df_mov[df_mov['tipo'] == 'Aporte']['valor'].sum()
+            saques = df_mov[df_mov['tipo'] == 'Saque']['valor'].sum()
+            s_ini = s_base_total + aportes - saques
+        else:
+            s_ini = s_base_total
 
     if mes_sel != "Todos":
         df_f = df_f[df_f['data'].dt.strftime('%m/%Y') == mes_sel]
@@ -67,20 +90,16 @@ def mostrar_dashboard():
     hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
     if not df_f.empty:
-        # Pega a data da primeira aposta feita no período filtrado
         data_inicio_operacoes = df_f['data'].min().replace(hour=0, minute=0, second=0, microsecond=0)
         
         if mes_sel != "Todos":
             m_idx, a_idx = map(int, mes_sel.split('/'))
-            # Se for o mês atual, conta do início das operações até hoje
             if hoje.month == m_idx and hoje.year == a_idx:
                 dias_passados = (hoje - data_inicio_operacoes).days + 1
                 ultimo_dia_mes = calendar.monthrange(a_idx, m_idx)[1]
-                # Dias restantes até o fim do mês civil
                 data_fim_mes = datetime(a_idx, m_idx, ultimo_dia_mes)
                 dias_restantes = (data_fim_mes - hoje).days
             else:
-                # Se for um mês passado, conta da primeira aposta até o fim daquele mês
                 ultimo_dia_mes = calendar.monthrange(a_idx, m_idx)[1]
                 data_fim_mes = datetime(a_idx, m_idx, ultimo_dia_mes)
                 dias_passados = (data_fim_mes - data_inicio_operacoes).days + 1
@@ -98,12 +117,11 @@ def mostrar_dashboard():
     greens = df_f[df_f['status'].str.contains('Green', na=False)]
     win_rate = (len(greens) / total_apostas * 100) if total_apostas > 0 else 0
     odd_media_greens = greens['odd'].mean() if not greens.empty else 0
-    
-    # Média de Apostas por Dia Ativo (ex: 16 apostas / 3 dias)
     apostas_por_dia = total_apostas / dias_passados if dias_passados > 0 else 0
 
     # --- MÉTRICAS ---
     c1, c2, c3 = st.columns(3)
+    # Aqui o cálculo agora considera o saldo inicial + aportes/saques + lucro das apostas
     c1.metric("Saldo Atualizado", f"R$ {s_ini + lucro_total:.2f}")
     c2.metric("Lucro Líquido", f"R$ {lucro_total:.2f}")
     c3.metric("Win Rate", f"{win_rate:.1f}%")
