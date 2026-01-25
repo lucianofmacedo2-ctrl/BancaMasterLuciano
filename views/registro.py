@@ -39,8 +39,8 @@ def mostrar_registro(df_csv):
         
         if arquivo_massa is not None:
             try:
-                # Carrega o CSV e limpa espaços e converte para minúsculas os cabeçalhos
                 df_massa = pd.read_csv(arquivo_massa)
+                # Limpa espaços e padroniza cabeçalhos em minúsculo
                 df_massa.columns = df_massa.columns.str.strip().str.lower()
                 
                 st.write("📋 Prévia dos dados detectados:", df_massa.head())
@@ -48,18 +48,18 @@ def mostrar_registro(df_csv):
                 if st.button("🚀 Confirmar Importação em Massa"):
                     sucessos = 0
                     erros = 0
-                    registros_concluidos = []
+                    detalhes_sucesso = []
                     barra_progresso = st.progress(0)
                     total_linhas = len(df_massa)
                     
                     for i, row in df_massa.iterrows():
                         try:
-                            # Tratamento de Stake e Odd (trata vírgula e espaços)
-                            s_raw = str(row['stake']).replace(',', '.').strip()
-                            o_raw = str(row['odd']).replace(',', '.').strip()
+                            # Tratamento robusto de números (Stake e Odd)
+                            s_val = str(row['stake']).replace(',', '.').strip()
+                            o_val = str(row['odd']).replace(',', '.').strip()
                             
-                            stk = float(s_raw)
-                            od = float(o_raw)
+                            stk = float(s_val)
+                            od = float(o_val)
                             stt = str(row['status']).strip()
                             luc = 0.0
                             
@@ -68,7 +68,7 @@ def mostrar_registro(df_csv):
                             elif stt == "Meio Green": luc = (stk * (od - 1)) / 2
                             elif stt == "Red": luc = -stk
                             elif stt == "Meio Red": luc = -stk / 2
-                            elif stt in ["Push", "Devolvida", "Aberta", "Push"]: luc = 0.0
+                            elif stt in ["Push", "Devolvida", "Aberta"]: luc = 0.0
                             
                             dados_massa = {
                                 "data": str(row['data']).strip(),
@@ -86,23 +86,21 @@ def mostrar_registro(df_csv):
                                 "obs": str(row['obs']).strip() if pd.notna(row['obs']) else ""
                             }
                             
-                            # 1. Enviar para Supabase
+                            # Salva no Supabase
                             supabase.table("apostas").insert(dados_massa).execute()
                             
-                            # 2. Backup Local
+                            # Adiciona ao Backup Local
                             if not os.path.exists("data"): os.makedirs("data")
                             df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
                             df_local = pd.concat([df_local, pd.DataFrame([dados_massa])], ignore_index=True)
                             df_local.to_csv(PATH_APOSTAS, index=False)
                             
-                            # Adiciona à lista de confirmação
-                            registros_concluidos.append({
+                            detalhes_sucesso.append({
                                 "Data": dados_massa['data'],
-                                "Jogo": f"{dados_massa['mandante']} x {dados_massa['visitante']}",
+                                "Confronto": f"{dados_massa['mandante']} x {dados_massa['visitante']}",
                                 "Status": stt,
                                 "Lucro": f"R$ {luc:.2f}"
                             })
-                            
                             sucessos += 1
                         except Exception as e:
                             erros += 1
@@ -110,26 +108,26 @@ def mostrar_registro(df_csv):
                         
                         barra_progresso.progress((i + 1) / total_linhas)
                     
-                    # ÁREA DE CONFIRMAÇÃO FINAL
+                    # Confirmação Final
                     st.divider()
                     st.balloons()
-                    st.success(f"🏁 Importação finalizada! {sucessos} apostas registradas com sucesso.")
+                    st.success(f"🏁 Finalizado! {sucessos} apostas registradas.")
                     
-                    if registros_concluidos:
-                        st.markdown("### ✅ Detalhamento dos Registros:")
-                        st.table(pd.DataFrame(registros_concluidos))
+                    if detalhes_sucesso:
+                        st.markdown("### ✅ Bilhetes Confirmados:")
+                        st.table(pd.DataFrame(detalhes_sucesso))
                     
                     if erros > 0:
-                        st.warning(f"⚠️ {erros} registros falharam. Verifique os erros acima.")
+                        st.warning(f"⚠️ {erros} linhas apresentaram erro.")
                     
-                    if st.button("Finalizar e Recarregar"):
+                    if st.button("🔄 Recarregar Sistema"):
                         st.rerun()
             except Exception as e:
-                st.error(f"Erro crítico no processamento: {e}")
+                st.error(f"Erro ao ler arquivo: {e}")
 
     st.divider()
 
-    # 2. Gerenciar Mercados e Métodos (Original)
+    # 2. Gerenciar Mercados e Métodos
     with st.expander("⚙️ Gerenciar Mercados e Métodos", expanded=False):
         c_aux1, c_aux2 = st.columns(2)
         with c_aux1:
@@ -138,15 +136,13 @@ def mostrar_registro(df_csv):
             if st.button("Adicionar Mercado"):
                 if novo_m:
                     supabase.table("config_auxiliares").insert({"tipo": "Mercado", "nome": novo_m}).execute()
-                    st.success("Adicionado!")
-                    time.sleep(0.5)
-                    st.rerun()
+                    st.success("Adicionado!"); time.sleep(0.5); st.rerun()
             
             lista_m = carregar_aux("Mercado")
             if lista_m:
-                m_excluir = st.selectbox("Excluir Mercado", ["Selecione..."] + lista_m)
-                if m_excluir != "Selecione..." and st.button("❌ Remover Mercado"):
-                    supabase.table("config_auxiliares").delete().eq("tipo", "Mercado").eq("nome", m_excluir).execute()
+                m_ex = st.selectbox("Excluir Mercado", ["Selecione..."] + lista_m)
+                if m_ex != "Selecione..." and st.button("❌ Remover Mercado"):
+                    supabase.table("config_auxiliares").delete().eq("tipo", "Mercado").eq("nome", m_ex).execute()
                     st.rerun()
 
         with c_aux2:
@@ -155,96 +151,66 @@ def mostrar_registro(df_csv):
             if st.button("Adicionar Método"):
                 if novo_met:
                     supabase.table("config_auxiliares").insert({"tipo": "Metodo", "nome": novo_met}).execute()
-                    st.success("Adicionado!")
-                    time.sleep(0.5)
-                    st.rerun()
+                    st.success("Adicionado!"); time.sleep(0.5); st.rerun()
             
             lista_met = carregar_aux("Metodo")
             if lista_met:
-                met_excluir = st.selectbox("Excluir Método", ["Selecione..."] + lista_met)
-                if met_excluir != "Selecione..." and st.button("❌ Remover Método"):
-                    supabase.table("config_auxiliares").delete().eq("tipo", "Metodo").eq("nome", met_excluir).execute()
+                met_ex = st.selectbox("Excluir Método", ["Selecione..."] + lista_met)
+                if met_ex != "Selecione..." and st.button("❌ Remover Método"):
+                    supabase.table("config_auxiliares").delete().eq("tipo", "Metodo").eq("nome", met_ex).execute()
                     st.rerun()
 
     st.divider()
     
-    # 3. Registro Manual (Simples, Dupla, Tripla)
-    tipo_aposta = st.radio("Registro Manual", ["Simples", "Dupla", "Tripla"], horizontal=True)
-    n_jogos = 1 if tipo_aposta == "Simples" else (2 if tipo_aposta == "Dupla" else 3)
+    # 3. Registro Manual
+    tipo_ap = st.radio("Registro Manual", ["Simples", "Dupla", "Tripla"], horizontal=True)
+    n_jogos = 1 if tipo_ap == "Simples" else (2 if tipo_ap == "Dupla" else 3)
     
     jogos_finais = []
     for i in range(n_jogos):
         st.markdown(f"#### ⚽ Jogo {i+1}")
         fora_csv = st.checkbox(f"Jogo {i+1} fora do CSV? (Manual)", key=f"fora_{i}")
-        col_j1, col_j2, col_j3 = st.columns(3)
-
+        col1, col2, col3 = st.columns(3)
         if fora_csv:
-            liga = col_j1.text_input("Liga", key=f"liga_{i}")
-            mandante = col_j2.text_input("Mandante", key=f"man_{i}")
-            visitante = col_j3.text_input("Visitante", key=f"vis_{i}")
+            liga = col1.text_input("Liga", key=f"l_{i}")
+            man = col2.text_input("Mandante", key=f"m_{i}")
+            vis = col3.text_input("Visitante", key=f"v_{i}")
         else:
-            liga = col_j1.selectbox("Selecione a Liga", sorted(df_csv['Liga'].unique()), key=f"liga_{i}")
-            df_filtrado = df_csv[df_csv['Liga'] == liga]
-            times = sorted(pd.concat([df_filtrado['Mandante'], df_filtrado['Visitante']]).unique())
-            mandante = col_j2.selectbox("Mandante", times, key=f"man_{i}")
-            visitante = col_j3.selectbox("Visitante", [t for t in times if t != mandante], key=f"vis_{i}")
-        
-        jogos_finais.append({"liga": liga, "mandante": mandante, "visitante": visitante})
+            liga = col1.selectbox("Liga", sorted(df_csv['Liga'].unique()), key=f"l_{i}")
+            df_f = df_csv[df_csv['Liga'] == liga]
+            times = sorted(pd.concat([df_f['Mandante'], df_f['Visitante']]).unique())
+            man = col2.selectbox("Mandante", times, key=f"m_{i}")
+            vis = col3.selectbox("Visitante", [t for t in times if t != man], key=f"v_{i}")
+        jogos_finais.append({"liga": liga, "mandante": man, "visitante": vis})
 
-    # 4. Detalhes Financeiros Manual
-    st.subheader("📋 Detalhes da Operação Manual")
-    with st.form("form_final_aposta", clear_on_submit=True):
+    # 4. Detalhes Operação Manual
+    with st.form("form_manual", clear_on_submit=True):
         f1, f2, f3, f4 = st.columns(4)
         data_ap = f1.date_input("Data", datetime.now())
         banca_sel = f1.selectbox("Banca", lista_bancas)
-        
-        mercados_lista = carregar_aux("Mercado")
-        mercado_reg = f2.selectbox("Mercado", mercados_lista if mercados_lista else ["Vazio"])
-        linha = f2.text_input("Linha (Ex: -1.0 ou Over 2.5)")
-        
-        metodos_lista = carregar_aux("Metodo")
-        metodo_reg = f3.selectbox("Método", metodos_lista if metodos_lista else ["Vazio"])
+        mercado_reg = f2.selectbox("Mercado", carregar_aux("Mercado"))
+        linha = f2.text_input("Linha")
+        metodo_reg = f3.selectbox("Método", carregar_aux("Metodo"))
         status_reg = f3.selectbox("Status", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
-        
         stake = f4.number_input("Stake", min_value=0.0, step=1.0)
-        odd = f4.number_input("Odd Total", min_value=1.0, step=0.1)
+        odd = f4.number_input("Odd", min_value=1.0, step=0.1)
         obs = st.text_input("Observação")
         
-        if st.form_submit_button("🚀 Registrar Aposta"):
-            # Validação: todos os jogos devem estar preenchidos
-            erro_preenchimento = any(not j['mandante'] or not j['visitante'] for j in jogos_finais)
-            
-            if erro_preenchimento:
-                st.error("Preencha os dados de todos os jogos!")
-            else:
-                liga_final = " / ".join(list(set([j['liga'] for j in jogos_finais])))
-                mandante_final = " + ".join([j['mandante'] for j in jogos_finais])
-                visitante_final = " + ".join([j['visitante'] for j in jogos_finais])
+        if st.form_submit_button("🚀 Registrar Aposta Manual"):
+            liga_f = " / ".join(list(set([j['liga'] for j in jogos_finais])))
+            man_f = " + ".join([j['mandante'] for j in jogos_finais])
+            vis_f = " + ".join([j['visitante'] for j in jogos_finais])
+            lucro = 0.0
+            if status_reg == "Green": lucro = stake * (odd - 1)
+            elif status_reg == "Meio Green": lucro = (stake * (odd - 1)) / 2
+            elif status_reg == "Red": lucro = -stake
+            elif status_reg == "Meio Red": lucro = -stake / 2
 
-                lucro = 0.0
-                if status_reg == "Green": lucro = stake * (odd - 1)
-                elif status_reg == "Meio Green": lucro = (stake * (odd - 1)) / 2
-                elif status_reg == "Red": lucro = -stake
-                elif status_reg == "Meio Red": lucro = -stake / 2
-
-                dados = {
-                    "data": data_ap.strftime('%Y-%m-%d'),
-                    "liga": liga_final, "mandante": mandante_final, "visitante": visitante_final,
-                    "mercado": mercado_reg, "linha": linha, "metodo": metodo_reg,
-                    "stake": float(stake), "odd": float(odd), "status": status_reg,
-                    "lucro": float(lucro), "banca_nome": banca_sel, "obs": obs
-                }
-                
-                try:
-                    supabase.table("apostas").insert(dados).execute()
-                    if not os.path.exists("data"): os.makedirs("data")
-                    df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
-                    df_local = pd.concat([df_local, pd.DataFrame([dados])], ignore_index=True)
-                    df_local.to_csv(PATH_APOSTAS, index=False)
-                    
-                    st.balloons()
-                    st.success("✅ Aposta Manual Registrada!")
-                    time.sleep(1)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
+            dados = {
+                "data": data_ap.strftime('%Y-%m-%d'), "liga": liga_f, "mandante": man_f, 
+                "visitante": vis_f, "mercado": mercado_reg, "linha": linha, 
+                "metodo": metodo_reg, "stake": float(stake), "odd": float(odd), 
+                "status": status_reg, "lucro": float(lucro), "banca_nome": banca_sel, "obs": obs
+            }
+            supabase.table("apostas").insert(dados).execute()
+            st.balloons(); st.success("Registrado!"); time.sleep(1); st.rerun()
