@@ -35,15 +35,17 @@ def mostrar_registro(df_csv):
     # --- NOVA FUNCIONALIDADE: REGISTRO EM MASSA VIA CSV ---
     with st.expander("📤 REGISTRO EM MASSA (CSV)", expanded=True):
         st.markdown("""
-        **Instruções:** Suba um arquivo CSV com as seguintes colunas:
-        `data, liga, mandante, visitante, mercado, linha, metodo, stake, odd, status, banca_nome, obs`
+        **Instruções:** O arquivo deve conter: `data, liga, mandante, visitante, mercado, linha, metodo, stake, odd, status, banca_nome, obs`
         """)
         arquivo_massa = st.file_uploader("Selecione o arquivo CSV", type=["csv"], key="uploader_csv")
         
         if arquivo_massa is not None:
             try:
+                # Carregamento e limpeza inicial de nomes de colunas
                 df_massa = pd.read_csv(arquivo_massa)
-                st.write("📋 Prévia dos dados para importação:", df_massa.head())
+                df_massa.columns = df_massa.columns.str.strip().str.lower()
+                
+                st.write("📋 Prévia dos dados detectados:", df_massa.head())
                 
                 if st.button("🚀 Confirmar Importação em Massa"):
                     sucessos = 0
@@ -53,37 +55,42 @@ def mostrar_registro(df_csv):
                     
                     for i, row in df_massa.iterrows():
                         try:
-                            # Cálculo de lucro automático para o banco de dados
-                            stk = float(row['stake'])
-                            od = float(row['odd'])
+                            # Limpeza e conversão de Stake e Odd (trata vírgula e espaços)
+                            s_raw = str(row['stake']).replace(',', '.').strip()
+                            o_raw = str(row['odd']).replace(',', '.').strip()
+                            
+                            stk = float(s_raw)
+                            od = float(o_raw)
                             stt = str(row['status']).strip()
                             luc = 0.0
                             
+                            # Lógica de cálculo de lucro automática
                             if stt == "Green": luc = stk * (od - 1)
                             elif stt == "Meio Green": luc = (stk * (od - 1)) / 2
                             elif stt == "Red": luc = -stk
                             elif stt == "Meio Red": luc = -stk / 2
+                            elif stt in ["Push", "Devolvida", "Aberta"]: luc = 0.0
                             
                             dados_massa = {
-                                "data": str(row['data']),
-                                "liga": str(row['liga']),
-                                "mandante": str(row['mandante']),
-                                "visitante": str(row['visitante']),
-                                "mercado": str(row['mercado']),
-                                "linha": str(row['linha']),
-                                "metodo": str(row['metodo']),
+                                "data": str(row['data']).strip(),
+                                "liga": str(row['liga']).strip(),
+                                "mandante": str(row['mandante']).strip(),
+                                "visitante": str(row['visitante']).strip(),
+                                "mercado": str(row['mercado']).strip(),
+                                "linha": str(row['linha']).strip(),
+                                "metodo": str(row['metodo']).strip(),
                                 "stake": stk,
                                 "odd": od,
                                 "status": stt,
                                 "lucro": float(luc),
-                                "banca_nome": str(row['banca_nome']),
-                                "obs": str(row['obs']) if pd.notna(row['obs']) else ""
+                                "banca_nome": str(row['banca_nome']).strip(),
+                                "obs": str(row['obs']).strip() if pd.notna(row['obs']) else ""
                             }
                             
-                            # 1. Salva no Supabase (Nuvem)
+                            # 1. Enviar para Supabase
                             supabase.table("apostas").insert(dados_massa).execute()
                             
-                            # 2. Salva no Local (Backup CSV)
+                            # 2. Backup Local
                             if not os.path.exists("data"): os.makedirs("data")
                             df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
                             df_local = pd.concat([df_local, pd.DataFrame([dados_massa])], ignore_index=True)
@@ -92,18 +99,17 @@ def mostrar_registro(df_csv):
                             sucessos += 1
                         except Exception as e:
                             erros += 1
-                            st.error(f"Erro na linha {i+1}: {e}")
+                            st.error(f"Erro na linha {i+1} ({row.get('mandante', 'Desconhecido')}): {e}")
                         
                         barra_progresso.progress((i + 1) / total_linhas)
                     
-                    st.success(f"✅ Importação Concluída: {sucessos} sucessos!")
-                    if erros > 0:
-                        st.warning(f"⚠️ Houve erro em {erros} registros.")
+                    st.success(f"✅ Processo concluído! {sucessos} apostas registradas.")
+                    if erros > 0: st.warning(f"⚠️ {erros} registros falharam.")
                     
                     time.sleep(2)
                     st.rerun()
             except Exception as e:
-                st.error(f"Erro ao ler o arquivo CSV: {e}")
+                st.error(f"Erro ao processar o arquivo: {e}")
 
     st.divider()
 
@@ -146,13 +152,11 @@ def mostrar_registro(df_csv):
 
     st.divider()
     
-    # 3. Seleção de Tipo e Quantidade de Jogos (Original)
-    tipo_aposta = st.radio("Tipo de Aposta Manual", ["Simples", "Dupla", "Tripla"], horizontal=True)
+    # 3. Registro Manual (Simples, Dupla, Tripla)
+    tipo_aposta = st.radio("Registro Manual", ["Simples", "Dupla", "Tripla"], horizontal=True)
     n_jogos = 1 if tipo_aposta == "Simples" else (2 if tipo_aposta == "Dupla" else 3)
     
     jogos_finais = []
-
-    # Gerador de campos dinâmicos baseado na escolha (Simples/Dupla/Tripla)
     for i in range(n_jogos):
         st.markdown(f"#### ⚽ Jogo {i+1}")
         fora_csv = st.checkbox(f"Jogo {i+1} fora do CSV? (Manual)", key=f"fora_{i}")
@@ -171,7 +175,7 @@ def mostrar_registro(df_csv):
         
         jogos_finais.append({"liga": liga, "mandante": mandante, "visitante": visitante})
 
-    # 4. Formulário Financeiro Final (Original)
+    # 4. Formulário Financeiro Manual
     st.subheader("📋 Detalhes da Operação Manual")
     with st.form("form_final_aposta", clear_on_submit=True):
         f1, f2, f3, f4 = st.columns(4)
@@ -186,23 +190,19 @@ def mostrar_registro(df_csv):
         metodo_reg = f3.selectbox("Método", metodos_lista if metodos_lista else ["Vazio"])
         status_reg = f3.selectbox("Status", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
         
-        stake = f4.number_input("Stake", min_value=0.0, step=10.0)
+        stake = f4.number_input("Stake", min_value=0.0, step=1.0)
         odd = f4.number_input("Odd Total", min_value=1.0, step=0.1)
         obs = st.text_input("Observação")
         
         if st.form_submit_button("🚀 Registrar Aposta"):
-            # Validação: todos os jogos devem estar preenchidos
             erro_preenchimento = any(not j['mandante'] or not j['visitante'] for j in jogos_finais)
-            
             if erro_preenchimento:
                 st.error("Preencha os dados de todos os jogos!")
             else:
-                # UNIFICAÇÃO DOS DADOS PARA O BANCO DE DADOS
                 liga_final = " / ".join(list(set([j['liga'] for j in jogos_finais])))
                 mandante_final = " + ".join([j['mandante'] for j in jogos_finais])
                 visitante_final = " + ".join([j['visitante'] for j in jogos_finais])
 
-                # Cálculo financeiro
                 lucro = 0.0
                 if status_reg == "Green": lucro = stake * (odd - 1)
                 elif status_reg == "Meio Green": lucro = (stake * (odd - 1)) / 2
@@ -226,17 +226,13 @@ def mostrar_registro(df_csv):
                 }
                 
                 try:
-                    # 1. Salva na Nuvem (Supabase)
                     supabase.table("apostas").insert(dados).execute()
-                    
-                    # 2. Salva no Local (Backup CSV)
                     if not os.path.exists("data"): os.makedirs("data")
                     df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
                     df_local = pd.concat([df_local, pd.DataFrame([dados])], ignore_index=True)
                     df_local.to_csv(PATH_APOSTAS, index=False)
-                    
                     st.balloons()
-                    st.success(f"✅ {tipo_aposta} Registrada com sucesso!")
+                    st.success("✅ Aposta Manual Registrada!")
                     time.sleep(1)
                     st.rerun()
                 except Exception as e:
