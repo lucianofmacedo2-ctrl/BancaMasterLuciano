@@ -32,16 +32,14 @@ def mostrar_registro(df_csv):
         st.warning("⚠️ Cadastre uma Banca primeiro na tela de Bancas!")
         return
 
-    # --- NOVA FUNCIONALIDADE: REGISTRO EM MASSA VIA CSV ---
+    # --- REGISTRO EM MASSA VIA CSV ---
     with st.expander("📤 REGISTRO EM MASSA (CSV)", expanded=True):
-        st.markdown("""
-        **Instruções:** O arquivo deve conter: `data, liga, mandante, visitante, mercado, linha, metodo, stake, odd, status, banca_nome, obs`
-        """)
+        st.markdown("Suba o arquivo CSV com as colunas: `data, liga, mandante, visitante, mercado, linha, metodo, stake, odd, status, banca_nome, obs`")
         arquivo_massa = st.file_uploader("Selecione o arquivo CSV", type=["csv"], key="uploader_csv")
         
         if arquivo_massa is not None:
             try:
-                # Carregamento e limpeza inicial de nomes de colunas
+                # Carrega o CSV e limpa espaços e converte para minúsculas os cabeçalhos
                 df_massa = pd.read_csv(arquivo_massa)
                 df_massa.columns = df_massa.columns.str.strip().str.lower()
                 
@@ -50,12 +48,13 @@ def mostrar_registro(df_csv):
                 if st.button("🚀 Confirmar Importação em Massa"):
                     sucessos = 0
                     erros = 0
+                    registros_concluidos = []
                     barra_progresso = st.progress(0)
                     total_linhas = len(df_massa)
                     
                     for i, row in df_massa.iterrows():
                         try:
-                            # Limpeza e conversão de Stake e Odd (trata vírgula e espaços)
+                            # Tratamento de Stake e Odd (trata vírgula e espaços)
                             s_raw = str(row['stake']).replace(',', '.').strip()
                             o_raw = str(row['odd']).replace(',', '.').strip()
                             
@@ -64,12 +63,12 @@ def mostrar_registro(df_csv):
                             stt = str(row['status']).strip()
                             luc = 0.0
                             
-                            # Lógica de cálculo de lucro automática
+                            # Cálculo de lucro automático
                             if stt == "Green": luc = stk * (od - 1)
                             elif stt == "Meio Green": luc = (stk * (od - 1)) / 2
                             elif stt == "Red": luc = -stk
                             elif stt == "Meio Red": luc = -stk / 2
-                            elif stt in ["Push", "Devolvida", "Aberta"]: luc = 0.0
+                            elif stt in ["Push", "Devolvida", "Aberta", "Push"]: luc = 0.0
                             
                             dados_massa = {
                                 "data": str(row['data']).strip(),
@@ -96,20 +95,37 @@ def mostrar_registro(df_csv):
                             df_local = pd.concat([df_local, pd.DataFrame([dados_massa])], ignore_index=True)
                             df_local.to_csv(PATH_APOSTAS, index=False)
                             
+                            # Adiciona à lista de confirmação
+                            registros_concluidos.append({
+                                "Data": dados_massa['data'],
+                                "Jogo": f"{dados_massa['mandante']} x {dados_massa['visitante']}",
+                                "Status": stt,
+                                "Lucro": f"R$ {luc:.2f}"
+                            })
+                            
                             sucessos += 1
                         except Exception as e:
                             erros += 1
-                            st.error(f"Erro na linha {i+1} ({row.get('mandante', 'Desconhecido')}): {e}")
+                            st.error(f"Erro na linha {i+1}: {e}")
                         
                         barra_progresso.progress((i + 1) / total_linhas)
                     
-                    st.success(f"✅ Processo concluído! {sucessos} apostas registradas.")
-                    if erros > 0: st.warning(f"⚠️ {erros} registros falharam.")
+                    # ÁREA DE CONFIRMAÇÃO FINAL
+                    st.divider()
+                    st.balloons()
+                    st.success(f"🏁 Importação finalizada! {sucessos} apostas registradas com sucesso.")
                     
-                    time.sleep(2)
-                    st.rerun()
+                    if registros_concluidos:
+                        st.markdown("### ✅ Detalhamento dos Registros:")
+                        st.table(pd.DataFrame(registros_concluidos))
+                    
+                    if erros > 0:
+                        st.warning(f"⚠️ {erros} registros falharam. Verifique os erros acima.")
+                    
+                    if st.button("Finalizar e Recarregar"):
+                        st.rerun()
             except Exception as e:
-                st.error(f"Erro ao processar o arquivo: {e}")
+                st.error(f"Erro crítico no processamento: {e}")
 
     st.divider()
 
@@ -175,7 +191,7 @@ def mostrar_registro(df_csv):
         
         jogos_finais.append({"liga": liga, "mandante": mandante, "visitante": visitante})
 
-    # 4. Formulário Financeiro Manual
+    # 4. Detalhes Financeiros Manual
     st.subheader("📋 Detalhes da Operação Manual")
     with st.form("form_final_aposta", clear_on_submit=True):
         f1, f2, f3, f4 = st.columns(4)
@@ -195,7 +211,9 @@ def mostrar_registro(df_csv):
         obs = st.text_input("Observação")
         
         if st.form_submit_button("🚀 Registrar Aposta"):
+            # Validação: todos os jogos devem estar preenchidos
             erro_preenchimento = any(not j['mandante'] or not j['visitante'] for j in jogos_finais)
+            
             if erro_preenchimento:
                 st.error("Preencha os dados de todos os jogos!")
             else:
@@ -211,18 +229,10 @@ def mostrar_registro(df_csv):
 
                 dados = {
                     "data": data_ap.strftime('%Y-%m-%d'),
-                    "liga": liga_final, 
-                    "mandante": mandante_final, 
-                    "visitante": visitante_final,
-                    "mercado": mercado_reg, 
-                    "linha": linha, 
-                    "metodo": metodo_reg,
-                    "stake": float(stake), 
-                    "odd": float(odd), 
-                    "status": status_reg,
-                    "lucro": float(lucro), 
-                    "banca_nome": banca_sel, 
-                    "obs": obs
+                    "liga": liga_final, "mandante": mandante_final, "visitante": visitante_final,
+                    "mercado": mercado_reg, "linha": linha, "metodo": metodo_reg,
+                    "stake": float(stake), "odd": float(odd), "status": status_reg,
+                    "lucro": float(lucro), "banca_nome": banca_sel, "obs": obs
                 }
                 
                 try:
@@ -231,6 +241,7 @@ def mostrar_registro(df_csv):
                     df_local = pd.read_csv(PATH_APOSTAS) if os.path.exists(PATH_APOSTAS) else pd.DataFrame()
                     df_local = pd.concat([df_local, pd.DataFrame([dados])], ignore_index=True)
                     df_local.to_csv(PATH_APOSTAS, index=False)
+                    
                     st.balloons()
                     st.success("✅ Aposta Manual Registrada!")
                     time.sleep(1)
