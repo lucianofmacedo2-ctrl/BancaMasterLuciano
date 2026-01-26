@@ -10,13 +10,13 @@ supabase = create_client(URL, KEY)
 
 def carregar_dados():
     try:
-        # Forçamos a busca de todos os dados atualizados
+        # Forçamos a busca sem cache para garantir que aposta nova apareça
         res = supabase.table("apostas").select("*").execute()
         df = pd.DataFrame(res.data)
         if not df.empty:
-            # Limpeza de strings para evitar erros de comparação
-            if 'status' in df.columns:
-                df['status'] = df['status'].astype(str).strip()
+            # Limpa espaços em branco que podem vir do CSV ou do input
+            for col in df.select_dtypes(['object']).columns:
+                df[col] = df[col].astype(str).str.strip()
         return df
     except Exception as e:
         st.error(f"Erro ao conectar com Supabase: {e}")
@@ -25,38 +25,36 @@ def carregar_dados():
 def mostrar_historico():
     st.title("📜 Histórico de Apostas")
     
-    # Carregamento sempre fresco dos dados
     df = carregar_dados()
 
     if df.empty:
         st.info("Nenhuma aposta encontrada no banco de dados.")
         return
 
-    # --- 1. RESOLVER APOSTAS ABERTAS ---
-    st.subheader("🔄 Atualizar Resultado da Aposta")
-    
-    # Criamos a coluna de busca garantindo que os nomes batam com o seu Supabase
-    # Adicionamos tratamento para caso colunas venham vazias (NaN)
+    # Criamos a coluna de busca para os selects de Update e Delete
+    # Adicionamos a data para facilitar a identificação
     df['Busca'] = (
         df['id'].astype(str) + " | " + 
         df['mandante'].fillna('?') + " x " + df['visitante'].fillna('?') + " | " + 
         df['mercado'].fillna('?') + " | " + 
         df['data'].astype(str)
     )
+
+    # --- 1. RESOLVER APOSTAS ABERTAS ---
+    st.subheader("🔄 Atualizar Resultado da Aposta")
     
-    # Filtramos apenas as que o status é exatamente 'Aberta'
-    # Usamos o .str.contains ou comparação direta limpa
+    # Filtro inteligente: ignora se é maiúsculo ou minúsculo
     df_abertas = df[df['status'].str.lower() == "aberta"]
 
     if not df_abertas.empty:
-        with st.expander("📝 Existem apostas pendentes. Clique para atualizar:", expanded=True):
+        with st.expander(f"📝 {len(df_abertas)} apostas pendentes encontradas", expanded=True):
             escolha = st.selectbox("Selecione a aposta para dar o resultado:", df_abertas['Busca'].tolist())
             
             c1, c2 = st.columns(2)
             with c1:
                 novo_status = st.selectbox("Resultado Final:", ["Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
             with c2:
-                st.write("") # Alinhamento
+                st.write(" ") # Espaçador
                 btn_confirmar = st.button("Confirmar Resultado", use_container_width=True)
             
             if btn_confirmar:
@@ -67,13 +65,12 @@ def mostrar_historico():
                 stake = float(dados_aposta['stake'])
                 odd = float(dados_aposta['odd'])
                 
-                # Recálculo do Lucro com base no novo status
+                # Recálculo do Lucro
                 lucro_final = 0.0
                 if novo_status == "Green": lucro_final = stake * (odd - 1)
                 elif novo_status == "Meio Green": lucro_final = (stake * (odd - 1)) / 2
                 elif novo_status == "Red": lucro_final = -stake
                 elif novo_status == "Meio Red": lucro_final = -stake / 2
-                elif novo_status == "Devolvida": lucro_final = 0.0
 
                 try:
                     supabase.table("apostas").update({
@@ -81,13 +78,13 @@ def mostrar_historico():
                         "lucro": float(lucro_final)
                     }).eq("id", id_sel).execute()
                     
-                    st.success(f"✅ Aposta {id_sel} atualizada para {novo_status}!")
+                    st.success(f"✅ Aposta {id_sel} atualizada!")
                     time.sleep(1)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao atualizar no banco: {e}")
     else:
-        st.info("✅ Tudo em dia! Não há apostas com status 'Aberta'.")
+        st.info("✅ Todas as apostas estão resolvidas.")
 
     st.divider()
 
@@ -99,13 +96,11 @@ def mostrar_historico():
         'linha', 'metodo', 'stake', 'odd', 'status', 'lucro', 'banca_nome'
     ]
     
-    # Filtrar apenas colunas que realmente existem no DF para evitar erro de visualização
+    # Exibimos apenas as colunas que existem no banco
     cols_existentes = [c for c in colunas_exibir if c in df.columns]
-    df_exibicao = df[cols_existentes].copy()
-
-    # Ordenar pela data mais recente e ID mais alto
-    if 'data' in df_exibicao.columns:
-        df_exibicao = df_exibicao.sort_values(by=['data', 'id'], ascending=[False, False])
+    
+    # Ordenação: Mais recentes primeiro (Data e ID)
+    df_exibicao = df[cols_existentes].sort_values(by=['data', 'id'], ascending=[False, False])
     
     st.dataframe(
         df_exibicao,
@@ -116,7 +111,6 @@ def mostrar_historico():
     # --- 3. EXCLUIR REGISTRO ---
     st.markdown("---")
     with st.expander("🗑️ Área de Exclusão"):
-        st.warning("Atenção: A exclusão é permanente.")
         item_deletar = st.selectbox("Selecione o registro para apagar:", df['Busca'].tolist(), key="del_box")
         if st.button("Excluir Permanentemente", type="primary"):
             try:
