@@ -30,18 +30,14 @@ def mostrar_registro(df_csv):
         st.warning("⚠️ Cadastre uma Banca primeiro na tela de Bancas!")
         return
 
-    # --- REGISTRO EM MASSA VIA CSV ---
-    with st.expander("📤 REGISTRO EM MASSA (CSV)", expanded=True):
+    # --- 1. REGISTRO EM MASSA VIA CSV ---
+    with st.expander("📤 REGISTRO EM MASSA (CSV)", expanded=False):
         st.markdown("Suba o arquivo CSV (O sistema detecta automaticamente se usou ',' ou ';').")
         arquivo_massa = st.file_uploader("Selecione o arquivo CSV", type=["csv"], key="uploader_csv")
         
         if arquivo_massa is not None:
             try:
-                # Lógica robusta para detectar separadores e limpar nomes de colunas
-                # Usamos sep=None para o pandas tentar descobrir sozinho (vírgula ou ponto e vírgula)
                 df_massa = pd.read_csv(arquivo_massa, sep=None, engine='python', encoding='utf-8-sig')
-                
-                # Limpa espaços e remove caracteres invisíveis dos nomes das colunas
                 df_massa.columns = [str(col).strip().lower() for col in df_massa.columns]
                 
                 st.write("📋 Prévia dos dados detectados:", df_massa.head())
@@ -55,20 +51,14 @@ def mostrar_registro(df_csv):
                     
                     for i, row in df_massa.iterrows():
                         try:
-                            # 1. Tratamento da Data (Evita erro de data vazia)
                             data_raw = str(row.get('data', '')).strip()
-                            if not data_raw or data_raw == "nan":
-                                data_final = datetime.now().strftime('%Y-%m-%d')
-                            else:
-                                data_final = data_raw
+                            data_final = data_raw if data_raw and data_raw != "nan" else datetime.now().strftime('%Y-%m-%d')
 
-                            # 2. Tratamento de Stake e Odd
                             s_raw = str(row.get('stake', '0')).replace(',', '.').strip()
                             o_raw = str(row.get('odd', '1')).replace(',', '.').strip()
                             stk = float(s_raw) if s_raw != 'nan' else 0.0
                             od = float(o_raw) if o_raw != 'nan' else 1.0
                             
-                            # 3. Status e Lucro
                             stt = str(row.get('status', 'Aberta')).strip()
                             luc = 0.0
                             if stt == "Green": luc = stk * (od - 1)
@@ -76,7 +66,6 @@ def mostrar_registro(df_csv):
                             elif stt == "Red": luc = -stk
                             elif stt == "Meio Red": luc = -stk / 2
                             
-                            # Montagem dos dados
                             dados_massa = {
                                 "data": data_final,
                                 "liga": str(row.get('liga', '')).strip(),
@@ -93,10 +82,8 @@ def mostrar_registro(df_csv):
                                 "obs": str(row.get('obs', '')) if pd.notna(row.get('obs')) else ""
                             }
                             
-                            # Envio ao Supabase
                             supabase.table("apostas").insert(dados_massa).execute()
                             sucessos += 1
-                            
                             detalhes_sucesso.append({
                                 "Data": data_final,
                                 "Jogo": f"{dados_massa['mandante']} x {dados_massa['visitante']}",
@@ -105,21 +92,80 @@ def mostrar_registro(df_csv):
                             })
                         except Exception as e:
                             erros += 1
-                            st.error(f"Erro na linha {i+1}: {str(e)}")
                         
                         barra_progresso.progress((i + 1) / total_linhas)
                     
-                    st.divider()
                     if sucessos > 0:
                         st.balloons()
                         st.success(f"🏁 Finalizado! {sucessos} apostas registradas.")
                         st.table(pd.DataFrame(detalhes_sucesso))
                     if erros > 0:
                         st.warning(f"⚠️ {erros} linhas falharam.")
-                    st.button("🔄 Recarregar Página", on_click=st.rerun)
-
             except Exception as e:
                 st.error(f"Erro crítico ao ler arquivo: {str(e)}")
 
     st.divider()
-    # ... (Restante do código de Registro Manual e Auxiliares permanece igual)
+
+    # --- 2. REGISTRO MANUAL (UMA A UMA) ---
+    st.subheader("🎯 Registro Individual")
+    with st.form("form_registro_manual", clear_on_submit=True):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            data = st.date_input("Data da Aposta", datetime.now())
+            banca = st.selectbox("Banca", lista_bancas)
+            liga = st.selectbox("Liga", carregar_aux("LIGA"))
+        with col2:
+            mandante = st.text_input("Time Mandante")
+            visitante = st.text_input("Time Visitante")
+            mercado = st.selectbox("Mercado", carregar_aux("MERCADO"))
+        with col3:
+            linha = st.text_input("Linha / Seleção")
+            metodo = st.selectbox("Método", carregar_aux("METODO"))
+            status = st.selectbox("Status Inicial", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
+
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            stake = st.number_input("Valor Apostado (R$)", min_value=0.0, step=1.0, format="%.2f")
+        with col5:
+            odd = st.number_input("Odd", min_value=1.01, step=0.01, format="%.2f")
+        with col6:
+            obs = st.text_input("Observações")
+
+        submit = st.form_submit_button("✅ Salvar Aposta Individual")
+
+        if submit:
+            if not mandante or not visitante:
+                st.error("Preencha os nomes dos times!")
+            else:
+                # Cálculo do lucro manual
+                lucro_manual = 0.0
+                if status == "Green": lucro_manual = stake * (odd - 1)
+                elif status == "Meio Green": lucro_manual = (stake * (odd - 1)) / 2
+                elif status == "Red": lucro_manual = -stake
+                elif status == "Meio Red": lucro_manual = -stake / 2
+
+                dados_manual = {
+                    "data": str(data),
+                    "banca_nome": banca,
+                    "liga": liga,
+                    "mandante": mandante,
+                    "visitante": visitante,
+                    "mercado": mercado,
+                    "linha": linha,
+                    "metodo": metodo,
+                    "stake": float(stake),
+                    "odd": float(odd),
+                    "status": status,
+                    "lucro": float(lucro_manual),
+                    "obs": obs
+                }
+
+                try:
+                    supabase.table("apostas").insert(dados_manual).execute()
+                    st.success(f"Aposta em {mandante} x {visitante} registrada com sucesso!")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao salvar no banco: {e}")
+
+    st.divider()
