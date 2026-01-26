@@ -40,11 +40,10 @@ def mostrar_registro(df_csv):
         
         if arquivo_massa is not None:
             try:
-                # Detecta separador automaticamente
                 df_massa = pd.read_csv(arquivo_massa, sep=None, engine='python', encoding='utf-8-sig')
                 df_massa.columns = [str(col).strip().lower() for col in df_massa.columns]
                 
-                st.write("📋 Prévia dos dados detectados:", df_massa.head())
+                st.write("📋 Prévia dos dados:", df_massa.head())
                 
                 if st.button("🚀 Confirmar Importação em Massa"):
                     sucessos = 0
@@ -54,16 +53,12 @@ def mostrar_registro(df_csv):
                     
                     for i, row in df_massa.iterrows():
                         try:
-                            # Tratamento de Data
                             data_raw = str(row.get('data', '')).strip()
                             data_f = data_raw if data_raw and data_raw != "nan" else datetime.now().strftime('%Y-%m-%d')
-                            
-                            # Tratamento de Valores
                             stk = float(str(row.get('stake', '0')).replace(',', '.'))
                             od = float(str(row.get('odd', '1')).replace(',', '.'))
                             stt = str(row.get('status', 'Aberta')).strip()
                             
-                            # Cálculo de Lucro
                             luc = 0.0
                             if stt == "Green": luc = stk * (od - 1)
                             elif stt == "Meio Green": luc = (stk * (od - 1)) / 2
@@ -91,8 +86,8 @@ def mostrar_registro(df_csv):
                             erros += 1
                         barra_progresso.progress((i + 1) / total_linhas)
                     
-                    st.success(f"🏁 Processo concluído! Sucessos: {sucessos} | Erros: {erros}")
-                    time.sleep(2)
+                    st.success(f"🏁 Processo concluído! Sucessos: {sucessos}")
+                    time.sleep(1)
                     st.rerun()
             except Exception as e:
                 st.error(f"Erro ao processar CSV: {e}")
@@ -100,11 +95,10 @@ def mostrar_registro(df_csv):
     st.markdown("---")
 
     # ------------------------------------------------------------------
-    # 2. SEÇÃO: REGISTRO INDIVIDUAL (O FORMULÁRIO QUE SUMIU)
+    # 2. SEÇÃO: REGISTRO INDIVIDUAL (MANUAL)
     # ------------------------------------------------------------------
-    st.subheader("🎯 Registro Individual (Uma a uma)")
+    st.subheader("🎯 Registro Individual")
     
-    # Carrega as listas auxiliares para os selectboxes
     lista_ligas = carregar_aux("LIGA")
     lista_mercados = carregar_aux("MERCADO")
     lista_metodos = carregar_aux("METODO")
@@ -138,7 +132,6 @@ def mostrar_registro(df_csv):
             if not mandante_m or not visitante_m:
                 st.warning("⚠️ Por favor, preencha o nome dos times.")
             else:
-                # Cálculo do lucro para o registro manual
                 lucro_calc = 0.0
                 if status_m == "Green": lucro_calc = stake_m * (odd_m - 1)
                 elif status_m == "Meio Green": lucro_calc = (stake_m * (odd_m - 1)) / 2
@@ -163,8 +156,36 @@ def mostrar_registro(df_csv):
 
                 try:
                     supabase.table("apostas").insert(dados_manual).execute()
-                    st.success(f"Aposta em {mandante_m} x {visitante_m} salva com sucesso!")
+                    st.success("✅ Aposta salva com sucesso!")
                     time.sleep(1)
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Erro ao salvar no Supabase: {e}")
+                    st.error(f"Erro ao salvar: {e}")
+
+    st.markdown("---")
+
+    # ------------------------------------------------------------------
+    # 3. SEÇÃO: CADASTRO DE AUXILIARES (LIGA, MERCADO, MÉTODO)
+    # ------------------------------------------------------------------
+    st.subheader("⚙️ Configurações Rápidas")
+    with st.expander("➕ Cadastrar Nova Liga, Mercado ou Método"):
+        col_aux1, col_aux2 = st.columns([1, 2])
+        with col_aux1:
+            tipo_novo = st.selectbox("O que deseja cadastrar?", ["LIGA", "MERCADO", "METODO"], key="tipo_aux")
+        with col_aux2:
+            nome_novo = st.text_input(f"Nome do(a) {tipo_novo}", key="nome_aux")
+        
+        if st.button("➕ Adicionar"):
+            if nome_novo.strip():
+                try:
+                    supabase.table("config_auxiliares").insert({
+                        "nome": nome_novo.strip().upper(),
+                        "tipo": tipo_novo
+                    }).execute()
+                    st.success(f"{tipo_novo} '{nome_novo}' adicionado!")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao cadastrar: {e}")
+            else:
+                st.warning("Digite um nome válido!")
