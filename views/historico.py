@@ -10,8 +10,14 @@ supabase = create_client(URL, KEY)
 
 def carregar_dados():
     try:
+        # Forçamos a busca de todos os dados atualizados
         res = supabase.table("apostas").select("*").execute()
-        return pd.DataFrame(res.data)
+        df = pd.DataFrame(res.data)
+        if not df.empty:
+            # Limpeza de strings para evitar erros de comparação
+            if 'status' in df.columns:
+                df['status'] = df['status'].astype(str).strip()
+        return df
     except Exception as e:
         st.error(f"Erro ao conectar com Supabase: {e}")
         return pd.DataFrame()
@@ -19,85 +25,105 @@ def carregar_dados():
 def mostrar_historico():
     st.title("📜 Histórico de Apostas")
     
+    # Carregamento sempre fresco dos dados
     df = carregar_dados()
 
     if df.empty:
-        st.info("Nenhuma aposta encontrada.")
+        st.info("Nenhuma aposta encontrada no banco de dados.")
         return
 
     # --- 1. RESOLVER APOSTAS ABERTAS ---
     st.subheader("🔄 Atualizar Resultado da Aposta")
     
     # Criamos a coluna de busca garantindo que os nomes batam com o seu Supabase
-    # Usamos .get() ou nomes em minúsculo para evitar o KeyError
+    # Adicionamos tratamento para caso colunas venham vazias (NaN)
     df['Busca'] = (
         df['id'].astype(str) + " | " + 
-        df['mandante'].fillna('') + " x " + df['visitante'].fillna('') + " | " + 
-        df['mercado'].fillna('')
+        df['mandante'].fillna('?') + " x " + df['visitante'].fillna('?') + " | " + 
+        df['mercado'].fillna('?') + " | " + 
+        df['data'].astype(str)
     )
     
-    # Filtramos apenas as que o status é 'Aberta'
-    df_abertas = df[df['status'] == "Aberta"]
+    # Filtramos apenas as que o status é exatamente 'Aberta'
+    # Usamos o .str.contains ou comparação direta limpa
+    df_abertas = df[df['status'].str.lower() == "aberta"]
 
     if not df_abertas.empty:
-        with st.expander("Atualizar status de apostas pendentes", expanded=True):
-            escolha = st.selectbox("Selecione a aposta:", df_abertas['Busca'].tolist())
-            novo_status = st.selectbox("Resultado:", ["Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
+        with st.expander("📝 Existem apostas pendentes. Clique para atualizar:", expanded=True):
+            escolha = st.selectbox("Selecione a aposta para dar o resultado:", df_abertas['Busca'].tolist())
             
-            if st.button("Confirmar Resultado"):
+            c1, c2 = st.columns(2)
+            with c1:
+                novo_status = st.selectbox("Resultado Final:", ["Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
+            with c2:
+                st.write("") # Alinhamento
+                btn_confirmar = st.button("Confirmar Resultado", use_container_width=True)
+            
+            if btn_confirmar:
                 id_sel = escolha.split(" | ")[0]
                 
-                # Localizamos os dados para recalcular o lucro
+                # Localizamos os dados da linha selecionada para o cálculo
                 dados_aposta = df[df['id'].astype(str) == id_sel].iloc[0]
                 stake = float(dados_aposta['stake'])
                 odd = float(dados_aposta['odd'])
                 
+                # Recálculo do Lucro com base no novo status
                 lucro_final = 0.0
                 if novo_status == "Green": lucro_final = stake * (odd - 1)
                 elif novo_status == "Meio Green": lucro_final = (stake * (odd - 1)) / 2
                 elif novo_status == "Red": lucro_final = -stake
                 elif novo_status == "Meio Red": lucro_final = -stake / 2
+                elif novo_status == "Devolvida": lucro_final = 0.0
 
                 try:
                     supabase.table("apostas").update({
                         "status": novo_status,
-                        "lucro": lucro_final
+                        "lucro": float(lucro_final)
                     }).eq("id", id_sel).execute()
                     
-                    st.success(f"Aposta {id_sel} atualizada!")
+                    st.success(f"✅ Aposta {id_sel} atualizada para {novo_status}!")
                     time.sleep(1)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao atualizar no banco: {e}")
     else:
-        st.write("✅ Não há apostas abertas para atualizar.")
+        st.info("✅ Tudo em dia! Não há apostas com status 'Aberta'.")
 
     st.divider()
 
-    # --- 2. LISTA GERAL (Visual da sua imagem) ---
-    st.subheader("Lista Geral de Apostas")
+    # --- 2. LISTA GERAL ---
+    st.subheader("📋 Lista Geral de Registros")
     
-    # Reordenando colunas para o layout da sua tabela
     colunas_exibir = [
         'id', 'data', 'liga', 'mandante', 'visitante', 'mercado', 
-        'linha', 'metodo', 'stake', 'odd', 'status', 'lucro', 'banca_nome', 'obs'
+        'linha', 'metodo', 'stake', 'odd', 'status', 'lucro', 'banca_nome'
     ]
     
-    # Garantimos que apenas colunas existentes sejam exibidas
-    df_final = df[[c for c in colunas_exibir if c in df.columns]]
+    # Filtrar apenas colunas que realmente existem no DF para evitar erro de visualização
+    cols_existentes = [c for c in colunas_exibir if c in df.columns]
+    df_exibicao = df[cols_existentes].copy()
+
+    # Ordenar pela data mais recente e ID mais alto
+    if 'data' in df_exibicao.columns:
+        df_exibicao = df_exibicao.sort_values(by=['data', 'id'], ascending=[False, False])
     
     st.dataframe(
-        df_final.sort_values(by='data', ascending=False),
+        df_exibicao,
         use_container_width=True,
         hide_index=True
     )
 
     # --- 3. EXCLUIR REGISTRO ---
-    with st.expander("🗑️ Deletar Registro"):
-        item_deletar = st.selectbox("Selecione o registro para apagar:", df['Busca'].tolist(), key="del")
+    st.markdown("---")
+    with st.expander("🗑️ Área de Exclusão"):
+        st.warning("Atenção: A exclusão é permanente.")
+        item_deletar = st.selectbox("Selecione o registro para apagar:", df['Busca'].tolist(), key="del_box")
         if st.button("Excluir Permanentemente", type="primary"):
-            id_del = item_deletar.split(" | ")[0]
-            supabase.table("apostas").delete().eq("id", id_del).execute()
-            st.warning("Registro removido com sucesso.")
-            time.sleep(1)
-            st.rerun()
+            try:
+                id_del = item_deletar.split(" | ")[0]
+                supabase.table("apostas").delete().eq("id", id_del).execute()
+                st.success("Registro removido com sucesso.")
+                time.sleep(1)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao deletar: {e}")
