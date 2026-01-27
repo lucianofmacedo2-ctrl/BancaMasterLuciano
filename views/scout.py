@@ -89,29 +89,21 @@ def calcular_probabilidades_mercado(df, time_name, periodo='FT'):
     if df.empty: return pd.DataFrame()
     n = len(df)
     
-    # Prefixos das colunas baseados no período
-    col_gm = f'Gols_Mandante_{periodo}'
-    col_gv = f'Gols_Visitante_{periodo}'
-    col_tg = f'Total_Gols_{periodo}'
+    # Identifica dinamicamente as colunas baseadas no período (FT, HT, ST)
+    c_gm, c_gv, c_tg = f'Gols_Mandante_{periodo}', f'Gols_Visitante_{periodo}', f'Total_Gols_{periodo}'
     
-    # Identificar gols do time atual e do adversário
-    g_pro = np.where(df['Mandante'] == time_name, df[col_gm], df[col_gv])
-    g_con = np.where(df['Mandante'] == time_name, df[col_gv], df[col_gm])
-    tg = df[col_tg]
-    btts = (df[col_gm] > 0) & (df[col_gv] > 0)
-    
+    # Verificação se as colunas existem no DF
+    if c_gm not in df.columns or c_gv not in df.columns: return pd.DataFrame()
+
     def perc(cond): return (len(df[cond]) / n) * 100
     
     mercados = [
-        {"Mercado": f"0.5 {periodo}", "% Batido": perc(tg >= 0.5)},
-        {"Mercado": f"1.5 {periodo}", "% Batido": perc(tg >= 1.5)},
-        {"Mercado": f"2.5 {periodo}", "% Batido": perc(tg >= 2.5)},
-        {"Mercado": f"3.5 {periodo}", "% Batido": perc(tg >= 3.5)},
-        {"Mercado": f"BTTS {periodo}", "% Batido": perc(btts)},
+        {"Mercado": f"0,5 {periodo}", "% Batido": perc(df[c_tg] >= 0.5)},
+        {"Mercado": f"1,5 {periodo}", "% Batido": perc(df[c_tg] >= 1.5)},
+        {"Mercado": f"2,5 {periodo}", "% Batido": perc(df[c_tg] >= 2.5)},
+        {"Mercado": f"3,5 {periodo}", "% Batido": perc(df[c_tg] >= 3.5)},
+        {"Mercado": f"BTTS {periodo}", "% Batido": perc((df[c_gm] > 0) & (df[c_gv] > 0))},
     ]
-    if periodo == 'FT':
-        mercados.append({"Mercado": "Marcou Gol", "% Batido": perc(g_pro > 0)})
-        
     return pd.DataFrame(mercados)
 
 def filtrar_por_n(df, n):
@@ -142,7 +134,7 @@ def mostrar_scout(df):
     criterio_mando = col_cfg2.radio("Critério de Mando", ["Geral", "Mando de Campo"], index=1, horizontal=True)
     criterio_h2h = col_cfg3.radio("Critério H2H", ["Geral", "Mando Específico"], index=0, horizontal=True)
 
-    # Filtragem de Histórico Geral (Considerando todas as temporadas para H2H)
+    # Lógica de Filtro por Mando
     if criterio_mando == "Geral":
         df_m = df_s[(df_s['Mandante'] == m_sel) | (df_s['Visitante'] == m_sel)].sort_values('Data', ascending=False)
         df_v = df_s[(df_s['Mandante'] == v_sel) | (df_s['Visitante'] == v_sel)].sort_values('Data', ascending=False)
@@ -153,14 +145,14 @@ def mostrar_scout(df):
     df_m = filtrar_por_n(df_m, n_jogos)
     df_v = filtrar_por_n(df_v, n_jogos)
 
-    # H2H buscando em todo o arquivo (Multitemporada)
+    # H2H - Multitemporada (Pega de todo o CSV)
     if criterio_h2h == "Geral":
         df_h2h = df[((df['Mandante'] == m_sel) & (df['Visitante'] == v_sel)) | ((df['Mandante'] == v_sel) & (df['Visitante'] == m_sel))].sort_values('Data', ascending=False)
     else:
         df_h2h = df[(df['Mandante'] == m_sel) & (df['Visitante'] == v_sel)].sort_values('Data', ascending=False)
     df_h2h = filtrar_por_n(df_h2h, n_jogos)
 
-    # Cálculos Médias
+    # Médias Principais
     def get_avg_stats(df_target, t_name):
         is_m = (df_target['Mandante'] == t_name)
         gm = np.where(is_m, df_target['Gols_Mandante_FT'], df_target['Gols_Visitante_FT']).mean()
@@ -175,7 +167,7 @@ def mostrar_scout(df):
     gm_m, ch_m, ct_m, ef_m, sd_m = get_avg_stats(df_m, m_sel)
     gm_v, ch_v, ct_v, ef_v, sd_v = get_avg_stats(df_v, v_sel)
 
-    # Info Cards
+    # Cabeçalho de Classificação
     tab_geral = calcular_tabela_classificacao(df_s)
     ci1, ci2 = st.columns(2)
     for col, t_name in zip([ci1, ci2], [m_sel, v_sel]):
@@ -183,7 +175,7 @@ def mostrar_scout(df):
             pos = tab_geral[tab_geral['Time'] == t_name].index[0]+1 if t_name in tab_geral['Time'].values else 0
             st.info(f"**{t_name}** | 🏆 {pos}º Lugar - {get_objetivo_txt(liga_sel, pos)}")
 
-    # Volume e Eficiência
+    # Containers de Médias
     with st.container(border=True):
         st.subheader("🔥 Médias de Volume")
         render_stat_row("GOLS MARCADOS FT", gm_m, gm_v)
@@ -191,8 +183,6 @@ def mostrar_scout(df):
         render_stat_row("ESCANTEIOS PRO", ct_m, ct_v)
 
     is_golden = (ef_m <= 1.5) and (ef_v <= 1.5) and (ef_m > 0) and (ef_v > 0)
-    if is_golden: st.warning("✨ **OPORTUNIDADE:** Eficiência Máxima detectada!")
-
     with st.container(border=True):
         st.markdown(f'<div class="{"golden-container" if is_golden else ""}">', unsafe_allow_html=True)
         st.subheader("🎯 Eficiência e Dominância")
@@ -200,7 +190,7 @@ def mostrar_scout(df):
         render_stat_row("SALDO MÉDIO DE CANTOS", sd_m, sd_v)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # TABS
+    # --- TABS ---
     t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes", "⏰ Minutos"])
     
     with t1:
@@ -220,62 +210,50 @@ def mostrar_scout(df):
             st.dataframe(h2_v, use_container_width=True, hide_index=True)
 
     with t3:
-        # Dicionário expandido para incluir Chutes e Finalizações
-        metrics_map = {
-            "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"),
-            "Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"),
-            "Cantos": ("Cantos_Mandante", "Cantos_Visitante"),
-            "Chutes no Gol": ("Chutes_Gol_Mandante", "Chutes_Gol_Visitante"),
-            "Finalizações": ("Finalizações_Totais_Mandante", "Finalizações_Totais_Visitante")
-        }
-        for label, (cm, cv) in metrics_map.items():
-            if cm in df_m.columns and cv in df_m.columns:
+        # Detalhes: Gols FT, HT, Cantos, Chutes e Finalizações
+        metrics_list = [
+            ("Gols FT", "Gols_Mandante_FT", "Gols_Visitante_FT"),
+            ("Gols HT", "Gols_Mandante_HT", "Gols_Visitante_HT"),
+            ("Cantos", "Cantos_Mandante", "Cantos_Visitante"),
+            ("Chutes no Gol", "Chutes_Gol_Mandante", "Chutes_Gol_Visitante"),
+            ("Finalizações", "Finalizações_Totais_Mandante", "Finalizações_Totais_Visitante")
+        ]
+        for label, cm, cv in metrics_list:
+            if cm in df.columns:
                 st.write(f"**{label}**")
-                c_a, c_b = st.columns(2)
-                # Cálculo dinâmico baseado no time mandante/visitante da linha
-                def get_stats_for_team(df_ref, t_name, col_m, col_v):
-                    is_team_m = df_ref['Mandante'] == t_name
-                    pro = np.where(is_team_m, df_ref[col_m], df_ref[col_v])
-                    con = np.where(is_team_m, df_ref[col_v], df_ref[col_m])
-                    return calcular_stats_completas(pro, con)
-
-                with c_a: st.dataframe(get_stats_for_team(df_m, m_sel, cm, cv).style.format("{:.2f}"), use_container_width=True)
-                with c_b: st.dataframe(get_stats_for_team(df_v, v_sel, cm, cv).style.format("{:.2f}"), use_container_width=True)
+                ca, cb = st.columns(2)
+                # Cálculo Mandante
+                ism = df_m['Mandante'] == m_sel
+                with ca: st.dataframe(calcular_stats_completas(np.where(ism, df_m[cm], df_m[cv]), np.where(ism, df_m[cv], df_m[cm])).style.format("{:.2f}"), use_container_width=True)
+                # Cálculo Visitante
+                isv = df_v['Mandante'] == v_sel
+                with cb: st.dataframe(calcular_stats_completas(np.where(isv, df_v[cm], df_v[cv]), np.where(isv, df_v[cv], df_v[cm])).style.format("{:.2f}"), use_container_width=True)
 
     with t4:
+        # Minutos: Feitos, Sofridos e Total
+        faixas = ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]
         for t_n, d_j in [(m_sel, df_m), (v_sel, df_v)]:
             st.write(f"**{t_n}**")
+            feitos, sofridos = [], []
+            for fx in faixas:
+                f = np.where(d_j['Mandante'] == t_n, d_j.get(f"{fx}_Mandante", 0), d_j.get(f"{fx}_Visitante", 0)).sum()
+                s = np.where(d_j['Mandante'] == t_n, d_j.get(f"{fx}_Visitante", 0), d_j.get(f"{fx}_Mandante", 0)).sum()
+                feitos.append(f); sofridos.append(s)
             
-            # Identificar prefixos (Mandante ou Visitante)
-            # Se for Geral, precisamos somar gols feitos e sofridos de acordo com a posição do time no jogo
-            faixas = ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]
-            
-            gols_feitos = np.zeros(len(faixas))
-            gols_sofridos = np.zeros(len(faixas))
-            
-            for i, fx in enumerate(faixas):
-                for _, row in d_j.iterrows():
-                    if row['Mandante'] == t_n:
-                        gols_feitos[i] += row.get(f"{fx}_Mandante", 0)
-                        gols_sofridos[i] += row.get(f"{fx}_Visitante", 0)
-                    else:
-                        gols_feitos[i] += row.get(f"{fx}_Visitante", 0)
-                        gols_sofridos[i] += row.get(f"{fx}_Mandante", 0)
-            
-            df_minutos = pd.DataFrame([gols_feitos, gols_sofridos, gols_feitos + gols_sofridos], 
-                                     columns=["0-15","16-30","31-45","46-60","61-75","76-90"], 
-                                     index=["Gols Feitos", "Gols Sofridos", "Total Gols"])
-            st.dataframe(df_minutos.astype(int), use_container_width=True)
+            df_min = pd.DataFrame([feitos, sofridos, np.array(feitos)+np.array(sofridos)], 
+                                 columns=["0-15","16-30","31-45","46-60","61-75","76-90"], 
+                                 index=["Gols Feitos", "Gols Sofridos", "Total Gols"])
+            st.dataframe(df_min.astype(int), use_container_width=True)
 
     st.divider()
     st.subheader("🎯 Frequência de Mercados")
-    
-    for periodo in ['FT', 'HT', 'ST']:
-        st.write(f"**Mercados {periodo}**")
+    # Loop para gerar os quadros de FT, HT e ST de forma idêntica
+    for p in ['FT', 'HT', 'ST']:
+        st.write(f"### Mercados {p}")
         cp1, cp2 = st.columns(2)
-        with cp1: 
-            st.write(f"Forma {m_sel}")
-            st.dataframe(calcular_probabilidades_mercado(df_m, m_sel, periodo).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
-        with cp2: 
-            st.write(f"Forma {v_sel}")
-            st.dataframe(calcular_probabilidades_mercado(df_v, v_sel, periodo).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
+        with cp1:
+            st.write(f"**{m_sel}**")
+            st.dataframe(calcular_probabilidades_mercado(df_m, m_sel, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
+        with cp2:
+            st.write(f"**{v_sel}**")
+            st.dataframe(calcular_probabilidades_mercado(df_v, v_sel, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
