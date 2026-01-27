@@ -67,14 +67,13 @@ def get_objetivo_txt(liga, pos):
             return f"{emoji} {obj}"
     return "⚪ Meio de Tabela"
 
-def render_stat_row(label, val_home, val_away, reverse_color=False):
+def render_stat_row(label, val_home, val_away):
     col1, col2, col3 = st.columns([1, 2, 1])
     v_h = float(val_home) if pd.notnull(val_home) else 0.0
     v_a = float(val_away) if pd.notnull(val_away) else 0.0
     total = v_h + v_a
     p_home = (v_h / total) if total > 0 else 0.5
     
-    # Se reverse_color for True, menos é melhor (como em Eficiência: menos chutes por canto é melhor)
     with col1: st.markdown(f"<p style='text-align: right; font-size: 18px; font-weight: bold; margin:0;'>{v_h:.2f}</p>", unsafe_allow_html=True)
     with col2:
         st.markdown(f"<p style='text-align: center; font-size: 11px; color: gray; margin:0;'>{label}</p>", unsafe_allow_html=True)
@@ -106,14 +105,12 @@ def calcular_stats_completas(serie_f, serie_s):
         cv = (dp / m * 100) if m > 0 else 0.0
         return {"Média": m, "DP": dp, "CV%": cv}
     
-    # Incluindo Saldo na tabela detalhada
-    df_res = pd.DataFrame({
+    return pd.DataFrame({
         "Marcados": get_metrics(serie_f), 
         "Sofridos": get_metrics(serie_s), 
         "Saldo": get_metrics(serie_f - serie_s),
         "Total Jogo": get_metrics(serie_f + serie_s)
     }).T
-    return df_res
 
 def calcular_probabilidades_mercado(df):
     if df.empty: return pd.DataFrame()
@@ -162,16 +159,8 @@ def mostrar_scout(df):
     v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v)
 
     tab_geral = calcular_tabela_classificacao(df_s)
-    liga_clean = str(liga_sel).upper().strip()
     
     st.markdown("---")
-    if liga_clean in REGRAS_LIGAS and not tab_geral.empty:
-        info = REGRAS_LIGAS[liga_clean]
-        rodada_atual = tab_geral['J'].max()
-        pct = (rodada_atual / info['rodadas']) * 100
-        st.markdown(f"📊 **Progresso da Competição:** Rodada **{int(rodada_atual)}** de **{info['rodadas']}** - **{pct:.1f}% concluída**")
-        st.progress(min(pct/100, 1.0))
-    
     df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
     df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
 
@@ -200,23 +189,24 @@ def mostrar_scout(df):
                     k3.metric("Chutes/G", f"{ch_media:.1f}")
 
     st.divider()
-    # CONTAINER 1: VOLUME TRADICIONAL
+    
+    # VOLUME (FT)
     with st.container(border=True):
-        st.caption("🔥 Médias de Volume (Últimos 10 Jogos Casa/Fora)")
+        st.subheader("🔥 Médias de Volume")
         render_stat_row("GOLS MARCADOS FT", df_m_h['Gols_Mandante_FT'].mean(), df_v_a['Gols_Visitante_FT'].mean())
         render_stat_row("CHUTES AO GOL", df_m_h['Chutes_Gol_Mandante'].mean(), df_v_a['Chutes_Gol_Visitante'].mean())
         render_stat_row("ESCANTEIOS PRO", df_m_h['Cantos_Mandante'].mean(), df_v_a['Cantos_Visitante'].mean())
 
-    # CONTAINER 2: MÉTRICAS AVANÇADAS (CHUTES/CANTO E DOMINÂNCIA)
+    # MÉTRICAS AVANÇADAS
     with st.container(border=True):
-        st.caption("🎯 Eficiência de Pressão e Dominância (Média 10 jogos)")
+        st.subheader("🎯 Eficiência e Dominância")
         
-        # Métrica 1: Eficiência (Chutes totais para gerar 1 escanteio) - Menor é melhor
+        # Eficiência (Usando Finalizações_Totais_Mandante como prioridade)
         ef_m = df_m_h['Finalizações_Totais_Mandante'].sum() / df_m_h['Cantos_Mandante'].sum() if df_m_h['Cantos_Mandante'].sum() > 0 else 0
         ef_v = df_v_a['Finalizações_Totais_Visitante'].sum() / df_v_a['Cantos_Visitante'].sum() if df_v_a['Cantos_Visitante'].sum() > 0 else 0
-        render_stat_row("FINALIZAÇÕES P/ CADA CANTO", ef_m, ef_v)
+        render_stat_row("CHUTES TOTAIS P/ 1 CANTO", ef_m, ef_v)
         
-        # Métrica 2: Dominância (Saldo de Cantos: Pro - Contra)
+        # Saldo de Cantos (Pro - Contra)
         saldo_m = df_m_h['Cantos_Mandante'].mean() - df_m_h['Cantos_Visitante'].mean()
         saldo_v = df_v_a['Cantos_Visitante'].mean() - df_v_a['Cantos_Mandante'].mean()
         render_stat_row("SALDO MÉDIO DE CANTOS", saldo_m, saldo_v)
@@ -229,16 +219,9 @@ def mostrar_scout(df):
             with col_f:
                 st.markdown(f"**{t_name}**")
                 for _, r in df_h.iterrows():
-                    if eh_mandante:
-                        res = "✅" if r['Gols_Mandante_FT'] > r['Gols_Visitante_FT'] else ("🟧" if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT'] else "❌")
-                    else:
-                        res = "✅" if r['Gols_Visitante_FT'] > r['Gols_Mandante_FT'] else ("🟧" if r['Gols_Visitante_FT'] == r['Gols_Mandante_FT'] else "❌")
-                    
+                    res = "✅" if (eh_mandante and r['Gols_Mandante_FT'] > r['Gols_Visitante_FT']) or (not eh_mandante and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']) else ("🟧" if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT'] else "❌")
                     data_str = r['Data'].strftime('%d/%m') if pd.notnull(r['Data']) else "S/D"
-                    g_m = int(r['Gols_Mandante_FT']) if pd.notnull(r['Gols_Mandante_FT']) else 0
-                    g_v = int(r['Gols_Visitante_FT']) if pd.notnull(r['Gols_Visitante_FT']) else 0
-                    adversario = r['Visitante'] if eh_mandante else r['Mandante']
-                    st.write(f"{res} {data_str} vs {adversario} ({g_m}x{g_v})")
+                    st.write(f"{res} {data_str} vs {r['Visitante'] if eh_mandante else r['Mandante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
     
     with t2:
         h2h = df_s[((df_s['Mandante'] == m_sel) & (df_s['Visitante'] == v_sel)) | ((df_s['Mandante'] == v_sel) & (df_s['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
@@ -256,8 +239,6 @@ def mostrar_scout(df):
     with t4:
         for t_n, df_j, mando in [(m_sel, df_m_h, "Mandante"), (v_sel, df_v_a, "Visitante")]:
             st.write(f"**{t_n}**"); adv = "Visitante" if mando == "Mandante" else "Mandante"
-            cols_f = [f"0-15_{mando}", f"16-30_{mando}", f"31-45+_mando", f"46-60_{mando}", f"61-75_{mando}", f"76-90+_{mando}"]
-            # Ajuste de nomes de colunas conforme o seu CSV (Mandante/Visitante)
             cols_f = [f"{c}_{mando}" for c in ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]]
             cols_s = [f"{c}_{adv}" for c in ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]]
             cols_f_exist = [c for c in cols_f if c in df_j.columns]
