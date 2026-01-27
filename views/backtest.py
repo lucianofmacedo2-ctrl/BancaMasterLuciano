@@ -21,7 +21,6 @@ def carregar_dados():
         
         df_h = df_h.dropna(subset=['dt_formatada'])
     except Exception as e:
-        st.error(f"Erro ao carregar histórico: {e}")
         df_h = pd.DataFrame()
         
     # 2. Carregar Agenda
@@ -36,7 +35,6 @@ def carregar_dados():
         df_a['dt_formatada'] = df_a['dt_obj'].dt.strftime('%d/%m/%Y')
         df_a = df_a.dropna(subset=['dt_formatada'])
     except Exception as e:
-        st.error(f"Erro ao carregar agenda: {e}")
         df_a = pd.DataFrame()
         
     return df_h, df_a
@@ -72,14 +70,16 @@ def processar_metricas_categoria(df_cat, titulo_aba):
 def mostrar_backtest():
     st.title("🧪 Backtest Master")
 
-    # --- FILTROS NO TOPO (Sempre visíveis) ---
+    # --- FILTROS NO TOPO ---
     st.subheader("🔍 Filtros de Estratégia")
+    
+    df_hist, df_agenda = carregar_dados()
+    
     with st.container():
         f_col1, f_col2 = st.columns([1, 2])
         with f_col1:
             usar_filtro = st.radio("Aplicar Filtro de Odd?", ["Não", "Sim"], horizontal=True)
         
-        df_hist, df_agenda = carregar_dados()
         df_filtered_hist = df_hist.copy()
         col_alvo = None
 
@@ -99,22 +99,24 @@ def mostrar_backtest():
                 col_alvo = mapa[mercado]
             with c2:
                 o_min = st.number_input("Odd Mínima", value=1.50, step=0.05)
-            with f3 := c3: # Usando assignment para evitar conflito
+            with c3:
                 o_max = st.number_input("Odd Máxima", value=2.50, step=0.05)
             
-            df_filtered_hist = df_filtered_hist[
-                (df_filtered_hist[col_alvo] >= o_min) & (df_filtered_hist[col_alvo] <= o_max)
-            ]
+            if col_alvo in df_filtered_hist.columns:
+                df_filtered_hist = df_filtered_hist[
+                    (df_filtered_hist[col_alvo] >= o_min) & (df_filtered_hist[col_alvo] <= o_max)
+                ]
 
     if df_hist.empty or df_agenda.empty:
-        st.warning("Aguardando carregamento dos arquivos...")
+        st.warning("Aguardando carregamento dos arquivos ou arquivos vazios...")
         return
 
     # Processamento das Listas
     back_gols, back_cantos, back_equi = [], [], []
 
     for _, row in df_agenda.iterrows():
-        mandante, visitante = str(row['Mandante']).strip(), str(row['Visitante']).strip()
+        mandante = str(row['Mandante']).strip()
+        visitante = str(row['Visitante']).strip()
         data_jogo = row['dt_formatada']
         
         # Radar (Média Histórica)
@@ -153,7 +155,7 @@ def mostrar_backtest():
             item = {
                 "Data": res['Data'],
                 "Jogo": f"{mandante} x {visitante}",
-                "Odd": res[col_alvo] if col_alvo else "-",
+                "Odd": res[col_alvo] if col_alvo and usar_filtro == "Sim" else "-",
                 "Placar HT": f"{int(res['Gols_Mandante_HT'])}x{int(res['Gols_Visitante_HT'])}",
                 "Placar FT": f"{int(res['Gols_Mandante_FT'])}x{int(res['Gols_Visitante_FT'])}",
                 "Cantos": int(c_ft),
