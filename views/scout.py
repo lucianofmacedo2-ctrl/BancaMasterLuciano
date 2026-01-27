@@ -72,16 +72,13 @@ def render_stat_row(label, val_home, val_away):
     v_h = float(val_home) if pd.notnull(val_home) else 0.0
     v_a = float(val_away) if pd.notnull(val_away) else 0.0
     
-    # Lógica especial para Saldo (pode ser negativo)
     if label == "SALDO MÉDIO DE CANTOS":
         diff = v_h - v_a
-        # Mapeia a diferença de -6 a +6 para o intervalo 0.0 a 1.0 da barra
         p_home = 0.5 + (diff / 12.0)
     else:
         total = abs(v_h) + abs(v_a)
         p_home = (v_h / total) if total > 0 else 0.5
     
-    # Trava de segurança para evitar erro do Streamlit (deve estar entre 0.0 e 1.0)
     p_home = max(0.0, min(1.0, float(p_home)))
     
     with col1: st.markdown(f"<p style='text-align: right; font-size: 18px; font-weight: bold; margin:0;'>{v_h:.2f}</p>", unsafe_allow_html=True)
@@ -209,14 +206,19 @@ def mostrar_scout(df):
     with st.container(border=True):
         st.subheader("🎯 Eficiência e Dominância")
         
-        with st.expander("👉 Saiba mais sobre estas métricas"):
+        with st.expander("👉 Saiba mais sobre essas métricas e números"):
             st.markdown("""
-            **Como interpretar os diagnósticos:**
-            * **Chutes p/ 1 Canto:** Avalia a precisão da pressão. 
-                * *Eficiência Máxima:* Time gera cantos com pouquíssimas tentativas.
-            * **Saldo Médio de Cantos:** Avalia quem controla o território.
-                * *Pressiona Muito:* Time dominante que mantém a bola no ataque.
-                * *Jogo Equilibrado:* Times com forças similares no campo.
+            **Como os diagnósticos são calculados:**
+            
+            1. **Chutes p/ 1 Canto (Eficiência):**
+                * **🎯 Eficiência Máxima (≤ 1.5):** O time precisa de menos de 1,5 chutes totais para gerar 1 escanteio.
+                * **🆗 Eficiência Normal (1.5 a 3.0):** Comportamento padrão de criação.
+                * **📉 Baixa Eficiência (> 3.0):** Chuta muito, mas gera poucos cantos (finaliza de longe ou erra muito).
+            
+            2. **Saldo Médio de Cantos (Dominância):**
+                * **🔥 Pressiona Muito (≥ +2.0):** O time faz, em média, 2 escanteios a mais que o adversário. Indica domínio total do campo.
+                * **⚖️ Jogo Equilibrado (-2.0 a +2.0):** Forças equivalentes; o jogo tende a ficar concentrado no meio.
+                * **🛡️ Sendo Pressionado (≤ -2.0):** O time cede muitos cantos e joga retraído.
             """)
         
         # --- LÓGICA DE DIAGNÓSTICO ---
@@ -230,12 +232,14 @@ def mostrar_scout(df):
             if val >= 3.0: return "📉 Baixa Eficiência"
             return "🆗 Eficiência Normal"
 
+        # Cálculos
         ef_m = df_m_h['Finalizações_Totais_Mandante'].sum() / df_m_h['Cantos_Mandante'].sum() if df_m_h['Cantos_Mandante'].sum() > 0 else 0
         ef_v = df_v_a['Finalizações_Totais_Visitante'].sum() / df_v_a['Cantos_Visitante'].sum() if df_v_a['Cantos_Visitante'].sum() > 0 else 0
         
         saldo_m = df_m_h['Cantos_Mandante'].mean() - df_m_h['Cantos_Visitante'].mean()
         saldo_v = df_v_a['Cantos_Visitante'].mean() - df_v_a['Cantos_Mandante'].mean()
 
+        # Renderização das Barras e Diagnósticos
         render_stat_row("CHUTES TOTAIS P/ 1 CANTO", ef_m, ef_v)
         c1, _, c2 = st.columns([1, 2, 1])
         c1.caption(f"_{get_diag_efi(ef_m)}_")
