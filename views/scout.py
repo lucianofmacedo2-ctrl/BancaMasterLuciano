@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import ast
 
-# --- DICIONÁRIO DE REGRAS ---
+# --- DICIONÁRIO DE REGRAS COMPLETO ---
 REGRAS_LIGAS = {
     "AUSTRALIA 1": {"times": 12, "rodadas": 26, "alvos": {"Playoff Título": [1, 6]}},
     "AUSTRIA 1": {"times": 12, "rodadas": 22, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [12, 12]}},
@@ -22,38 +21,11 @@ REGRAS_LIGAS = {
     "ENGLAND 2": {"times": 24, "rodadas": 46, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 6], "Rebaixamento": [22, 24]}},
     "ENGLAND 3": {"times": 24, "rodadas": 46, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 6], "Rebaixamento": [21, 24]}},
     "ENGLAND 4": {"times": 24, "rodadas": 46, "alvos": {"Acesso": [1, 3], "Playoff Acesso": [4, 7], "Rebaixamento": [23, 24]}},
-    "EUROPA CHAMPIONS LEAGUE": {"times": 32, "rodadas": 6, "alvos": {"Oitavas de Final": [1, 2]}},
     "FRANCE 1": {"times": 18, "rodadas": 34, "alvos": {"Champions League": [1, 3], "Europa League": [4, 4], "Conference League": [5, 5], "Rebaixamento": [17, 18]}},
     "FRANCE 2": {"times": 20, "rodadas": 38, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 5], "Rebaixamento": [18, 20]}},
-    "FRANCE 3": {"times": 18, "rodadas": 34, "alvos": {"Acesso": [1, 1], "Rebaixamento": [15, 18]}},
     "GERMANY 1": {"times": 18, "rodadas": 34, "alvos": {"Champions League": [1, 4], "Europa League": [5, 5], "Conference League": [6, 6], "Rebaixamento": [17, 18]}},
-    "GERMANY 2": {"times": 18, "rodadas": 34, "alvos": {"Acesso": [1, 2], "Playoff Permanência": [16, 16], "Rebaixamento": [17, 18]}},
-    "GERMANY 3": {"times": 20, "rodadas": 38, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 3], "Rebaixamento": [17, 20]}},
-    "GREECE 1": {"times": 14, "rodadas": 26, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [13, 14]}},
-    "ISRAEL 1": {"times": 14, "rodadas": 26, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [13, 14]}},
     "ITALY 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Europa League": [5, 5], "Conference League": [6, 6], "Rebaixamento": [18, 20]}},
-    "ITALY 2": {"times": 20, "rodadas": 38, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 8], "Rebaixamento": [18, 20]}},
-    "JAPAN 1": {"times": 20, "rodadas": 38, "alvos": {"Champions Asia": [1, 3], "Rebaixamento": [18, 20]}},
-    "JAPAN 2": {"times": 22, "rodadas": 42, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 6], "Rebaixamento": [21, 22]}},
-    "NETHERLANDS 1": {"times": 18, "rodadas": 34, "alvos": {"Champions League": [1, 2], "Europa League": [3, 3], "Conference League": [4, 4], "Rebaixamento": [17, 18]}},
-    "NETHERLANDS 2": {"times": 20, "rodadas": 38, "alvos": {"Acesso": [1, 1], "Playoff Acesso": [2, 8], "Rebaixamento": [19, 20]}},
-    "NORWAY 1": {"times": 16, "rodadas": 30, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [15, 16]}},
-    "POLAND 1": {"times": 18, "rodadas": 34, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [16, 18]}},
-    "PORTUGAL 1": {"times": 18, "rodadas": 34, "alvos": {"Champions League": [1, 2], "Europa League": [3, 3], "Conference League": [4, 4], "Rebaixamento": [17, 18]}},
-    "PORTUGAL 2": {"times": 18, "rodadas": 34, "alvos": {"Acesso": [1, 2], "Rebaixamento": [17, 18]}},
-    "ROMANIA 1": {"times": 16, "rodadas": 30, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [15, 16]}},
-    "SAUDI ARABIA 1": {"times": 18, "rodadas": 34, "alvos": {"Champions Asia": [1, 3], "Rebaixamento": [16, 18]}},
-    "SCOTLAND 1": {"times": 12, "rodadas": 38, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [12, 12]}},
-    "SERBIA 1": {"times": 16, "rodadas": 30, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [15, 16]}},
-    "SLOVAKIA 1": {"times": 12, "rodadas": 22, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [11, 12]}},
-    "SLOVENIA 1": {"times": 10, "rodadas": 36, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [9, 10]}},
-    "SOUTH AFRICA 1": {"times": 16, "rodadas": 30, "alvos": {"Champions Africa": [1, 2], "Rebaixamento": [15, 16]}},
-    "SOUTH KOREA 1": {"times": 12, "rodadas": 38, "alvos": {"Champions Asia": [1, 3], "Rebaixamento": [11, 12]}},
-    "SOUTH KOREA 2": {"times": 14, "rodadas": 39, "alvos": {"Acesso": [1, 1], "Playoff Acesso": [2, 5]}},
     "SPAIN 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Europa League": [5, 6], "Conference League": [7, 7], "Rebaixamento": [18, 20]}},
-    "SPAIN 2": {"times": 22, "rodadas": 42, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 6], "Rebaixamento": [19, 22]}},
-    "SWEDEN 1": {"times": 16, "rodadas": 30, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [15, 16]}},
-    "SWITZERLAND 1": {"times": 12, "rodadas": 38, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [11, 12]}},
     "USA 1": {"times": 29, "rodadas": 34, "alvos": {"Playoffs": [1, 9]}},
 }
 
@@ -111,181 +83,150 @@ def calcular_stats_completas(serie_f, serie_s):
         m = s.mean(); dp = s.std() if len(s) > 1 else 0.0
         cv = (dp / m * 100) if m > 0 else 0.0
         return {"Média": m, "DP": dp, "CV%": cv}
-    
-    return pd.DataFrame({
-        "Marcados": get_metrics(serie_f), 
-        "Sofridos": get_metrics(serie_s), 
-        "Saldo": get_metrics(serie_f - serie_s),
-        "Total Jogo": get_metrics(serie_f + serie_s)
-    }).T
+    return pd.DataFrame({"Marcados": get_metrics(serie_f), "Sofridos": get_metrics(serie_s), "Saldo": get_metrics(serie_f - serie_s), "Total Jogo": get_metrics(serie_f + serie_s)}).T
 
-def calcular_probabilidades_mercado(df):
+def calcular_probabilidades_mercado(df, time_name):
     if df.empty: return pd.DataFrame()
-    n = len(df); tg_ht, tg_ft = df['Total_Gols_HT'], df['Total_Gols_FT']
-    tg_st = tg_ft - tg_ht; gm_ht, gv_ht = df['Gols_Mandante_HT'], df['Gols_Visitante_HT']
+    n = len(df)
+    # Ajusta gols baseado em quem é o time analisado em cada linha do histórico
+    gm = np.where(df['Mandante'] == time_name, df['Gols_Mandante_FT'], df['Gols_Visitante_FT'])
+    gv = np.where(df['Mandante'] == time_name, df['Gols_Visitante_FT'], df['Gols_Mandante_FT'])
+    tg_ft = df['Total_Gols_FT']
+    tg_ht = df['Total_Gols_HT']
+    
     def perc(cond): return (len(df[cond]) / n) * 100
-    mercados = []
-    for pref, stot, sm, sv in [("HT", tg_ht, gm_ht, gv_ht), ("ST", tg_st, (df['Gols_Mandante_FT']-gm_ht), (df['Gols_Visitante_FT']-gv_ht)), ("FT", tg_ft, df['Gols_Mandante_FT'], df['Gols_Visitante_FT'])]:
-        for g in [0.5, 1.5, 2.5, 3.5]: mercados.append({"Mercado": f"{g} {pref}", "% Batido": perc(stot >= g)})
-        mercados.append({"Mercado": f"BTTS {pref}", "% Batido": perc((sm > 0) & (sv > 0))})
+    
+    mercados = [
+        {"Mercado": "0.5 FT", "% Batido": perc(tg_ft >= 0.5)},
+        {"Mercado": "1.5 FT", "% Batido": perc(tg_ft >= 1.5)},
+        {"Mercado": "2.5 FT", "% Batido": perc(tg_ft >= 2.5)},
+        {"Mercado": "BTTS FT", "% Batido": perc((df['Gols_Mandante_FT'] > 0) & (df['Gols_Visitante_FT'] > 0))},
+        {"Mercado": "0.5 HT", "% Batido": perc(tg_ht >= 0.5)},
+        {"Mercado": "Marcou Gol", "% Batido": perc(gm > 0)}
+    ]
     return pd.DataFrame(mercados)
 
+def filtrar_por_n(df, n):
+    if n == "Todos": return df
+    return df.head(int(n))
+
 def mostrar_scout(df):
-    st.markdown("""
-    <style>
-        div[data-testid="stDataFrame"] td { text-align: center !important; }
-        [data-testid="stMetricValue"] { text-align: center !important; color: #000000 !important; font-weight: 800 !important; width: 100%; }
-        [data-testid="stMetricLabel"] { text-align: center !important; width: 100%; }
-    </style>
-    """, unsafe_allow_html=True)
-    
+    st.markdown("<style>.golden-container { border: 2px solid #FFD700; border-radius: 10px; padding: 15px; background-color: rgba(255, 215, 0, 0.05); margin-bottom: 20px;} [data-testid='stMetricValue'] { text-align: center !important; font-weight: 800 !important; }</style>", unsafe_allow_html=True)
     st.title("🚀 Scout Profissional")
 
     df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
-
-    l_v = st.session_state.get('liga_scout', None)
-    t_m_v = st.session_state.get('time_casa_scout', None)
-    t_v_v = st.session_state.get('time_fora_scout', None)
-
     ligas_list = sorted(df['Liga'].unique())
-    idx_l = ligas_list.index(l_v) if l_v in ligas_list else 0
-    
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", ligas_list, index=idx_l)
-    df_l = df[df['Liga'] == liga_sel].copy()
-    temp_sel = c2.selectbox("Temporada", sorted(df_l['Temporada'].unique(), reverse=True))
+    liga_sel = c1.selectbox("Selecione a Liga", ligas_list)
+    temp_sel = c2.selectbox("Temporada", sorted(df[df['Liga'] == liga_sel]['Temporada'].unique(), reverse=True))
     
-    df_s = df_l[df_l['Temporada'] == temp_sel].copy()
+    df_s = df[(df['Liga'] == liga_sel) & (df['Temporada'] == temp_sel)].copy()
     times_liga = sorted(df_s['Mandante'].unique())
     
-    idx_m = times_liga.index(t_m_v) if t_m_v in times_liga else 0
     c3, c4 = st.columns(2)
-    m_sel = c3.selectbox("Mandante (Casa)", times_liga, index=idx_m)
-    opcoes_v = [t for t in times_liga if t != m_sel]
-    idx_v = opcoes_v.index(t_v_v) if t_v_v in opcoes_v else 0
-    v_sel = c4.selectbox("Visitante (Fora)", opcoes_v, index=idx_v)
-
-    tab_geral = calcular_tabela_classificacao(df_s)
-    
-    st.markdown("---")
-    df_m_h = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(10)
-    df_v_a = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(10)
-
-    if not df_m_h.empty and not df_v_a.empty:
-        col_i1, col_i2 = st.columns(2)
-        for col, t_name, df_hist, mando in zip([col_i1, col_i2], [m_sel, v_sel], [df_m_h, df_v_a], ["Casa", "Fora"]):
-            with col:
-                pos_row = tab_geral[tab_geral['Time'] == t_name] if not tab_geral.empty else pd.DataFrame()
-                if not pos_row.empty:
-                    pos = pos_row.index[0] + 1
-                    obj = get_objetivo_txt(liga_sel, pos)
-                    
-                    if mando == "Casa":
-                        cs = (df_hist['Gols_Visitante_FT'] == 0).sum()
-                        fsm = (df_hist['Gols_Mandante_FT'] == 0).sum()
-                        ch_media = df_hist['Chutes_Gol_Mandante'].mean()
-                    else:
-                        cs = (df_hist['Gols_Mandante_FT'] == 0).sum()
-                        fsm = (df_hist['Gols_Visitante_FT'] == 0).sum()
-                        ch_media = df_hist['Chutes_Gol_Visitante'].mean()
-
-                    st.info(f"**{t_name}** ({mando})\n\n🏆 {pos}º Lugar | 🎯 {obj}")
-                    k1, k2, k3 = st.columns(3)
-                    k1.metric("Clean Sheets", int(cs))
-                    k2.metric("F.S.M", int(fsm))
-                    k3.metric("Chutes/G", f"{ch_media:.1f}")
+    m_sel = c3.selectbox("Time Mandante", times_liga)
+    v_sel = c4.selectbox("Time Visitante", [t for t in times_liga if t != m_sel])
 
     st.divider()
-    
+    st.subheader("⚙️ Configurações de Análise")
+    col_cfg1, col_cfg2, col_cfg3 = st.columns(3)
+    n_jogos = col_cfg1.radio("Quantidade de Jogos", ["5", "10", "Todos"], index=1, horizontal=True)
+    criterio_mando = col_cfg2.radio("Critério de Mando", ["Geral", "Mando de Campo"], index=1, horizontal=True)
+    criterio_h2h = col_cfg3.radio("Critério H2H", ["Geral", "Mando Específico"], index=0, horizontal=True)
+
+    # Filtragem
+    if criterio_mando == "Geral":
+        df_m = df_s[(df_s['Mandante'] == m_sel) | (df_s['Visitante'] == m_sel)].sort_values('Data', ascending=False)
+        df_v = df_s[(df_s['Mandante'] == v_sel) | (df_s['Visitante'] == v_sel)].sort_values('Data', ascending=False)
+    else:
+        df_m = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False)
+        df_v = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False)
+
+    df_m = filtrar_por_n(df_m, n_jogos)
+    df_v = filtrar_por_n(df_v, n_jogos)
+
+    if criterio_h2h == "Geral":
+        df_h2h = df_s[((df_s['Mandante'] == m_sel) & (df_s['Visitante'] == v_sel)) | ((df_s['Mandante'] == v_sel) & (df_s['Visitante'] == m_sel))].sort_values('Data', ascending=False)
+    else:
+        df_h2h = df_s[(df_s['Mandante'] == m_sel) & (df_s['Visitante'] == v_sel)].sort_values('Data', ascending=False)
+    df_h2h = filtrar_por_n(df_h2h, n_jogos)
+
+    # Cálculos Médias
+    def get_avg_stats(df_target, t_name):
+        is_m = (df_target['Mandante'] == t_name)
+        gm = np.where(is_m, df_target['Gols_Mandante_FT'], df_target['Gols_Visitante_FT']).mean()
+        ch = np.where(is_m, df_target['Chutes_Gol_Mandante'], df_target['Chutes_Gol_Visitante']).mean()
+        ct = np.where(is_m, df_target['Cantos_Mandante'], df_target['Cantos_Visitante']).mean()
+        fin = np.where(is_m, df_target['Finalizações_Totais_Mandante'], df_target['Finalizações_Totais_Visitante']).sum()
+        ct_t = np.where(is_m, df_target['Cantos_Mandante'], df_target['Cantos_Visitante']).sum()
+        ef = fin / ct_t if ct_t > 0 else 0
+        sd = np.where(is_m, df_target['Cantos_Mandante'] - df_target['Cantos_Visitante'], df_target['Cantos_Visitante'] - df_target['Cantos_Mandante']).mean()
+        return gm, ch, ct, ef, sd
+
+    gm_m, ch_m, ct_m, ef_m, sd_m = get_avg_stats(df_m, m_sel)
+    gm_v, ch_v, ct_v, ef_v, sd_v = get_avg_stats(df_v, v_sel)
+
+    # Info Cards
+    tab_geral = calcular_tabela_classificacao(df_s)
+    ci1, ci2 = st.columns(2)
+    for col, t_name, d_h in zip([ci1, ci2], [m_sel, v_sel], [df_m, df_v]):
+        with col:
+            pos = tab_geral[tab_geral['Time'] == t_name].index[0]+1 if t_name in tab_geral['Time'].values else 0
+            st.info(f"**{t_name}** | 🏆 {pos}º Lugar - {get_objetivo_txt(liga_sel, pos)}")
+
+    # Volume e Eficiência
     with st.container(border=True):
         st.subheader("🔥 Médias de Volume")
-        render_stat_row("GOLS MARCADOS FT", df_m_h['Gols_Mandante_FT'].mean(), df_v_a['Gols_Visitante_FT'].mean())
-        render_stat_row("CHUTES AO GOL", df_m_h['Chutes_Gol_Mandante'].mean(), df_v_a['Chutes_Gol_Visitante'].mean())
-        render_stat_row("ESCANTEIOS PRO", df_m_h['Cantos_Mandante'].mean(), df_v_a['Cantos_Visitante'].mean())
+        render_stat_row("GOLS MARCADOS FT", gm_m, gm_v)
+        render_stat_row("CHUTES AO GOL", ch_m, ch_v)
+        render_stat_row("ESCANTEIOS PRO", ct_m, ct_v)
+
+    is_golden = (ef_m <= 1.5) and (ef_v <= 1.5) and (ef_m > 0) and (ef_v > 0)
+    if is_golden: st.warning("✨ **OPORTUNIDADE:** Eficiência Máxima detectada!")
 
     with st.container(border=True):
+        st.markdown(f'<div class="{"golden-container" if is_golden else ""}">', unsafe_allow_html=True)
         st.subheader("🎯 Eficiência e Dominância")
-        
-        with st.expander("👉 Saiba mais sobre essas métricas e números"):
-            st.markdown("""
-            **Como os diagnósticos são calculados:**
-            
-            1. **Chutes p/ 1 Canto (Eficiência):**
-                * **🎯 Eficiência Máxima (≤ 1.5):** O time precisa de menos de 1,5 chutes totais para gerar 1 escanteio.
-                * **🆗 Eficiência Normal (1.5 a 3.0):** Comportamento padrão de criação.
-                * **📉 Baixa Eficiência (> 3.0):** Chuta muito, mas gera poucos cantos (finaliza de longe ou erra muito).
-            
-            2. **Saldo Médio de Cantos (Dominância):**
-                * **🔥 Pressiona Muito (≥ +2.0):** O time faz, em média, 2 escanteios a mais que o adversário. Indica domínio total do campo.
-                * **⚖️ Jogo Equilibrado (-2.0 a +2.0):** Forças equivalentes; o jogo tende a ficar concentrado no meio.
-                * **🛡️ Sendo Pressionado (≤ -2.0):** O time cede muitos cantos e joga retraído.
-            """)
-        
-        # --- LÓGICA DE DIAGNÓSTICO ---
-        def get_diag_saldo(val):
-            if val >= 2.0: return "🔥 Pressiona Muito"
-            if val <= -2.0: return "🛡️ Sendo Pressionado"
-            return "⚖️ Jogo Equilibrado"
-
-        def get_diag_efi(val):
-            if val <= 1.5: return "🎯 Eficiência Máxima"
-            if val >= 3.0: return "📉 Baixa Eficiência"
-            return "🆗 Eficiência Normal"
-
-        # Cálculos
-        ef_m = df_m_h['Finalizações_Totais_Mandante'].sum() / df_m_h['Cantos_Mandante'].sum() if df_m_h['Cantos_Mandante'].sum() > 0 else 0
-        ef_v = df_v_a['Finalizações_Totais_Visitante'].sum() / df_v_a['Cantos_Visitante'].sum() if df_v_a['Cantos_Visitante'].sum() > 0 else 0
-        
-        saldo_m = df_m_h['Cantos_Mandante'].mean() - df_m_h['Cantos_Visitante'].mean()
-        saldo_v = df_v_a['Cantos_Visitante'].mean() - df_v_a['Cantos_Mandante'].mean()
-
-        # Renderização das Barras e Diagnósticos
         render_stat_row("CHUTES TOTAIS P/ 1 CANTO", ef_m, ef_v)
-        c1, _, c2 = st.columns([1, 2, 1])
-        c1.caption(f"_{get_diag_efi(ef_m)}_")
-        c2.markdown(f"<p style='text-align:right; font-size:12px; color:gray; font-style:italic;'>{get_diag_efi(ef_v)}</p>", unsafe_allow_html=True)
-        
-        render_stat_row("SALDO MÉDIO DE CANTOS", saldo_m, saldo_v)
-        c3, _, c4 = st.columns([1, 2, 1])
-        c3.caption(f"_{get_diag_saldo(saldo_m)}_")
-        c4.markdown(f"<p style='text-align:right; font-size:12px; color:gray; font-style:italic;'>{get_diag_saldo(saldo_v)}</p>", unsafe_allow_html=True)
+        render_stat_row("SALDO MÉDIO DE CANTOS", sd_m, sd_v)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
+    # Tabs
+    t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes", "⏰ Minutos"])
     
     with t1:
         cf1, cf2 = st.columns(2)
-        for col_f, t_name, df_h, eh_mandante in zip([cf1, cf2], [m_sel, v_sel], [df_m_h, df_v_a], [True, False]):
-            with col_f:
-                st.markdown(f"**{t_name}**")
-                for _, r in df_h.iterrows():
-                    res = "✅" if (eh_mandante and r['Gols_Mandante_FT'] > r['Gols_Visitante_FT']) or (not eh_mandante and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']) else ("🟧" if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT'] else "❌")
-                    data_str = r['Data'].strftime('%d/%m') if pd.notnull(r['Data']) else "S/D"
-                    st.write(f"{res} {data_str} vs {r['Visitante'] if eh_mandante else r['Mandante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
-    
-    with t2:
-        h2h = df_s[((df_s['Mandante'] == m_sel) & (df_s['Visitante'] == v_sel)) | ((df_s['Mandante'] == v_sel) & (df_s['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
-        if not h2h.empty:
-            h2h_view = h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']].copy()
-            h2h_view['Data'] = h2h_view['Data'].dt.strftime('%d/%m/%Y')
-            st.dataframe(h2h_view, use_container_width=True, hide_index=True)
-    
-    with t3:
-        for label, (cm, cv) in {"Gols HT": ("Gols_Mandante_HT", "Gols_Visitante_HT"), "Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"), "Cantos": ("Cantos_Mandante", "Cantos_Visitante")}.items():
-            st.subheader(label); ca, cb = st.columns(2)
-            with ca: st.dataframe(calcular_stats_completas(df_m_h[cm], df_m_h[cv]).style.format("{:.2f}"), use_container_width=True)
-            with cb: st.dataframe(calcular_stats_completas(df_v_a[cv], df_v_a[cm]).style.format("{:.2f}"), use_container_width=True)
-    
-    with t4:
-        for t_n, df_j, mando in [(m_sel, df_m_h, "Mandante"), (v_sel, df_v_a, "Visitante")]:
-            st.write(f"**{t_n}**"); adv = "Visitante" if mando == "Mandante" else "Mandante"
-            cols_f = [f"{c}_{mando}" for c in ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]]
-            cols_s = [f"{c}_{adv}" for c in ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]]
-            cols_f_exist = [c for c in cols_f if c in df_j.columns]
-            cols_s_exist = [c for c in cols_s if c in df_j.columns]
-            if cols_f_exist:
-                st.dataframe(pd.DataFrame([df_j[cols_f_exist].sum().values, df_j[cols_s_exist].sum().values], columns=["0-15","16-30","31-45","46-60","61-75","76-90"][:len(cols_f_exist)], index=["Marcados", "Sofridos"]), use_container_width=True)
+        for col, t_name, d_h in zip([cf1, cf2], [m_sel, v_sel], [df_m, df_v]):
+            with col:
+                st.write(f"**Últimos de {t_name}**")
+                for _, r in d_h.iterrows():
+                    eh_m = (r['Mandante'] == t_name)
+                    res = "✅" if (eh_m and r['Gols_Mandante_FT'] > r['Gols_Visitante_FT']) or (not eh_m and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']) else ("🟧" if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT'] else "❌")
+                    st.write(f"{res} {r['Data'].strftime('%d/%m')} vs {r['Visitante'] if eh_m else r['Mandante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
 
-    st.divider(); st.subheader("🎯 Frequência de Mercados")
+    with t2:
+        if not df_h2h.empty:
+            h2_v = df_h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']].copy()
+            h2_v['Data'] = h2_v['Data'].dt.strftime('%d/%m/%Y')
+            st.dataframe(h2_v, use_container_width=True, hide_index=True)
+
+    with t3:
+        for label, (cm, cv) in {"Gols FT": ("Gols_Mandante_FT", "Gols_Visitante_FT"), "Cantos": ("Cantos_Mandante", "Cantos_Visitante")}.items():
+            st.write(f"**{label}**")
+            c_a, c_b = st.columns(2)
+            with c_a: st.dataframe(calcular_stats_completas(df_m[cm if criterio_mando=="Mando de Campo" else 'Gols_Mandante_FT'], df_m[cv if criterio_mando=="Mando de Campo" else 'Gols_Visitante_FT']).style.format("{:.2f}"), use_container_width=True)
+            with c_b: st.dataframe(calcular_stats_completas(df_v[cv if criterio_mando=="Mando de Campo" else 'Gols_Visitante_FT'], df_v[cm if criterio_mando=="Mando de Campo" else 'Gols_Mandante_FT']).style.format("{:.2f}"), use_container_width=True)
+
+    with t4:
+        for t_n, d_j, mando in [(m_sel, df_m, "Mandante"), (v_sel, df_v, "Visitante")]:
+            st.write(f"**{t_n}**")
+            cols_f = [f"{c}_{mando}" for c in ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]]
+            cols_f_ex = [c for c in cols_f if c in d_j.columns]
+            if cols_f_ex:
+                st.dataframe(pd.DataFrame([d_j[cols_f_ex].sum().values], columns=["0-15","16-30","31-45","46-60","61-75","76-90"][:len(cols_f_ex)], index=["Gols"]), use_container_width=True)
+
+    st.divider()
+    st.subheader("🎯 Frequência de Mercados")
     cp1, cp2 = st.columns(2)
-    with cp1: st.dataframe(calcular_probabilidades_mercado(df_m_h).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
-    with cp2: st.dataframe(calcular_probabilidades_mercado(df_v_a).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
+    with cp1: st.dataframe(calcular_probabilidades_mercado(df_m, m_sel).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
+    with cp2: st.dataframe(calcular_probabilidades_mercado(df_v, v_sel).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn"), use_container_width=True)
