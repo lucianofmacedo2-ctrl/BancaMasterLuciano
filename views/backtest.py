@@ -112,7 +112,7 @@ def mostrar_backtest():
         return
 
     # Processamento das Listas
-    back_gols, back_cantos, back_equi = [], [], []
+    back_gols, back_cantos, back_equi, back_combo = [], [], [], []
 
     for _, row in df_agenda.iterrows():
         mandante = str(row['Mandante']).strip()
@@ -166,10 +166,13 @@ def mostrar_backtest():
             if tem_gol: back_gols.append(item)
             if tem_canto: back_cantos.append(item)
             if equi: back_equi.append(item)
+            # REGRA DO COMBO: Ambos os critérios de Fogo ativos
+            if tem_gol and tem_canto: back_combo.append(item)
 
     # Exibição
     st.divider()
-    t1, t2, t3 = st.tabs(["🔥 Gols", "🚩 Cantos", "⚖️ Equilíbrio"])
+    t1, t2, t3, t4 = st.tabs(["🔥 Gols", "🚩 Cantos", "⚖️ Equilíbrio", "🔥🚩 Fogo Combo"])
     with t1: processar_metricas_categoria(pd.DataFrame(back_gols), "Estratégia Gols")
     with t2: processar_metricas_categoria(pd.DataFrame(back_cantos), "Estratégia Cantos")
     with t3: processar_metricas_categoria(pd.DataFrame(back_equi), "Estratégia Equilíbrio")
+    with t4: processar_metricas_categoria(pd.DataFrame(back_combo), "Estratégia Fogo Combo (Gols + Cantos)")
