@@ -71,8 +71,18 @@ def render_stat_row(label, val_home, val_away):
     col1, col2, col3 = st.columns([1, 2, 1])
     v_h = float(val_home) if pd.notnull(val_home) else 0.0
     v_a = float(val_away) if pd.notnull(val_away) else 0.0
-    total = v_h + v_a
-    p_home = (v_h / total) if total > 0 else 0.5
+    
+    # Lógica especial para Saldo (pode ser negativo)
+    if label == "SALDO MÉDIO DE CANTOS":
+        diff = v_h - v_a
+        # Mapeia a diferença de -6 a +6 para o intervalo 0.0 a 1.0 da barra
+        p_home = 0.5 + (diff / 12.0)
+    else:
+        total = abs(v_h) + abs(v_a)
+        p_home = (v_h / total) if total > 0 else 0.5
+    
+    # Trava de segurança para evitar erro do Streamlit (deve estar entre 0.0 e 1.0)
+    p_home = max(0.0, min(1.0, float(p_home)))
     
     with col1: st.markdown(f"<p style='text-align: right; font-size: 18px; font-weight: bold; margin:0;'>{v_h:.2f}</p>", unsafe_allow_html=True)
     with col2:
@@ -129,10 +139,6 @@ def mostrar_scout(df):
         div[data-testid="stDataFrame"] td { text-align: center !important; }
         [data-testid="stMetricValue"] { text-align: center !important; color: #000000 !important; font-weight: 800 !important; width: 100%; }
         [data-testid="stMetricLabel"] { text-align: center !important; width: 100%; }
-        .diag-box { padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; text-align: center; }
-        .diag-press { background-color: #d4edda; color: #155724; }
-        .diag-equal { background-color: #fff3cd; color: #856404; }
-        .diag-low { background-color: #f8d7da; color: #721c24; }
     </style>
     """, unsafe_allow_html=True)
     
@@ -205,9 +211,12 @@ def mostrar_scout(df):
         
         with st.expander("👉 Saiba mais sobre estas métricas"):
             st.markdown("""
-            **Como interpretar:**
-            * **Chutes p/ 1 Canto:** Quanto menor, mais eficiente (precisa de poucas tentativas p/ gerar escanteio).
-            * **Saldo Médio de Cantos:** Indica quem controla o campo. Positivo (+) amassa o rival.
+            **Como interpretar os diagnósticos:**
+            * **Chutes p/ 1 Canto:** Avalia a precisão da pressão. 
+                * *Eficiência Máxima:* Time gera cantos com pouquíssimas tentativas.
+            * **Saldo Médio de Cantos:** Avalia quem controla o território.
+                * *Pressiona Muito:* Time dominante que mantém a bola no ataque.
+                * *Jogo Equilibrado:* Times com forças similares no campo.
             """)
         
         # --- LÓGICA DE DIAGNÓSTICO ---
@@ -227,7 +236,6 @@ def mostrar_scout(df):
         saldo_m = df_m_h['Cantos_Mandante'].mean() - df_m_h['Cantos_Visitante'].mean()
         saldo_v = df_v_a['Cantos_Visitante'].mean() - df_v_a['Cantos_Mandante'].mean()
 
-        # Renderizando com os textos de ajuda abaixo de cada barra
         render_stat_row("CHUTES TOTAIS P/ 1 CANTO", ef_m, ef_v)
         c1, _, c2 = st.columns([1, 2, 1])
         c1.caption(f"_{get_diag_efi(ef_m)}_")
