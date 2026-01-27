@@ -197,25 +197,21 @@ def mostrar_scout(df):
         render_stat_row("CHUTES AO GOL", df_m_h['Chutes_Gol_Mandante'].mean(), df_v_a['Chutes_Gol_Visitante'].mean())
         render_stat_row("ESCANTEIOS PRO", df_m_h['Cantos_Mandante'].mean(), df_v_a['Cantos_Visitante'].mean())
 
-    # MÉTRICAS AVANÇADAS COM EXPLICAÇÃO
+    # MÉTRICAS AVANÇADAS COM EXPANDER (LAYOUT LIMPO)
     with st.container(border=True):
-        c_title, c_help = st.columns([0.8, 0.2])
-        c_title.subheader("🎯 Eficiência e Dominância")
+        st.subheader("🎯 Eficiência e Dominância")
         
-        # O Ícone de interrogação com o texto explicativo
-        c_help.markdown("### ℹ️")
-        c_help.help("""
-        **COMO INTERPRETAR:**
+        # O EXPANDER DISCRETO
+        with st.expander("👉 Saiba mais sobre estas métricas"):
+            st.markdown("""
+            **Como interpretar os números abaixo:**
+            * **Chutes p/ 1 Canto:** Mostra quantas finalizações o time faz para conquistar um escanteio. 
+                * *Leitura:* Números **baixos** indicam um time muito perigoso e eficiente.
+            * **Saldo Médio de Cantos:** É a diferença entre cantos marcados e sofridos.
+                * *Leitura:* Um valor **positivo (+)** alto indica um time que amassa o adversário no campo de ataque.
+            """)
         
-        1. **Chutes p/ 1 Canto:** Indica quantos chutes o time precisa dar para gerar 1 escanteio. 
-           - *Quanto MENOR o número, mais eficiente é a pressão do time.*
-        
-        2. **Saldo Médio de Cantos:** É a diferença entre Cantos Pró e Cantos Contra.
-           - *Saldo Positivo (+):* O time domina e sufoca o adversário.
-           - *Saldo Negativo (-):* O time é dominado e cede muita pressão.
-        """)
-        
-        # Cálculos
+        # Cálculos e Renderização
         ef_m = df_m_h['Finalizações_Totais_Mandante'].sum() / df_m_h['Cantos_Mandante'].sum() if df_m_h['Cantos_Mandante'].sum() > 0 else 0
         ef_v = df_v_a['Finalizações_Totais_Visitante'].sum() / df_v_a['Cantos_Visitante'].sum() if df_v_a['Cantos_Visitante'].sum() > 0 else 0
         render_stat_row("CHUTES TOTAIS P/ 1 CANTO", ef_m, ef_v)
@@ -226,7 +222,6 @@ def mostrar_scout(df):
 
     t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
     
-    # ... (Restante do código permanece o mesmo para garantir funcionalidade) ...
     with t1:
         cf1, cf2 = st.columns(2)
         for col_f, t_name, df_h, eh_mandante in zip([cf1, cf2], [m_sel, v_sel], [df_m_h, df_v_a], [True, False]):
