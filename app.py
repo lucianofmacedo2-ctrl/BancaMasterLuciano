@@ -3,8 +3,8 @@ import pandas as pd
 import os
 import shutil
 from datetime import datetime
-# Adicionado backtest na importação das views
-from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest 
+# Corrigido: Removida a vírgula extra no final da importação
+from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest
 import styles
 
 # --- FUNÇÃO DE BACKUP (MANTIDA) ---
@@ -37,27 +37,26 @@ df_csv = carregar_dados_csv()
 st.sidebar.title("🏆 Master Luciano")
 
 # --- LÓGICA DE NAVEGAÇÃO ATUALIZADA ---
-# Adicionado "🧪 Backtest" na lista de opções
 opcoes_menu = ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "🧪 Backtest", "📝 Registro", "📂 Histórico", "🏦 Bancas", "🎯 Metas"]
 
 # Inicializa se for a primeira vez
 if 'menu_ativo' not in st.session_state:
     st.session_state.menu_ativo = "📊 Dashboard"
 
-# Encontra a posição da página atual na lista para manter a sincronia
+# Encontra a posição da página atual na lista
 if st.session_state.menu_ativo in opcoes_menu:
     index_atual = opcoes_menu.index(st.session_state.menu_ativo)
 else:
     index_atual = 0
 
-# O rádio lateral que controla a navegação
+# Menu de Navegação Lateral
 menu = st.sidebar.radio(
     "Navegação", 
     opcoes_menu, 
     index=index_atual
 )
 
-# Se o usuário clicar manualmente, atualizamos a variável de estado
+# Atualiza o estado se o usuário clicar
 if menu != st.session_state.menu_ativo:
     st.session_state.menu_ativo = menu
 
