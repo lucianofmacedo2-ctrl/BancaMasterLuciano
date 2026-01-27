@@ -97,8 +97,8 @@ def mostrar_backtest():
             m_cantos = (df_m_hist['Cantos_Mandante'].mean() + df_m_hist['Cantos_Visitante'].mean()) + \
                        (df_v_hist['Cantos_Mandante'].mean() + df_v_hist['Cantos_Visitante'].mean())
 
-            if m_gols > 5.0: tem_gol = True
-            if m_cantos > 15.0: tem_canto = True
+            if m_gols > 4.0: tem_gol = True
+            if m_cantos > 13.0: tem_canto = True
 
         # Lógica de Equilíbrio pelas Odds
         try:
