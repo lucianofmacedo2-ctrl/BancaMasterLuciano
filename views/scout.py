@@ -80,10 +80,8 @@ def calcular_stats_completas(serie_f, serie_s):
         m = s.mean(); dp = s.std() if len(s) > 1 else 0.0
         cv = (dp / m * 100) if m > 0 else 0.0
         return {"Média": m, "DP": dp, "CV%": cv}
-    
     s_f = pd.to_numeric(pd.Series(serie_f), errors='coerce').fillna(0)
     s_s = pd.to_numeric(pd.Series(serie_s), errors='coerce').fillna(0)
-    
     return pd.DataFrame({
         "Marcados": get_metrics(s_f), 
         "Sofridos": get_metrics(s_s), 
@@ -91,20 +89,32 @@ def calcular_stats_completas(serie_f, serie_s):
         "Total Jogo": get_metrics(s_f + s_s)
     }).T
 
-def calcular_probabilidades_mercado(df, time_name, periodo='FT'):
+def calcular_probabilidades_mercado(df, periodo='FT'):
     if df.empty: return pd.DataFrame()
     n = len(df)
-    c_gm, c_gv, c_tg = f'Gols_Mandante_{periodo}', f'Gols_Visitante_{periodo}', f'Total_Gols_{periodo}'
-    if c_gm not in df.columns: return pd.DataFrame()
+    temp_df = df.copy()
+
+    # Lógica de extração de dados por período
+    if periodo == 'ST':
+        # Cálculo: ST = FT - HT
+        c_gm, c_gv = 'Gols_Mandante_ST_Calc', 'Gols_Visitante_ST_Calc'
+        temp_df[c_gm] = temp_df['Gols_Mandante_FT'] - temp_df['Gols_Mandante_HT']
+        temp_df[c_gv] = temp_df['Gols_Visitante_FT'] - temp_df['Gols_Visitante_HT']
+        temp_df['Total_Gols_ST_Calc'] = temp_df[c_gm] + temp_df[c_gv]
+        c_tg = 'Total_Gols_ST_Calc'
+    else:
+        c_gm, c_gv, c_tg = f'Gols_Mandante_{periodo}', f'Gols_Visitante_{periodo}', f'Total_Gols_{periodo}'
     
-    def perc(cond): return (len(df[cond]) / n) * 100
+    if c_gm not in temp_df.columns: return pd.DataFrame()
+
+    def perc(cond): return (len(temp_df[cond]) / n) * 100
     
     mercados = [
-        {"Mercado": f"0,5 {periodo}", "% Batido": perc(df[c_tg] >= 0.5)},
-        {"Mercado": f"1,5 {periodo}", "% Batido": perc(df[c_tg] >= 1.5)},
-        {"Mercado": f"2,5 {periodo}", "% Batido": perc(df[c_tg] >= 2.5)},
-        {"Mercado": f"3,5 {periodo}", "% Batido": perc(df[c_tg] >= 3.5)},
-        {"Mercado": f"BTTS {periodo}", "% Batido": perc((df[c_gm] > 0) & (df[c_gv] > 0))},
+        {"Mercado": f"0,5 {periodo}", "% Batido": perc(temp_df[c_tg] >= 0.5)},
+        {"Mercado": f"1,5 {periodo}", "% Batido": perc(temp_df[c_tg] >= 1.5)},
+        {"Mercado": f"2,5 {periodo}", "% Batido": perc(temp_df[c_tg] >= 2.5)},
+        {"Mercado": f"3,5 {periodo}", "% Batido": perc(temp_df[c_tg] >= 3.5)},
+        {"Mercado": f"BTTS {periodo}", "% Batido": perc((temp_df[c_gm] > 0) & (temp_df[c_gv] > 0))},
     ]
     return pd.DataFrame(mercados)
 
@@ -152,7 +162,6 @@ def mostrar_scout(df):
         df_h2h = df[(df['Mandante'] == m_sel) & (df['Visitante'] == v_sel)].sort_values('Data', ascending=False)
     df_h2h = filtrar_por_n(df_h2h, n_jogos)
 
-    # Médias
     def get_avg_stats(df_target, t_name):
         is_m = (df_target['Mandante'] == t_name)
         gm = np.where(is_m, df_target['Gols_Mandante_FT'], df_target['Gols_Visitante_FT']).mean()
@@ -188,7 +197,6 @@ def mostrar_scout(df):
         render_stat_row("SALDO MÉDIO DE CANTOS", sd_m, sd_v)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TABS ---
     t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes", "⏰ Minutos"])
     
     with t1:
@@ -219,16 +227,10 @@ def mostrar_scout(df):
             if cm in df.columns:
                 st.write(f"**{label}**")
                 ca, cb = st.columns(2)
-                # Mandante
                 ism = df_m['Mandante'] == m_sel
-                val_m_pro = np.where(ism, df_m[cm], df_m[cv])
-                val_m_con = np.where(ism, df_m[cv], df_m[cm])
-                with ca: st.dataframe(calcular_stats_completas(val_m_pro, val_m_con).style.format("{:.2f}"), use_container_width=True)
-                # Visitante
+                with ca: st.dataframe(calcular_stats_completas(np.where(ism, df_m[cm], df_m[cv]), np.where(ism, df_m[cv], df_m[cm])).style.format("{:.2f}"), use_container_width=True)
                 isv = df_v['Mandante'] == v_sel
-                val_v_pro = np.where(isv, df_v[cm], df_v[cv])
-                val_v_con = np.where(isv, df_v[cv], df_v[cm])
-                with cb: st.dataframe(calcular_stats_completas(val_v_pro, val_v_con).style.format("{:.2f}"), use_container_width=True)
+                with cb: st.dataframe(calcular_stats_completas(np.where(isv, df_v[cm], df_v[cv]), np.where(isv, df_v[cv], df_v[cm])).style.format("{:.2f}"), use_container_width=True)
 
     with t4:
         faixas = ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"]
@@ -251,7 +253,7 @@ def mostrar_scout(df):
         cp1, cp2 = st.columns(2)
         with cp1:
             st.write(f"**{m_sel}**")
-            st.dataframe(calcular_probabilidades_mercado(df_m, m_sel, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
+            st.dataframe(calcular_probabilidades_mercado(df_m, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
         with cp2:
             st.write(f"**{v_sel}**")
-            st.dataframe(calcular_probabilidades_mercado(df_v, v_sel, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
+            st.dataframe(calcular_probabilidades_mercado(df_v, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
