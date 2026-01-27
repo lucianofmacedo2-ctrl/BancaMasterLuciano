@@ -7,37 +7,43 @@ URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMaster
 ARQUIVO_HISTORICO = 'dados_25_26.csv'
 
 def carregar_dados():
+    # 1. Carregar Histórico
     try:
         df_h = pd.read_csv(ARQUIVO_HISTORICO, sep=None, engine='python', encoding='utf-8-sig')
         df_h.columns = [c.strip() for c in df_h.columns]
+        # Criar chave de data limpa e converter odds para número
         df_h['dt_formatada'] = pd.to_datetime(df_h['Data'], dayfirst=True, errors='coerce').dt.strftime('%d/%m/%Y')
-        df_h = df_h.dropna(subset=['dt_formatada'])
         
-        # Converter colunas de Odd para numérico para evitar erro de filtro
         colunas_odds = ['Odd_Mandante_HT', 'Odd_Empate_HT', 'Odd_Visitante_HT', 'Odd_Over_25Gols_FT', 'Odd_BTTS_Sim']
         for col in colunas_odds:
             if col in df_h.columns:
                 df_h[col] = pd.to_numeric(df_h[col].astype(str).str.replace(',', '.'), errors='coerce')
-                
-    except:
+        
+        df_h = df_h.dropna(subset=['dt_formatada'])
+    except Exception as e:
+        st.error(f"Erro ao carregar histórico: {e}")
         df_h = pd.DataFrame()
         
+    # 2. Carregar Agenda
     try:
         df_a = pd.read_csv(URL_AGENDA, sep=None, engine='python', encoding='utf-8-sig')
         df_a.columns = [c.strip() for c in df_a.columns]
+        
         df_a['dt_obj'] = pd.to_datetime(df_a['Data'], dayfirst=True, errors='coerce')
         data_corte = datetime(2026, 1, 22)
         df_a = df_a[df_a['dt_obj'] >= data_corte].copy()
+        
         df_a['dt_formatada'] = df_a['dt_obj'].dt.strftime('%d/%m/%Y')
         df_a = df_a.dropna(subset=['dt_formatada'])
-    except:
+    except Exception as e:
+        st.error(f"Erro ao carregar agenda: {e}")
         df_a = pd.DataFrame()
         
     return df_h, df_a
 
 def processar_metricas_categoria(df_cat, titulo_aba):
     if df_cat.empty:
-        st.warning(f"Nenhum jogo atende aos critérios e filtros de Odd para: {titulo_aba}")
+        st.warning(f"Sem jogos para exibir em: {titulo_aba}")
         return
 
     total_j = len(df_cat)
@@ -53,8 +59,8 @@ def processar_metricas_categoria(df_cat, titulo_aba):
     c4.metric("Taxa 9.5 Cantos", f"{taxa_cnt:.1f}%")
 
     def style_results(val):
-        if val == "✅": return 'color: green; font-weight: bold'
-        if val == "❌": return 'color: red; font-weight: bold'
+        if val == "✅": return 'background-color: #d4edda; color: #155724; font-weight: bold'
+        if val == "❌": return 'background-color: #f8d7da; color: #721c24; font-weight: bold'
         return ''
 
     st.dataframe(
@@ -62,98 +68,92 @@ def processar_metricas_categoria(df_cat, titulo_aba):
         use_container_width=True, 
         hide_index=True
     )
-    st.divider()
 
 def mostrar_backtest():
-    st.title("🧪 Backtest com Filtro de Odds")
-    
-    df_hist, df_agenda = carregar_dados()
+    st.title("🧪 Backtest Master")
+
+    # --- FILTROS NO TOPO (Sempre visíveis) ---
+    st.subheader("🔍 Filtros de Estratégia")
+    with st.container():
+        f_col1, f_col2 = st.columns([1, 2])
+        with f_col1:
+            usar_filtro = st.radio("Aplicar Filtro de Odd?", ["Não", "Sim"], horizontal=True)
+        
+        df_hist, df_agenda = carregar_dados()
+        df_filtered_hist = df_hist.copy()
+        col_alvo = None
+
+        if usar_filtro == "Sim":
+            c1, c2, c3 = st.columns([2, 1, 1])
+            with c1:
+                mercado = st.selectbox("Selecione o Mercado:", [
+                    "Over 2.5 Gols FT", "Mandante HT", "Empate HT", "Visitante HT", "Ambas Marcam (BTTS)"
+                ])
+                mapa = {
+                    "Over 2.5 Gols FT": "Odd_Over_25Gols_FT",
+                    "Mandante HT": "Odd_Mandante_HT",
+                    "Empate HT": "Odd_Empate_HT",
+                    "Visitante HT": "Odd_Visitante_HT",
+                    "Ambas Marcam (BTTS)": "Odd_BTTS_Sim"
+                }
+                col_alvo = mapa[mercado]
+            with c2:
+                o_min = st.number_input("Odd Mínima", value=1.50, step=0.05)
+            with f3 := c3: # Usando assignment para evitar conflito
+                o_max = st.number_input("Odd Máxima", value=2.50, step=0.05)
+            
+            df_filtered_hist = df_filtered_hist[
+                (df_filtered_hist[col_alvo] >= o_min) & (df_filtered_hist[col_alvo] <= o_max)
+            ]
 
     if df_hist.empty or df_agenda.empty:
-        st.error("Erro ao carregar os dados para o Backtest.")
+        st.warning("Aguardando carregamento dos arquivos...")
         return
 
-    # --- SIDEBAR: FILTROS DE ODDS ---
-    st.sidebar.header("🎯 Filtro de Odds (Backtest)")
-    usar_filtro = st.sidebar.radio("Filtrar por Odd?", ["Não (Trazer todos)", "Sim (Definir Range)"])
-    
-    df_filtered_hist = df_hist.copy()
+    # Processamento das Listas
+    back_gols, back_cantos, back_equi = [], [], []
 
-    if usar_filtro == "Sim (Definir Range)":
-        mercado = st.sidebar.selectbox("Escolha o Mercado:", [
-            "Over 2.5 Gols FT",
-            "Mandante HT",
-            "Empate HT",
-            "Visitante HT",
-            "Ambas Marcam (BTTS)"
-        ])
-        
-        mapa_colunas = {
-            "Over 2.5 Gols FT": "Odd_Over_25Gols_FT",
-            "Mandante HT": "Odd_Mandante_HT",
-            "Empate HT": "Odd_Empate_HT",
-            "Visitante HT": "Odd_Visitante_HT",
-            "Ambas Marcam (BTTS)": "Odd_BTTS_Sim"
-        }
-        
-        col_alvo = mapa_colunas[mercado]
-        
-        c_min, c_max = st.sidebar.columns(2)
-        odd_min = c_min.number_input("Odd Mín:", value=1.50, step=0.05)
-        odd_max = c_max.number_input("Odd Máx:", value=2.00, step=0.05)
-        
-        # Aplicar filtro de odd no histórico antes de cruzar
-        df_filtered_hist = df_filtered_hist[
-            (df_filtered_hist[col_alvo] >= odd_min) & 
-            (df_filtered_hist[col_alvo] <= odd_max)
-        ]
-
-    back_gols, back_cantos, back_equilibrio = [], [], []
-
-    # Processamento dos jogos
     for _, row in df_agenda.iterrows():
-        mandante = str(row['Mandante']).strip()
-        visitante = str(row['Visitante']).strip()
+        mandante, visitante = str(row['Mandante']).strip(), str(row['Visitante']).strip()
         data_jogo = row['dt_formatada']
         
-        # Radar (sempre olha o histórico total para média)
-        df_m_hist = df_hist[df_hist['Mandante'] == mandante]
-        df_v_hist = df_hist[df_hist['Visitante'] == visitante]
+        # Radar (Média Histórica)
+        df_m_h = df_hist[df_hist['Mandante'] == mandante]
+        df_v_h = df_hist[df_hist['Visitante'] == visitante]
         
-        tem_gol, tem_canto, equilibrio = False, False, False
+        tem_gol, tem_canto, equi = False, False, False
 
-        if not df_m_hist.empty and not df_v_hist.empty:
-            m_gols = (df_m_hist['Gols_Mandante_FT'].mean() + df_m_hist['Gols_Visitante_FT'].mean()) + \
-                     (df_v_hist['Gols_Mandante_FT'].mean() + df_v_hist['Gols_Visitante_FT'].mean())
-            m_cantos = (df_m_hist['Cantos_Mandante'].mean() + df_m_hist['Cantos_Visitante'].mean()) + \
-                       (df_v_hist['Cantos_Mandante'].mean() + df_v_hist['Cantos_Visitante'].mean())
-
+        if not df_m_h.empty and not df_v_h.empty:
+            m_gols = (df_m_h['Gols_Mandante_FT'].mean() + df_m_h['Gols_Visitante_FT'].mean()) + \
+                     (df_v_h['Gols_Mandante_FT'].mean() + df_v_h['Gols_Visitante_FT'].mean())
+            m_cants = (df_m_h['Cantos_Mandante'].mean() + df_m_h['Cantos_Visitante'].mean()) + \
+                      (df_v_h['Cantos_Mandante'].mean() + df_v_h['Cantos_Visitante'].mean())
             if m_gols > 5.0: tem_gol = True
-            if m_cantos > 15.0: tem_canto = True
+            if m_cants > 15.0: tem_canto = True
 
         try:
-            val_m = float(str(row.get('Odd Mandante', 0)).replace(',', '.'))
-            val_v = float(str(row.get('Odd Visitante', 0)).replace(',', '.'))
-            if abs(val_m - val_v) <= 1.0: equilibrio = True
+            v_m = float(str(row.get('Odd Mandante', 0)).replace(',', '.'))
+            v_v = float(str(row.get('Odd Visitante', 0)).replace(',', '.'))
+            if abs(v_m - v_v) <= 1.0: equi = True
         except: pass
 
-        # Cruzamento Rigoroso com o Histórico FILTRADO pelas ODDS
-        res_partida = df_filtered_hist[
+        # Busca no Histórico Filtrado por ODD
+        res_p = df_filtered_hist[
             (df_filtered_hist['Mandante'] == mandante) & 
             (df_filtered_hist['Visitante'] == visitante) & 
             (df_filtered_hist['dt_formatada'] == data_jogo)
         ]
         
-        if not res_partida.empty:
-            res = res_partida.iloc[0]
+        if not res_p.empty:
+            res = res_p.iloc[0]
             g_ht = res['Gols_Mandante_HT'] + res['Gols_Visitante_HT']
             g_ft = res['Gols_Mandante_FT'] + res['Gols_Visitante_FT']
             c_ft = res['Cantos_Mandante'] + res['Cantos_Visitante']
             
-            dados = {
+            item = {
                 "Data": res['Data'],
                 "Jogo": f"{mandante} x {visitante}",
-                "Odd Alvo": res[col_alvo] if usar_filtro == "Sim (Definir Range)" else "-",
+                "Odd": res[col_alvo] if col_alvo else "-",
                 "Placar HT": f"{int(res['Gols_Mandante_HT'])}x{int(res['Gols_Visitante_HT'])}",
                 "Placar FT": f"{int(res['Gols_Mandante_FT'])}x{int(res['Gols_Visitante_FT'])}",
                 "Cantos": int(c_ft),
@@ -161,12 +161,13 @@ def mostrar_backtest():
                 "Over 2.5": "✅" if g_ft > 2.5 else "❌",
                 "Over 9.5": "✅" if c_ft > 9.5 else "❌"
             }
+            if tem_gol: back_gols.append(item)
+            if tem_canto: back_cantos.append(item)
+            if equi: back_equi.append(item)
 
-            if tem_gol: back_gols.append(dados)
-            if tem_canto: back_cantos.append(dados)
-            if equilibrio: back_equilibrio.append(dados)
-
-    tab1, tab2, tab3 = st.tabs(["🔥 Gols", "🚩 Cantos", "⚖️ Equilíbrio"])
-    with tab1: processar_metricas_categoria(pd.DataFrame(back_gols), "Fogo 2.5 FT")
-    with tab2: processar_metricas_categoria(pd.DataFrame(back_cantos), "Fogo 9.5 Cantos")
-    with tab3: processar_metricas_categoria(pd.DataFrame(back_equilibrio), "Equilibrados")
+    # Exibição
+    st.divider()
+    t1, t2, t3 = st.tabs(["🔥 Gols", "🚩 Cantos", "⚖️ Equilíbrio"])
+    with t1: processar_metricas_categoria(pd.DataFrame(back_gols), "Estratégia Gols")
+    with t2: processar_metricas_categoria(pd.DataFrame(back_cantos), "Estratégia Cantos")
+    with t3: processar_metricas_categoria(pd.DataFrame(back_equi), "Estratégia Equilíbrio")
