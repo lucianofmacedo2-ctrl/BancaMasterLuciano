@@ -3,7 +3,8 @@ import pandas as pd
 import os
 import shutil
 from datetime import datetime
-from views import scout, registro, historico, dashboard, bancas, jogos, metas  # Adicionado metas aqui
+# Adicionado backtest na importação das views
+from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest 
 import styles
 
 # --- FUNÇÃO DE BACKUP (MANTIDA) ---
@@ -36,28 +37,31 @@ df_csv = carregar_dados_csv()
 st.sidebar.title("🏆 Master Luciano")
 
 # --- LÓGICA DE NAVEGAÇÃO ATUALIZADA ---
-# Adicionei "🎯 Metas" na lista abaixo
-opcoes_menu = ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "📝 Registro", "📂 Histórico", "🏦 Bancas", "🎯 Metas"]
+# Adicionado "🧪 Backtest" na lista de opções
+opcoes_menu = ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "🧪 Backtest", "📝 Registro", "📂 Histórico", "🏦 Bancas", "🎯 Metas"]
 
 # Inicializa se for a primeira vez
 if 'menu_ativo' not in st.session_state:
     st.session_state.menu_ativo = "📊 Dashboard"
 
-# Encontra a posição da página atual na lista
-index_atual = opcoes_menu.index(st.session_state.menu_ativo)
+# Encontra a posição da página atual na lista para manter a sincronia
+if st.session_state.menu_ativo in opcoes_menu:
+    index_atual = opcoes_menu.index(st.session_state.menu_ativo)
+else:
+    index_atual = 0
 
-# O segredo: usamos o parâmetro 'index' para forçar a posição
+# O rádio lateral que controla a navegação
 menu = st.sidebar.radio(
     "Navegação", 
     opcoes_menu, 
     index=index_atual
 )
 
-# Se o usuário clicar manualmente, atualizamos a variável
+# Se o usuário clicar manualmente, atualizamos a variável de estado
 if menu != st.session_state.menu_ativo:
     st.session_state.menu_ativo = menu
 
-# --- RENDERIZAÇÃO ---
+# --- RENDERIZAÇÃO DAS PÁGINAS ---
 if st.session_state.menu_ativo == "📊 Dashboard":
     dashboard.mostrar_dashboard() 
 elif st.session_state.menu_ativo == "📅 Jogos":
@@ -67,11 +71,13 @@ elif st.session_state.menu_ativo == "🔎 Scout":
         scout.mostrar_scout(df_csv)
     else:
         st.error("Arquivo 'dados_25_26.csv' não encontrado.")
+elif st.session_state.menu_ativo == "🧪 Backtest":
+    backtest.mostrar_backtest()
 elif st.session_state.menu_ativo == "📝 Registro":
     registro.mostrar_registro(df_csv)
 elif st.session_state.menu_ativo == "📂 Histórico":
     historico.mostrar_historico()
 elif st.session_state.menu_ativo == "🏦 Bancas":
     bancas.mostrar_bancas()
-elif st.session_state.menu_ativo == "🎯 Metas":  # Nova condição para carregar a página de metas
+elif st.session_state.menu_ativo == "🎯 Metas":
     metas.mostrar_metas()
