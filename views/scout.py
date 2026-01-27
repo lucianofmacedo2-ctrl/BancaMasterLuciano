@@ -129,6 +129,10 @@ def mostrar_scout(df):
         div[data-testid="stDataFrame"] td { text-align: center !important; }
         [data-testid="stMetricValue"] { text-align: center !important; color: #000000 !important; font-weight: 800 !important; width: 100%; }
         [data-testid="stMetricLabel"] { text-align: center !important; width: 100%; }
+        .diag-box { padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; text-align: center; }
+        .diag-press { background-color: #d4edda; color: #155724; }
+        .diag-equal { background-color: #fff3cd; color: #856404; }
+        .diag-low { background-color: #f8d7da; color: #721c24; }
     </style>
     """, unsafe_allow_html=True)
     
@@ -190,35 +194,49 @@ def mostrar_scout(df):
 
     st.divider()
     
-    # VOLUME (FT)
     with st.container(border=True):
         st.subheader("🔥 Médias de Volume")
         render_stat_row("GOLS MARCADOS FT", df_m_h['Gols_Mandante_FT'].mean(), df_v_a['Gols_Visitante_FT'].mean())
         render_stat_row("CHUTES AO GOL", df_m_h['Chutes_Gol_Mandante'].mean(), df_v_a['Chutes_Gol_Visitante'].mean())
         render_stat_row("ESCANTEIOS PRO", df_m_h['Cantos_Mandante'].mean(), df_v_a['Cantos_Visitante'].mean())
 
-    # MÉTRICAS AVANÇADAS COM EXPANDER (LAYOUT LIMPO)
     with st.container(border=True):
         st.subheader("🎯 Eficiência e Dominância")
         
-        # O EXPANDER DISCRETO
         with st.expander("👉 Saiba mais sobre estas métricas"):
             st.markdown("""
-            **Como interpretar os números abaixo:**
-            * **Chutes p/ 1 Canto:** Mostra quantas finalizações o time faz para conquistar um escanteio. 
-                * *Leitura:* Números **baixos** indicam um time muito perigoso e eficiente.
-            * **Saldo Médio de Cantos:** É a diferença entre cantos marcados e sofridos.
-                * *Leitura:* Um valor **positivo (+)** alto indica um time que amassa o adversário no campo de ataque.
+            **Como interpretar:**
+            * **Chutes p/ 1 Canto:** Quanto menor, mais eficiente (precisa de poucas tentativas p/ gerar escanteio).
+            * **Saldo Médio de Cantos:** Indica quem controla o campo. Positivo (+) amassa o rival.
             """)
         
-        # Cálculos e Renderização
+        # --- LÓGICA DE DIAGNÓSTICO ---
+        def get_diag_saldo(val):
+            if val >= 2.0: return "🔥 Pressiona Muito"
+            if val <= -2.0: return "🛡️ Sendo Pressionado"
+            return "⚖️ Jogo Equilibrado"
+
+        def get_diag_efi(val):
+            if val <= 1.5: return "🎯 Eficiência Máxima"
+            if val >= 3.0: return "📉 Baixa Eficiência"
+            return "🆗 Eficiência Normal"
+
         ef_m = df_m_h['Finalizações_Totais_Mandante'].sum() / df_m_h['Cantos_Mandante'].sum() if df_m_h['Cantos_Mandante'].sum() > 0 else 0
         ef_v = df_v_a['Finalizações_Totais_Visitante'].sum() / df_v_a['Cantos_Visitante'].sum() if df_v_a['Cantos_Visitante'].sum() > 0 else 0
-        render_stat_row("CHUTES TOTAIS P/ 1 CANTO", ef_m, ef_v)
         
         saldo_m = df_m_h['Cantos_Mandante'].mean() - df_m_h['Cantos_Visitante'].mean()
         saldo_v = df_v_a['Cantos_Visitante'].mean() - df_v_a['Cantos_Mandante'].mean()
+
+        # Renderizando com os textos de ajuda abaixo de cada barra
+        render_stat_row("CHUTES TOTAIS P/ 1 CANTO", ef_m, ef_v)
+        c1, _, c2 = st.columns([1, 2, 1])
+        c1.caption(f"_{get_diag_efi(ef_m)}_")
+        c2.markdown(f"<p style='text-align:right; font-size:12px; color:gray; font-style:italic;'>{get_diag_efi(ef_v)}</p>", unsafe_allow_html=True)
+        
         render_stat_row("SALDO MÉDIO DE CANTOS", saldo_m, saldo_v)
+        c3, _, c4 = st.columns([1, 2, 1])
+        c3.caption(f"_{get_diag_saldo(saldo_m)}_")
+        c4.markdown(f"<p style='text-align:right; font-size:12px; color:gray; font-style:italic;'>{get_diag_saldo(saldo_v)}</p>", unsafe_allow_html=True)
 
     t1, t2, t3, t4 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Stats Detalhadas", "⏰ Minutos"])
     
