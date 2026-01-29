@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import os
+import requests
+from io import BytesIO
 
 # --- DICIONÁRIO DE REGRAS COMPLETO ---
 REGRAS_LIGAS = {
@@ -254,20 +256,28 @@ def mostrar_scout(df):
             st.write(f"**{v_sel}**")
             st.dataframe(calcular_probabilidades_mercado(df_v, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
 
-# --- BLOCO PRINCIPAL: CARREGAMENTO DOS DADOS ---
-# Tenta carregar localmente, se não conseguir, carrega do GitHub
-PATH_LOCAL = "dados_25_26.parquet"
-URL_GITHUB = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/dados_25_26.parquet"
-
-try:
-    if os.path.exists(PATH_LOCAL):
-        df_principal = pd.read_parquet(PATH_LOCAL)
-    else:
-        df_principal = pd.read_parquet(URL_GITHUB)
+# --- CARREGAMENTO DE DADOS COM CACHE ---
+@st.cache_data(ttl=3600)  # Cache de 1 hora
+def carregar_dados():
+    # Tenta local primeiro, se falhar vai para o GitHub
+    path_local = "dados_25_26.parquet"
+    url_github = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.parquet"
     
-    # Chama a função principal para mostrar a tela
-    mostrar_scout(df_principal)
+    try:
+        if os.path.exists(path_local):
+            return pd.read_parquet(path_local)
+        else:
+            # Baixa do GitHub e lê os bytes
+            response = requests.get(url_github)
+            return pd.read_parquet(BytesIO(response.content))
+    except Exception as e:
+        return f"Erro crítico: {e}"
 
-except Exception as e:
-    st.error(f"Erro ao carregar o arquivo: {e}")
-    st.info("Certifique-se de que o arquivo 'dados_25_26.parquet' está na pasta raiz do GitHub.")
+# Execução
+df_principal = carregar_dados()
+
+if isinstance(df_principal, str):
+    st.error(df_principal)
+    st.info("O arquivo 'dados_25_26.parquet' não foi encontrado. Verifique se o nome no GitHub está exatamente igual.")
+else:
+    mostrar_scout(df_principal)
