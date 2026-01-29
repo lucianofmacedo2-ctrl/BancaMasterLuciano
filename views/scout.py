@@ -5,15 +5,31 @@ import os
 import requests
 from io import BytesIO
 
-# --- DICIONÁRIO DE REGRAS COMPLETO ---
+# --- DICIONÁRIO DE REGRAS COMPLETO (Preservado) ---
 REGRAS_LIGAS = {
     "AUSTRALIA 1": {"times": 12, "rodadas": 26, "alvos": {"Playoff Título": [1, 6]}},
     "AUSTRIA 1": {"times": 12, "rodadas": 22, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [12, 12]}},
     "BELGIUM 1": {"times": 16, "rodadas": 30, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [15, 16]}},
     "BRAZIL 1": {"times": 20, "rodadas": 38, "alvos": {"Libertadores": [1, 6], "Pré-Libertadores": [7, 8], "Sul-Americana": [9, 14], "Rebaixamento": [17, 20]}},
     "BRAZIL 2": {"times": 20, "rodadas": 38, "alvos": {"Acesso": [1, 4], "Rebaixamento": [17, 20]}},
+    "BRAZIL 3": {"times": 20, "rodadas": 38, "alvos": {"Acesso": [1, 4], "Rebaixamento": [17, 20]}},
+    "CHILE 1": {"times": 16, "rodadas": 30, "alvos": {"Libertadores": [1, 3], "Sul-Americana": [4, 7], "Rebaixamento": [15, 16]}},
+    "CHINA 1": {"times": 16, "rodadas": 30, "alvos": {"Champions Asia": [1, 3], "Rebaixamento": [15, 16]}},
+    "COPA LIBERTADORES": {"times": 32, "rodadas": 6, "alvos": {"Oitavas de Final": [1, 2]}},
+    "CROATIA 1": {"times": 10, "rodadas": 36, "alvos": {"Champions League": [1, 1], "Conference League": [2, 2], "Rebaixamento": [9, 10]}},
+    "CZECH 1": {"times": 16, "rodadas": 30, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [15, 16]}},
+    "DENMARK 1": {"times": 12, "rodadas": 22, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [11, 12]}},
+    "EGYPT 1": {"times": 18, "rodadas": 34, "alvos": {"Champions Africa": [1, 2], "Rebaixamento": [16, 18]}},
     "ENGLAND 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Europa League": [5, 5], "Conference League": [6, 6], "Rebaixamento": [18, 20]}},
     "ENGLAND 2": {"times": 24, "rodadas": 46, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 6], "Rebaixamento": [22, 24]}},
+    "ENGLAND 3": {"times": 24, "rodadas": 46, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 6], "Rebaixamento": [21, 24]}},
+    "ENGLAND 4": {"times": 24, "rodadas": 46, "alvos": {"Acesso": [1, 3], "Playoff Acesso": [4, 7], "Rebaixamento": [23, 24]}},
+    "FRANCE 1": {"times": 18, "rodadas": 34, "alvos": {"Champions League": [1, 3], "Europa League": [4, 4], "Conference League": [5, 5], "Rebaixamento": [17, 18]}},
+    "FRANCE 2": {"times": 20, "rodadas": 38, "alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 5], "Rebaixamento": [18, 20]}},
+    "GERMANY 1": {"times": 18, "rodadas": 34, "alvos": {"Champions League": [1, 4], "Europa League": [5, 5], "Conference League": [6, 6], "Rebaixamento": [17, 18]}},
+    "ITALY 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Europa League": [5, 5], "Conference League": [6, 6], "Rebaixamento": [18, 20]}},
+    "SPAIN 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Europa League": [5, 6], "Conference League": [7, 7], "Rebaixamento": [18, 20]}},
+    "USA 1": {"times": 29, "rodadas": 34, "alvos": {"Playoffs": [1, 9]}},
 }
 
 def get_objetivo_txt(liga, pos):
@@ -30,11 +46,9 @@ def render_stat_row(label, val_home, val_away):
     col1, col2, col3 = st.columns([1, 2, 1])
     v_h = float(val_home) if pd.notnull(val_home) else 0.0
     v_a = float(val_away) if pd.notnull(val_away) else 0.0
-    
     total = abs(v_h) + abs(v_a)
     p_home = (v_h / total) if total > 0 else 0.5
     p_home = max(0.0, min(1.0, float(p_home)))
-    
     with col1: st.markdown(f"<p style='text-align: right; font-size: 18px; font-weight: bold; margin:0;'>{v_h:.2f}</p>", unsafe_allow_html=True)
     with col2:
         st.markdown(f"<p style='text-align: center; font-size: 11px; color: gray; margin:0;'>{label}</p>", unsafe_allow_html=True)
@@ -79,7 +93,6 @@ def calcular_probabilidades_mercado(df, periodo='FT'):
     n = len(df)
     temp_df = df.copy()
     c_gm, c_gv, c_tg = f'Gols_Mandante_{periodo}', f'Gols_Visitante_{periodo}', f'Total_Gols_{periodo}'
-    
     if c_gm not in temp_df.columns: return pd.DataFrame()
     def perc(cond): return (len(temp_df[cond]) / n) * 100
     mercados = [
@@ -127,34 +140,27 @@ def mostrar_scout(df):
     df_m = filtrar_por_n(df_m, n_jogos)
     df_v = filtrar_por_n(df_v, n_jogos)
 
-    # Lógica de Médias Segura (sem quebrar se a coluna faltar)
-    def get_avg_safe(df_target, team, col_prefix):
-        if f"{col_prefix}_Mandante" not in df_target.columns: return 0.0
-        is_m = df_target['Mandante'] == team
-        return np.where(is_m, df_target[f"{col_prefix}_Mandante"], df_target[f"{col_prefix}_Visitante"]).mean()
-
-    gm_m = get_avg_safe(df_m, m_sel, "Gols_Mandante_FT" if False else "Gols") # Ajustado via lógica interna
-    # Simplificação para o seu arquivo específico:
-    gm_m = np.where(df_m['Mandante']==m_sel, df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']).mean()
-    gm_v = np.where(df_v['Mandante']==v_sel, df_v['Gols_Mandante_FT'], df_v['Gols_Visitante_FT']).mean()
+    # Médias de Gols Seguras
+    gm_m = np.where(df_m['Mandante']==m_sel, df_m.get('Gols_Mandante_FT', 0), df_m.get('Gols_Visitante_FT', 0)).mean()
+    gm_v = np.where(df_v['Mandante']==v_sel, df_v.get('Gols_Mandante_FT', 0), df_v.get('Gols_Visitante_FT', 0)).mean()
     
-    # Cantos e Chutes (Colunas que não existem no seu arquivo, mas mantivemos a funcionalidade visual)
-    ct_m = get_avg_safe(df_m, m_sel, "Cantos") 
-    ct_v = get_avg_safe(df_v, v_sel, "Cantos")
+    # Mantendo placeholders para estatísticas que não existem no parquet (Cantos/Chutes)
+    ct_m, ct_v = 0.0, 0.0 
 
     tab_geral = calcular_tabela_classificacao(df_s)
     ci1, ci2 = st.columns(2)
     for col, t_name in zip([ci1, ci2], [m_sel, v_sel]):
         with col:
-            pos = tab_geral[tab_geral['Time'] == t_name].index[0]+1 if t_name in tab_geral['Time'].values else 0
+            pos_list = tab_geral[tab_geral['Time'] == t_name].index.tolist()
+            pos = pos_list[0]+1 if pos_list else 0
             st.info(f"**{t_name}** | 🏆 {pos}º Lugar - {get_objetivo_txt(liga_sel, pos)}")
 
     with st.container(border=True):
         st.subheader("🔥 Médias de Volume")
         render_stat_row("GOLS MARCADOS FT", gm_m, gm_v)
-        render_stat_row("ESCANTEIOS (Se disp.)", ct_m, ct_v)
+        render_stat_row("ESCANTEIOS (S/ Dados)", ct_m, ct_v)
 
-    t1, t2, t3 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes"])
+    t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes", "⏰ Minutos"])
     
     with t1:
         cf1, cf2 = st.columns(2)
@@ -163,8 +169,9 @@ def mostrar_scout(df):
                 st.write(f"**Últimos de {t_name}**")
                 for _, r in d_h.iterrows():
                     eh_m = (r['Mandante'] == t_name)
-                    res = "✅" if (eh_m and r['Gols_Mandante_FT'] > r['Gols_Visitante_FT']) or (not eh_m and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']) else ("🟧" if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT'] else "❌")
-                    st.write(f"{res} {r['Data'].strftime('%d/%m')} vs {r['Visitante'] if eh_m else r['Mandante']} ({int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])})")
+                    gm_r, gv_r = r.get('Gols_Mandante_FT', 0), r.get('Gols_Visitante_FT', 0)
+                    res = "✅" if (eh_m and gm_r > gv_r) or (not eh_m and gv_r > gm_r) else ("🟧" if gm_r == gv_r else "❌")
+                    st.write(f"{res} {r['Data'].strftime('%d/%m')} vs {r['Visitante'] if eh_m else r['Mandante']} ({int(gm_r)}x{int(gv_r)})")
 
     with t2:
         df_h2h = df[((df['Mandante'] == m_sel) & (df['Visitante'] == v_sel)) | ((df['Mandante'] == v_sel) & (df['Visitante'] == m_sel))].sort_values('Data', ascending=False).head(10)
@@ -173,8 +180,11 @@ def mostrar_scout(df):
     with t3:
         st.write("**Gols FT**")
         ca, cb = st.columns(2)
-        with ca: st.dataframe(calcular_stats_completas(df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']), use_container_width=True)
-        with cb: st.dataframe(calcular_stats_completas(df_v['Gols_Visitante_FT'], df_v['Gols_Mandante_FT']), use_container_width=True)
+        with ca: st.dataframe(calcular_stats_completas(df_m.get('Gols_Mandante_FT', 0), df_m.get('Gols_Visitante_FT', 0)), use_container_width=True)
+        with cb: st.dataframe(calcular_stats_completas(df_v.get('Gols_Visitante_FT', 0), df_v.get('Gols_Mandante_FT', 0)), use_container_width=True)
+
+    with t4:
+        st.warning("Dados de minutos de gol não disponíveis neste arquivo.")
 
     st.divider()
     st.subheader("🎯 Frequência de Mercados")
@@ -184,17 +194,30 @@ def mostrar_scout(df):
         with cp1: st.dataframe(calcular_probabilidades_mercado(df_m, p), use_container_width=True, hide_index=True)
         with cp2: st.dataframe(calcular_probabilidades_mercado(df_v, p), use_container_width=True, hide_index=True)
 
+# --- CARREGAMENTO DE DADOS (CORRIGIDO PARA O SEU LINK) ---
 @st.cache_data(ttl=600)
 def carregar_dados():
+    # Caminho exato que funcionará no seu GitHub
     url_github = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.parquet"
+    
     try:
-        response = requests.get(url_github)
-        return pd.read_parquet(BytesIO(response.content))
+        # Força o download via requests para garantir que o Streamlit Cloud acesse
+        response = requests.get(url_github, timeout=10)
+        if response.status_code == 200:
+            return pd.read_parquet(BytesIO(response.content))
+        else:
+            # Se falhar o link, tenta ler o arquivo se ele estiver na mesma pasta
+            if os.path.exists("dados_25_26.parquet"):
+                return pd.read_parquet("dados_25_26.parquet")
+            return f"Erro de Conexão: Status {response.status_code}"
     except Exception as e:
-        return f"Erro: {e}"
+        return f"Erro crítico ao carregar: {e}"
 
+# Execução final
 df_principal = carregar_dados()
-if not isinstance(df_principal, str):
-    mostrar_scout(df_principal)
-else:
+
+if isinstance(df_principal, str):
     st.error(df_principal)
+    st.info("Dica: Certifique-se de que o arquivo 'dados_25_26.parquet' foi enviado para a raiz do seu repositório no GitHub.")
+else:
+    mostrar_scout(df_principal)
