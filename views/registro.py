@@ -9,11 +9,11 @@ URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
 KEY = "sb_publishable_pM5xDBpqZzo7h5SQqiFcfQ_ixbbydIB"
 supabase = create_client(URL, KEY)
 
+# --- FUNÇÕES DE CARREGAMENTO (COM CACHE DESATIVADO PARA ATUALIZAÇÃO REAL-TIME) ---
 def carregar_aux(tipo, filtro_pais=None):
     try:
         query = supabase.table("config_auxiliares").select("*").eq("tipo", tipo)
         if filtro_pais and filtro_pais != "-":
-            # Remove espaços e coloca em maiúsculo para garantir o match
             query = query.eq("pais_vinculo", filtro_pais.strip().upper())
         res = query.execute()
         return sorted(res.data, key=lambda x: x['nome'])
@@ -29,7 +29,6 @@ def carregar_operadores():
 
 def carregar_paises():
     try:
-        # Busca apenas os países únicos que estão cadastrados como vínculo de alguma LIGA
         res = supabase.table("config_auxiliares").select("pais_vinculo").eq("tipo", "LIGA").execute()
         paises = set([str(item['pais_vinculo']).strip().upper() for item in res.data if item.get('pais_vinculo')])
         return sorted(list(paises))
@@ -39,17 +38,6 @@ def carregar_paises():
 def mostrar_registro(df_csv):
     st.title("📝 Registro de Aposta")
     
-    # Validação de Bancas
-    try:
-        res_b = supabase.table("bancas").select("nome").execute()
-        lista_bancas = [str(b['nome']) for b in res_b.data]
-    except: 
-        lista_bancas = []
-
-    if not lista_bancas:
-        st.warning("⚠️ Cadastre uma Banca primeiro na tela de Bancas!")
-        return
-
     # ------------------------------------------------------------------
     # 1. SEÇÃO: CONFIGURAÇÕES (CADASTRO E EXCLUSÃO)
     # ------------------------------------------------------------------
@@ -63,7 +51,6 @@ def mostrar_registro(df_csv):
         with col_c2:
             nome_novo = st.text_input("Nome (Ex: COLOMBIA 1)", key="nome_cad").strip().upper()
         with col_c3:
-            # Campo obrigatório para LIGA para o filtro funcionar
             pais_v = st.text_input("País Vinculado (Ex: COLOMBIA)", key="pais_cad").strip().upper() if tipo_novo == "LIGA" else None
         
         if st.button("➕ Confirmar Cadastro"):
@@ -75,7 +62,8 @@ def mostrar_registro(df_csv):
                         payload = {"nome": nome_novo, "tipo": tipo_novo, "pais_vinculo": pais_v if pais_v else None}
                         supabase.table("config_auxiliares").insert(payload).execute()
                     st.success(f"{tipo_novo} cadastrado com sucesso!")
-                    time.sleep(1); st.rerun()
+                    time.sleep(1)
+                    st.rerun() # Força a página a recarregar e atualizar as listas
                 except Exception as e: st.error(f"Erro: {e}")
             else: st.warning("Preencha o nome!")
 
@@ -101,8 +89,9 @@ def mostrar_registro(df_csv):
                     else:
                         supabase.table("config_auxiliares").delete().eq("nome", nome_real).eq("tipo", tipo_exc).execute()
                     st.success("Excluído com sucesso!")
-                    time.sleep(1); st.rerun()
-                except Exception as e: st.error(f"Erro ao excluir: {e}")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e: st.error(f"Erro: {e}")
 
     st.markdown("---")
 
@@ -111,23 +100,25 @@ def mostrar_registro(df_csv):
     # ------------------------------------------------------------------
     st.subheader("🎯 Registro Individual")
     
+    # Carregamento das listas
     lista_paises = carregar_paises()
     lista_mercados = [item['nome'] for item in carregar_aux("MERCADO")]
     lista_metodos = [item['nome'] for item in carregar_aux("METODO")]
     lista_operadores = [item['nome'] for item in carregar_operadores()]
 
-    with st.form("form_registro_manual", clear_on_submit=True):
-        l1_c1, l1_c2, l1_c3 = st.columns(3)
-        with l1_c1: data_m = st.date_input("Data da Aposta", datetime.now())
-        with l1_c2: 
-            # Usuário seleciona o País (ex: COLOMBIA)
-            pais_m = st.selectbox("País", ["-"] + lista_paises)
-        with l1_c3: 
-            # Busca ligas que tenham o país acima como vínculo
-            ligas_f = carregar_aux("LIGA", filtro_pais=pais_m) if pais_m != "-" else []
-            lista_ligas_nomes = [item['nome'] for item in ligas_f]
-            liga_m = st.selectbox("Liga", lista_ligas_nomes if lista_ligas_nomes else ["Nenhuma liga encontrada"])
+    # Usamos uma linha fora do formulário para o País para permitir que o selectbox da Liga atualize dinamicamente
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        data_m = st.date_input("Data da Aposta", datetime.now())
+    with col_p2:
+        pais_selecionado = st.selectbox("Selecione o País", ["-"] + lista_paises)
+    with col_p3:
+        # Se um país for selecionado, busca as ligas. Se não, lista vazia.
+        ligas_filtradas = carregar_aux("LIGA", filtro_pais=pais_selecionado) if pais_selecionado != "-" else []
+        nomes_ligas = [item['nome'] for item in ligas_filtradas]
+        liga_selecionada = st.selectbox("Liga", nomes_ligas if nomes_ligas else ["Nenhuma liga cadastrada"])
 
+    with st.form("form_registro_manual", clear_on_submit=True):
         l2_c1, l2_c2, l2_c3 = st.columns(3)
         with l2_c1: mandante_m = st.text_input("Time Mandante")
         with l2_c2: visitante_m = st.text_input("Time Visitante")
@@ -144,14 +135,21 @@ def mostrar_registro(df_csv):
         with l4_c3: operador_m = st.selectbox("Operador", lista_operadores if lista_operadores else ["-"])
 
         l5_c1, l5_c2, l5_c3 = st.columns(3)
+        # Busca bancas
+        try:
+            res_b = supabase.table("bancas").select("nome").execute()
+            lista_bancas = [str(b['nome']) for b in res_b.data]
+        except: lista_bancas = ["-"]
+        
         with l5_c1: banca_m = st.selectbox("Banca", lista_bancas)
         with l5_c2: status_m = st.selectbox("Status Inicial", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
         with l5_c3: obs_m = st.text_input("Observações")
 
         if st.form_submit_button("🚀 Salvar Aposta Individual"):
-            if not mandante_m or not visitante_m or liga_m in ["-", "Nenhuma liga encontrada"]:
-                st.warning("⚠️ Selecione uma LIGA válida e preencha os times.")
+            if not mandante_m or not visitante_m or liga_selecionada == "Nenhuma liga cadastrada":
+                st.warning("⚠️ Verifique se selecionou uma LIGA e preencheu os times.")
             else:
+                # Cálculo de lucro
                 lucro_calc = 0.0
                 if status_m == "Green": lucro_calc = stake_m * (odd_m - 1)
                 elif status_m == "Meio Green": lucro_calc = (stake_m * (odd_m - 1)) / 2
@@ -159,7 +157,7 @@ def mostrar_registro(df_csv):
                 elif status_m == "Meio Red": lucro_calc = -stake_m / 2
 
                 dados = {
-                    "data": str(data_m), "banca_nome": banca_m, "liga": liga_m, "pais": pais_m,
+                    "data": str(data_m), "banca_nome": banca_m, "liga": liga_selecionada, "pais": pais_selecionado,
                     "mandante": mandante_m, "visitante": visitante_m, "mercado": mercado_m,
                     "linha": linha_m, "metodo": metodo_m, "stake": float(stake_m),
                     "odd": float(odd_m), "status": status_m, "lucro": float(lucro_calc),
@@ -167,8 +165,8 @@ def mostrar_registro(df_csv):
                 }
                 try:
                     supabase.table("apostas").insert(dados).execute()
-                    st.success("✅ Aposta salva com sucesso!"); time.sleep(1); st.rerun()
-                except Exception as e: st.error(f"Erro ao salvar: {e}")
+                    st.success("✅ Aposta salva!"); time.sleep(1); st.rerun()
+                except Exception as e: st.error(f"Erro: {e}")
 
     st.markdown("---")
 
@@ -176,7 +174,7 @@ def mostrar_registro(df_csv):
     # 3. SEÇÃO: REGISTRO EM MASSA (CSV)
     # ------------------------------------------------------------------
     with st.expander("📤 REGISTRO EM MASSA (CSV)"):
-        arquivo_massa = st.file_uploader("Selecione o arquivo CSV", type=["csv"])
+        arquivo_massa = st.file_uploader("Arquivo CSV", type=["csv"])
         if arquivo_massa:
             try:
                 df_m = pd.read_csv(arquivo_massa, sep=None, engine='python', encoding='utf-8-sig')
@@ -202,5 +200,5 @@ def mostrar_registro(df_csv):
                             "banca_nome": str(row.get('banca_nome', '')), "obs": str(row.get('obs', ''))
                         }
                         supabase.table("apostas").insert(d).execute()
-                    st.success("🏁 Importação concluída!"); time.sleep(1); st.rerun()
+                    st.success("Importação concluída!"); st.rerun()
             except Exception as e: st.error(f"Erro no CSV: {e}")
