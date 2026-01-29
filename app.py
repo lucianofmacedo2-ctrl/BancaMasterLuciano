@@ -26,7 +26,7 @@ styles.apply_styles()
 
 def carregar_dados_csv():
     try:
-        df = pd.read_csv('dados_25_26.csv')
+        df = pd.read_csv('dados_25_26.parquet')
         df.columns = [c.strip() for c in df.columns] 
         return df
     except Exception as e:
@@ -69,7 +69,7 @@ elif st.session_state.menu_ativo == "🔎 Scout":
     if not df_csv.empty:
         scout.mostrar_scout(df_csv)
     else:
-        st.error("Arquivo 'dados_25_26.csv' não encontrado.")
+        st.error("Arquivo 'dados_25_26.parquet' não encontrado.")
 elif st.session_state.menu_ativo == "🧪 Backtest":
     backtest.mostrar_backtest()
 elif st.session_state.menu_ativo == "📝 Registro":
@@ -80,3 +80,4 @@ elif st.session_state.menu_ativo == "🏦 Bancas":
     bancas.mostrar_bancas()
 elif st.session_state.menu_ativo == "🎯 Metas":
     metas.mostrar_metas()
+
