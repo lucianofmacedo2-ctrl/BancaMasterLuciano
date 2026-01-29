@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import os
 
 # --- DICIONÁRIO DE REGRAS COMPLETO ---
 REGRAS_LIGAS = {
@@ -93,10 +94,7 @@ def calcular_probabilidades_mercado(df, periodo='FT'):
     if df.empty: return pd.DataFrame()
     n = len(df)
     temp_df = df.copy()
-
-    # Lógica de extração de dados por período
     if periodo == 'ST':
-        # Cálculo: ST = FT - HT
         c_gm, c_gv = 'Gols_Mandante_ST_Calc', 'Gols_Visitante_ST_Calc'
         temp_df[c_gm] = temp_df['Gols_Mandante_FT'] - temp_df['Gols_Mandante_HT']
         temp_df[c_gv] = temp_df['Gols_Visitante_FT'] - temp_df['Gols_Visitante_HT']
@@ -106,9 +104,7 @@ def calcular_probabilidades_mercado(df, periodo='FT'):
         c_gm, c_gv, c_tg = f'Gols_Mandante_{periodo}', f'Gols_Visitante_{periodo}', f'Total_Gols_{periodo}'
     
     if c_gm not in temp_df.columns: return pd.DataFrame()
-
     def perc(cond): return (len(temp_df[cond]) / n) * 100
-    
     mercados = [
         {"Mercado": f"0,5 {periodo}", "% Batido": perc(temp_df[c_tg] >= 0.5)},
         {"Mercado": f"1,5 {periodo}", "% Batido": perc(temp_df[c_tg] >= 1.5)},
@@ -258,3 +254,20 @@ def mostrar_scout(df):
             st.write(f"**{v_sel}**")
             st.dataframe(calcular_probabilidades_mercado(df_v, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
 
+# --- BLOCO PRINCIPAL: CARREGAMENTO DOS DADOS ---
+# Tenta carregar localmente, se não conseguir, carrega do GitHub
+PATH_LOCAL = "dados_25_26.parquet"
+URL_GITHUB = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/dados_25_26.parquet"
+
+try:
+    if os.path.exists(PATH_LOCAL):
+        df_principal = pd.read_parquet(PATH_LOCAL)
+    else:
+        df_principal = pd.read_parquet(URL_GITHUB)
+    
+    # Chama a função principal para mostrar a tela
+    mostrar_scout(df_principal)
+
+except Exception as e:
+    st.error(f"Erro ao carregar o arquivo: {e}")
+    st.info("Certifique-se de que o arquivo 'dados_25_26.parquet' está na pasta raiz do GitHub.")
