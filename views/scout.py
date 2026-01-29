@@ -257,3 +257,4 @@ def mostrar_scout(df):
         with cp2:
             st.write(f"**{v_sel}**")
             st.dataframe(calcular_probabilidades_mercado(df_v, p).style.format({"% Batido": "{:.1f}%"}).background_gradient(cmap="RdYlGn", vmin=0, vmax=100), use_container_width=True, hide_index=True)
+
