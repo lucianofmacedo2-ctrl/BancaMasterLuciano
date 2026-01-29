@@ -4,7 +4,7 @@ from datetime import datetime
 
 # Links dos arquivos
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
-ARQUIVO_HISTORICO = 'dados_25_26.csv'
+ARQUIVO_HISTORICO = 'dados_25_26.parquet'
 
 def carregar_dados():
     try:
