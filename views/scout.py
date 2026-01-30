@@ -4,16 +4,12 @@ import numpy as np
 import os
 import requests
 from io import BytesIO
+import time
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Scout Profissional - Banca Master", layout="wide")
+st.set_page_config(page_title="Scout Banca Master", layout="wide")
 
-# Limpar cache se as ligas não estiverem batendo com o CSV novo
-if st.sidebar.button("🔄 Atualizar Base de Dados"):
-    st.cache_data.clear()
-    st.rerun()
-
-# --- DICIONÁRIO DE REGRAS (Preservado conforme solicitado) ---
+# --- REGRAS DAS LIGAS (Preservadas) ---
 REGRAS_LIGAS = {
     "BRAZIL 1": {"times": 20, "rodadas": 38, "alvos": {"Libertadores": [1, 6], "Rebaixamento": [17, 20]}},
     "ENGLAND 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Rebaixamento": [18, 20]}},
@@ -60,25 +56,16 @@ def calcular_tabela_classificacao(df_liga):
     df_tab['SG'] = df_tab['GP'] - df_tab['GC']
     return df_tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
 
-def calcular_stats_completas(serie_f, serie_s):
-    def get_metrics(s):
-        s = pd.to_numeric(pd.Series(s), errors='coerce').fillna(0)
-        m = s.mean(); dp = s.std() if len(s) > 1 else 0.0
-        cv = (dp / m * 100) if m > 0 else 0.0
-        return {"Média": m, "DP": dp, "CV%": cv}
-    return pd.DataFrame({"Marcados": get_metrics(serie_f), "Sofridos": get_metrics(serie_s)}).T
-
 def mostrar_scout(df):
     st.title("🚀 Scout Profissional - Banca Master")
 
-    # --- GARANTIA DE CAPTURA DE TODAS AS LIGAS ---
-    df['Liga'] = df['Liga'].astype(str).str.strip().str.upper()
-    
-    # Criar lista de ligas garantindo que Portugal 3 e outras estejam nela
-    listagem_ligas = sorted(df['Liga'].unique().tolist())
+    # --- FORÇAR RECONHECIMENTO DE TODAS AS LIGAS ---
+    # Limpa nomes, remove nulos e garante que Portugal 3 apareça
+    df['Liga'] = df['Liga'].astype(str).str.strip()
+    listagem_ligas = sorted([l for l in df['Liga'].unique() if l != 'nan' and l != 'None'])
     
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", listagem_ligas)
+    liga_sel = c1.selectbox("Selecione a Liga", listagem_ligas, index=0)
     
     df_liga = df[df['Liga'] == liga_sel].copy()
     temps = sorted(df_liga['Temporada'].astype(str).unique().tolist(), reverse=True)
@@ -88,7 +75,6 @@ def mostrar_scout(df):
     df_s['Data'] = pd.to_datetime(df_s['Data'], errors='coerce')
     
     times = sorted(df_s['Mandante'].unique().tolist())
-    
     m_sel = st.selectbox("Mandante", times)
     v_sel = st.selectbox("Visitante", [t for t in times if t != m_sel])
 
@@ -101,7 +87,6 @@ def mostrar_scout(df):
     df_m = get_form(m_sel)
     df_v = get_form(v_sel)
 
-    # --- MÉTRICAS ---
     st.divider()
     st.subheader("📊 Médias de Desempenho (FT)")
     
@@ -113,42 +98,51 @@ def mostrar_scout(df):
                     np.where(df_m['Mandante']==m_sel, df_m.get('Cantos_Mandante_FT', 0), df_m.get('Cantos_Visitante_FT', 0)).mean(),
                     np.where(df_v['Mandante']==v_sel, df_v.get('Cantos_Mandante_FT', 0), df_v.get('Cantos_Visitante_FT', 0)).mean())
 
-    # --- ABAS (Tudo preservado e funcionando) ---
+    # --- ABAS ---
     t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes", "⏰ Minutos"])
     
     with t1:
-        col_a, col_b = st.columns(2)
-        col_a.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
-        col_b.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
+        c_a, c_b = st.columns(2)
+        c_a.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
+        c_b.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
 
     with t2:
         h2h = df[((df['Mandante'] == m_sel) & (df['Visitante'] == v_sel)) | ((df['Mandante'] == v_sel) & (df['Visitante'] == m_sel))].sort_values('Data', ascending=False)
         st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True, hide_index=True)
 
     with t3:
-        st.table(calcular_stats_completas(df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']))
+        def calc_stats(s1, s2):
+            m = s1.mean(); dp = s1.std() if len(s1)>1 else 0
+            return pd.DataFrame({"Média": [m], "DP": [dp]}, index=["Marcados"])
+        st.table(calc_stats(df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']))
 
     with t4:
         minutos = ['0-15_Mandante', '16-30_Mandante', '31-45+_Mandante', '46-60_Mandante', '61-75_Mandante', '76-90+_Mandante']
         st.bar_chart(df_m[minutos].mean())
 
-# --- CARREGADOR SEM CACHE ANTIGO ---
-@st.cache_data(ttl=1) # Cache de 1 segundo força a leitura do arquivo novo
+# --- CARREGAMENTO FORÇADO ---
+@st.cache_data(ttl=5) # Cache de apenas 5 segundos
 def carregar_dados():
-    url = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv"
+    # Usando timestamp para enganar o cache do navegador/github
+    url = f"https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv?v={time.time()}"
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=15)
         if response.status_code == 200:
-            return pd.read_csv(BytesIO(response.content), sep=',', on_bad_lines='skip')
+            return pd.read_csv(BytesIO(response.content))
     except:
         pass
     if os.path.exists("dados_25_26.csv"):
-        return pd.read_csv("dados_25_26.csv", sep=',', on_bad_lines='skip')
+        return pd.read_csv("dados_25_26.csv")
     return None
+
+# Botão na lateral para garantir o reset
+if st.sidebar.button("🗑️ Limpar Tudo e Recarregar"):
+    st.cache_data.clear()
+    st.rerun()
 
 df_principal = carregar_dados()
 
 if df_principal is not None:
     mostrar_scout(df_principal)
 else:
-    st.error("Erro ao carregar o arquivo CSV.")
+    st.error("Erro ao localizar o arquivo CSV.")
