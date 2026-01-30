@@ -11,7 +11,6 @@ REGRAS_LIGAS = {
     "BRAZIL 1": {"times": 20, "rodadas": 38, "alvos": {"Libertadores": [1, 6], "Rebaixamento": [17, 20]}},
     "ENGLAND 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Rebaixamento": [18, 20]}},
     "ENGLAND 2": {"times": 24, "rodadas": 46, "alvos": {"Acesso": [1, 2], "Playoff": [3, 6]}},
-    # Adicione outras conforme sua necessidade
 }
 
 def get_objetivo_txt(liga, pos):
@@ -54,32 +53,10 @@ def calcular_tabela_classificacao(df_liga):
     df_tab['SG'] = df_tab['GP'] - df_tab['GC']
     return df_tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
 
-def calcular_stats_completas(serie_f, serie_s):
-    def get_metrics(s):
-        s = pd.to_numeric(pd.Series(s), errors='coerce').fillna(0)
-        m = s.mean(); dp = s.std() if len(s) > 1 else 0.0
-        cv = (dp / m * 100) if m > 0 else 0.0
-        return {"Média": m, "DP": dp, "CV%": cv}
-    return pd.DataFrame({"Marcados": get_metrics(serie_f), "Sofridos": get_metrics(serie_s)}).T
-
-def calcular_probabilidades_mercado(df, periodo='FT'):
-    if df.empty: return pd.DataFrame()
-    n = len(df)
-    c_gm, c_gv, c_tg = f'Gols_Mandante_{periodo}', f'Gols_Visitante_{periodo}', f'Total_Gols_{periodo}'
-    if c_gm not in df.columns: return pd.DataFrame()
-    def perc(cond): return (len(df[cond]) / n) * 100
-    mercados = [
-        {"Mercado": f"0,5 {periodo}", "% Batido": perc(df[c_tg] >= 0.5)},
-        {"Mercado": f"1,5 {periodo}", "% Batido": perc(df[c_tg] >= 1.5)},
-        {"Mercado": f"BTTS {periodo}", "% Batido": perc((df[c_gm] > 0) & (df[c_gv] > 0))},
-    ]
-    return pd.DataFrame(mercados)
-
 def mostrar_scout(df):
     st.title("🚀 Scout Profissional - Banca Master")
-    df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
     
-    # --- FILTROS LATERAIS ---
+    # Filtros
     ligas = sorted(df['Liga'].unique())
     c1, c2 = st.columns(2)
     liga_sel = c1.selectbox("Liga", ligas)
@@ -88,9 +65,8 @@ def mostrar_scout(df):
     df_s = df[(df['Liga'] == liga_sel) & (df['Temporada'] == temp_sel)].copy()
     times = sorted(df_s['Mandante'].unique())
     
-    c3, c4 = st.columns(2)
-    m_sel = c3.selectbox("Mandante", times)
-    v_sel = c4.selectbox("Visitante", [t for t in times if t != m_sel])
+    m_sel = st.selectbox("Mandante", times)
+    v_sel = st.selectbox("Visitante", [t for t in times if t != m_sel])
 
     n_jogos = st.radio("Quantidade de Jogos", ["5", "10", "Todos"], index=1, horizontal=True)
     
@@ -101,93 +77,72 @@ def mostrar_scout(df):
     df_m = get_form(m_sel)
     df_v = get_form(v_sel)
 
-    # --- MÉTRICAS DE VOLUME (Usando as colunas reais) ---
+    # --- MÉTRICAS COM COLUNAS REAIS ---
     st.divider()
-    st.subheader("🔥 Médias por Partida")
+    st.subheader("📊 Médias de Desempenho (FT)")
     
     # Gols
     gm_m = np.where(df_m['Mandante']==m_sel, df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']).mean()
     gm_v = np.where(df_v['Mandante']==v_sel, df_v['Gols_Mandante_FT'], df_v['Gols_Visitante_FT']).mean()
-    render_stat_row("GOLS MARCADOS FT", gm_m, gm_v)
+    render_stat_row("GOLS MARCADOS", gm_m, gm_v)
 
     # Cantos (Escanteios)
     ct_m = np.where(df_m['Mandante']==m_sel, df_m.get('Cantos_Mandante_FT', 0), df_m.get('Cantos_Visitante_FT', 0)).mean()
     ct_v = np.where(df_v['Mandante']==v_sel, df_v.get('Cantos_Mandante_FT', 0), df_v.get('Cantos_Visitante_FT', 0)).mean()
-    render_stat_row("CANTOS FT", ct_m, ct_v)
+    render_stat_row("CANTOS (ESCANTEIOS)", ct_m, ct_v)
 
-    # xG (Expected Goals)
+    # xG
     xg_m = np.where(df_m['Mandante']==m_sel, df_m.get('xG_Mandante', 0), df_m.get('xG_Visitante', 0)).mean()
     xg_v = np.where(df_v['Mandante']==v_sel, df_v.get('xG_Mandante', 0), df_v.get('xG_Visitante', 0)).mean()
     render_stat_row("EXPECTED GOALS (xG)", xg_m, xg_v)
 
-    # --- ABAS DE DETALHES ---
-    t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Mercados", "⏰ Minutos"])
-    
+    # Cartões
+    ca_m = np.where(df_m['Mandante']==m_sel, df_m.get('Cartao_Amarelo_Mandante', 0), df_m.get('Cartao_Amarelo_Visitante', 0)).mean()
+    ca_v = np.where(df_v['Mandante']==v_sel, df_v.get('Cartao_Amarelo_Mandante', 0), df_v.get('Cartao_Amarelo_Visitante', 0)).mean()
+    render_stat_row("CARTÕES AMARELOS", ca_m, ca_v)
+
+    # Abas
+    t1, t2, t3 = st.tabs(["🕒 Últimos Jogos", "⚔️ H2H", "🎯 Mercados"])
     with t1:
-        cm, cv = st.columns(2)
-        with cm:
-            st.write(f"Últimos de {m_sel}")
-            st.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
-        with cv:
-            st.write(f"Últimos de {v_sel}")
-            st.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
+        col1, col2 = st.columns(2)
+        col1.write(f"Histórico {m_sel}")
+        col1.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
+        col2.write(f"Histórico {v_sel}")
+        col2.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
 
-    with t2:
-        h2h = df[((df['Mandante'] == m_sel) & (df['Visitante'] == v_sel)) | ((df['Mandante'] == v_sel) & (df['Visitante'] == m_sel))].sort_values('Data', ascending=False)
-        st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
-
-    with t3:
-        st.subheader("Probabilidades de Mercado")
-        cp_m, cp_v = st.columns(2)
-        with cp_m: 
-            st.write(m_sel)
-            st.dataframe(calcular_probabilidades_mercado(df_m, 'FT'), hide_index=True)
-        with cp_v: 
-            st.write(v_sel)
-            st.dataframe(calcular_probabilidades_mercado(df_v, 'FT'), hide_index=True)
-
-    with t4:
-        st.info("Distribuição de Gols por Minuto (Média Geral)")
-        # Exemplo de uso das colunas de minutos
-        st.write(f"Minutos Gols {m_sel}:", df_m[df_m['Mandante']==m_sel]['0-15_Mandante'].mean())
-
-# --- FUNÇÃO DE CARREGAMENTO ULTRA-RESISTENTE ---
-@st.cache_data(ttl=600)
+# --- CARREGAMENTO DO ARQUIVO (SISTEMA DE SEGURANÇA) ---
+@st.cache_data(ttl=300)
 def carregar_dados():
-    # Caminho Raw do GitHub
-    url_raw = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/dados_25_26.parquet"
+    # URL RAW Direta do GitHub
+    url = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.parquet"
     
-    # 1. Tenta baixar via URL Raw
+    # Tentativa 1: Download Direto
     try:
-        r = requests.get(url_raw, timeout=15)
-        if r.status_code == 200:
-            return pd.read_parquet(BytesIO(r.content))
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            return pd.read_parquet(BytesIO(response.content))
     except:
         pass
 
-    # 2. Tenta ler da pasta local (raiz do projeto)
-    try:
-        if os.path.exists("dados_25_26.parquet"):
-            return pd.read_parquet("dados_25_26.parquet")
-    except:
-        pass
+    # Tentativa 2: Ler da pasta raiz (Streamlit Cloud)
+    caminhos_possiveis = ["dados_25_26.parquet", "views/dados_25_26.parquet", "../dados_25_26.parquet"]
+    for caminho in caminhos_possiveis:
+        if os.path.exists(caminho):
+            return pd.read_parquet(caminho)
     
     return None
 
-# --- EXECUÇÃO ---
+# Execução
 df_principal = carregar_dados()
 
 if df_principal is not None:
     mostrar_scout(df_principal)
 else:
-    st.error("Não conseguimos localizar o arquivo 'dados_25_26.parquet'.")
-    st.markdown("""
-    **Como resolver:**
-    1. Verifique se o nome do arquivo no GitHub é exatamente `dados_25_26.parquet`.
-    2. Certifique-se que o repositório é Público.
-    """)
-    # Fallback: Upload manual caso tudo falhe
-    uploaded = st.file_uploader("Ou suba o arquivo manualmente aqui:", type="parquet")
+    st.error("❌ ERRO: O ficheiro 'dados_25_26.parquet' não foi encontrado.")
+    st.info("O sistema tentou baixar do GitHub e procurar nas pastas locais, mas falhou.")
+    
+    # Fallback: Upload Manual para o utilizador não ficar parado
+    uploaded = st.sidebar.file_uploader("Faça upload do arquivo .parquet manualmente aqui:", type="parquet")
     if uploaded:
         df_manual = pd.read_parquet(uploaded)
         mostrar_scout(df_manual)
