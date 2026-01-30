@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
+import numpy as np  # Adicionado para corrigir o NameError
 from datetime import datetime, timedelta
 
 # Links dos arquivos
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
 
-def mostrar_jogos(df_hist): # Agora aceita o df_hist vindo do app.py
+def mostrar_jogos(df_hist): 
     st.title("📅 Agenda de Jogos")
 
     with st.expander("💡 Entenda os Sinais de Alerta (Radar de Valor)", expanded=True):
@@ -71,16 +72,12 @@ def mostrar_jogos(df_hist): # Agora aceita o df_hist vindo do app.py
                 tem_gol = False
                 tem_canto = False
                 
-                # --- LÓGICA DE ALERTAS (ATUALIZADA PARA AS NOVAS COLUNAS) ---
                 if not df_hist.empty:
                     df_m = df_hist[df_hist['Mandante'] == mandante]
                     df_v = df_hist[df_hist['Visitante'] == visitante]
                     
                     if not df_m.empty and not df_v.empty:
-                        # Média de Gols Total (Mandante e Visitante)
                         m_gols = (df_m['Total_Gols_FT'].mean() + df_v['Total_Gols_FT'].mean()) / 2
-                        
-                        # Média de Cantos (Usando Corners_H e Corners_A se existirem)
                         col_c_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
                         col_c_a = 'Corners_A' if 'Corners_A' in df_hist.columns else 'Cantos_Visitante'
                         
@@ -91,13 +88,11 @@ def mostrar_jogos(df_hist): # Agora aceita o df_hist vindo do app.py
                         
                         if m_gols > 2.5: tem_gol = True
 
-                # Formatação dos Ícones
                 icones = ""
                 if tem_gol and tem_canto: icones = " 🔥⚽🚩"
                 elif tem_gol: icones = " 🔥⚽"
                 elif tem_canto: icones = " 🔥🚩"
 
-                # --- LÓGICA DE ODDS E EQUILÍBRIO ---
                 odd_m = row.get('Odd Mandante', 0)
                 odd_e = row.get('Odd Empate', 0)
                 odd_v = row.get('Odd Visitante', 0)
@@ -122,7 +117,6 @@ def mostrar_jogos(df_hist): # Agora aceita o df_hist vindo do app.py
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-    # --- RANKING TOP 5 (AJUSTADO PARA NOVAS COLUNAS) ---
     if not df_hist.empty and times_no_dia:
         st.divider()
         st.subheader(f"📊 Rankings de Performance - {st.session_state.data_exibicao}")
@@ -130,7 +124,6 @@ def mostrar_jogos(df_hist): # Agora aceita o df_hist vindo do app.py
         times_dia_unicos = list(set(times_no_dia))
         rank_data = []
 
-        # Identificar colunas corretas de Chutes e Cantos
         col_ch_h = 'ShotsOnTarget_H' if 'ShotsOnTarget_H' in df_hist.columns else 'Chutes_Gol_Mandante'
         col_ch_a = 'ShotsOnTarget_A' if 'ShotsOnTarget_A' in df_hist.columns else 'Chutes_Gol_Visitante'
         col_cn_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
@@ -139,14 +132,11 @@ def mostrar_jogos(df_hist): # Agora aceita o df_hist vindo do app.py
         for t in times_dia_unicos:
             df_t = df_hist[(df_hist['Mandante'] == t) | (df_hist['Visitante'] == t)]
             if not df_t.empty:
-                # Gols Marcados e Sofridos
                 gm = np.where(df_t['Mandante']==t, df_t['Gols_Mandante_FT'], df_t['Gols_Visitante_FT']).mean()
                 gs = np.where(df_t['Mandante']==t, df_t['Gols_Visitante_FT'], df_t['Gols_Mandante_FT']).mean()
-                # Gols HT
                 gm_ht = np.where(df_t['Mandante']==t, df_t['Gols_Mandante_HT'], df_t['Gols_Visitante_HT']).mean()
                 gs_ht = np.where(df_t['Mandante']==t, df_t['Gols_Visitante_HT'], df_t['Gols_Mandante_HT']).mean()
                 
-                # Cantos e Chutes (se colunas existirem)
                 cm = 0; chm = 0
                 if col_cn_h in df_hist.columns:
                     cm = np.where(df_t['Mandante']==t, df_t[col_cn_h], df_t[col_cn_a]).mean()
