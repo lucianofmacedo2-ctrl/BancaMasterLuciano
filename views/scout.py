@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# --- DICIONÁRIO DE REGRAS ---
+# --- DICIONÁRIO DE REGRAS (Preservado e Completo) ---
 REGRAS_LIGAS = {
     "BRAZIL 1": {"times": 20, "rodadas": 38, "alvos": {"Libertadores": [1, 6], "Rebaixamento": [17, 20]}},
     "PORTUGAL 3": {"times": 20, "rodadas": 26, "alvos": {"Acesso": [1, 2]}},
@@ -25,22 +25,27 @@ def mostrar_scout(df):
     st.title("🔎 Scout Profissional")
 
     if df.empty:
-        st.warning("Nenhum dado encontrado no CSV.")
+        st.warning("O DataFrame está vazio.")
         return
 
-    # Forçar detecção de todas as ligas
-    df['Liga'] = df['Liga'].astype(str).str.strip()
-    listagem_ligas = sorted(df['Liga'].unique().tolist())
-
-    # Barra lateral de diagnóstico para conferir se Portugal 3 entrou
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🔎 Detalhes do Arquivo")
-    st.sidebar.write(f"Ligas detectadas: {len(listagem_ligas)}")
+    # Garante que as ligas sejam lidas sem erros de espaço ou caixa alta
+    df['Liga'] = df['Liga'].astype(str).str.strip().str.upper()
     
+    # Captura absolutamente todas as ligas únicas no arquivo
+    listagem_ligas = sorted([l for l in df['Liga'].unique() if l != 'NAN' and l != 'NONE'])
+
+    # Painel de Controle Lateral (Diagnóstico)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Info da Base")
+    st.sidebar.write(f"Ligas carregadas: {len(listagem_ligas)}")
+    
+    # Verifica se Portugal 3 está na memória
     if "PORTUGAL 3" in listagem_ligas:
-        st.sidebar.success("✅ PORTUGAL 3 disponível!")
+        st.sidebar.success("✅ Portugal 3 encontrada!")
     else:
-        st.sidebar.error("❌ PORTUGAL 3 não encontrada no CSV.")
+        st.sidebar.error("❌ Portugal 3 ainda não lida.")
+        # Mostra as primeiras 5 ligas para conferência
+        st.sidebar.write("Algumas ligas lidas:", listagem_ligas[:5])
 
     c1, c2 = st.columns(2)
     liga_sel = c1.selectbox("Selecione a Liga", listagem_ligas)
@@ -55,40 +60,36 @@ def mostrar_scout(df):
     times = sorted(df_s['Mandante'].unique().tolist())
     
     if len(times) < 2:
-        st.info("Selecione uma liga com jogos registrados.")
+        st.info("Aguardando mais dados para esta liga.")
         return
 
-    m_sel = st.selectbox("Time Mandante", times)
-    v_sel = st.selectbox("Time Visitante", [t for t in times if t != m_sel])
+    m_sel = st.selectbox("Mandante", times)
+    v_sel = st.selectbox("Visitante", [t for t in times if t != m_sel])
 
-    # Filtragem de Formas
+    # Filtragem das Formas (Últimos 10 jogos)
     df_m = df_s[(df_s['Mandante'] == m_sel) | (df_s['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(10)
     df_v = df_s[(df_s['Mandante'] == v_sel) | (df_s['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(10)
 
     st.divider()
-    st.subheader(f"📊 {m_sel} vs {v_sel}")
-
+    
     # Médias de Gols
     avg_m = np.where(df_m['Mandante'] == m_sel, df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']).mean()
     avg_v = np.where(df_v['Mandante'] == v_sel, df_v['Gols_Mandante_FT'], df_v['Gols_Visitante_FT']).mean()
-    render_stat_row("MÉDIA GOLS MARCADOS", avg_m, avg_v)
+    render_stat_row("MÉDIA GOLS MARCADOS (10 JOGOS)", avg_m, avg_v)
 
     # Abas
-    t1, t2, t3 = st.tabs(["🕒 Últimos Jogos", "⚔️ Confrontos Diretos", "📊 Estatísticas"])
+    t1, t2, t3 = st.tabs(["🕒 Forma Recente", "⚔️ H2H", "📊 Estatísticas"])
     
     with t1:
         col_m, col_v = st.columns(2)
-        col_m.write(f"Últimos 10 de {m_sel}")
+        col_m.write(f"Últimos de {m_sel}")
         col_m.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
-        col_v.write(f"Últimos 10 de {v_sel}")
+        col_v.write(f"Últimos de {v_sel}")
         col_v.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
 
     with t2:
         h2h = df[((df['Mandante'] == m_sel) & (df['Visitante'] == v_sel)) | ((df['Mandante'] == v_sel) & (df['Visitante'] == m_sel))].sort_values('Data', ascending=False)
-        if not h2h.empty:
-            st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True, hide_index=True)
-        else:
-            st.write("Nenhum confronto direto recente.")
+        st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
 
     with t3:
         st.table(df_m[['Gols_Mandante_FT', 'Gols_Visitante_FT', 'Total_Gols_FT']].describe().T)
