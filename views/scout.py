@@ -114,21 +114,21 @@ def mostrar_scout(df):
 @st.cache_data(ttl=300)
 def carregar_dados():
     # URL RAW Direta do GitHub
-    url = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.parquet"
+    url = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv"
     
     # Tentativa 1: Download Direto
     try:
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            return pd.read_parquet(BytesIO(response.content))
+            return pd.read_csv(BytesIO(response.content))
     except:
         pass
 
     # Tentativa 2: Ler da pasta raiz (Streamlit Cloud)
-    caminhos_possiveis = ["dados_25_26.parquet", "views/dados_25_26.parquet", "../dados_25_26.parquet"]
+    caminhos_possiveis = ["dados_25_26.csv", "views/dados_25_26.csv", "../dados_25_26.csv"]
     for caminho in caminhos_possiveis:
         if os.path.exists(caminho):
-            return pd.read_parquet(caminho)
+            return pd.read_csv(caminho)
     
     return None
 
@@ -138,11 +138,12 @@ df_principal = carregar_dados()
 if df_principal is not None:
     mostrar_scout(df_principal)
 else:
-    st.error("❌ ERRO: O ficheiro 'dados_25_26.parquet' não foi encontrado.")
+    st.error("❌ ERRO: O ficheiro 'dados_25_26.csv' não foi encontrado.")
     st.info("O sistema tentou baixar do GitHub e procurar nas pastas locais, mas falhou.")
     
     # Fallback: Upload Manual para o utilizador não ficar parado
-    uploaded = st.sidebar.file_uploader("Faça upload do arquivo .parquet manualmente aqui:", type="parquet")
+    uploaded = st.sidebar.file_uploader("Faça upload do arquivo .csv manualmente aqui:", type="csv")
     if uploaded:
-        df_manual = pd.read_parquet(uploaded)
+        df_manual = pd.read_csv(uploaded)
         mostrar_scout(df_manual)
+
