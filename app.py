@@ -9,22 +9,11 @@ import time
 from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest
 import styles
 
-def realizar_backup():
-    pasta_data = "data"
-    pasta_backup = "backups"
-    if not os.path.exists(pasta_data): return
-    if not os.path.exists(pasta_backup): os.makedirs(pasta_backup)
-    data_hoje = datetime.now().strftime("%Y-%m-%d")
-    arquivo_zip = os.path.join(pasta_backup, f"backup_{data_hoje}")
-    if not os.path.exists(arquivo_zip + ".zip"):
-        try: shutil.make_archive(arquivo_zip, 'zip', pasta_data)
-        except Exception as e: print(f"Erro no backup: {e}")
-
-realizar_backup()
-
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Master Luciano - Banca", layout="wide", page_icon="⚽")
 styles.apply_styles()
 
+# --- FUNÇÃO DE CARREGAMENTO DE DADOS ---
 @st.cache_data(ttl=60)
 def carregar_dados_csv():
     url = f"https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv?v={time.time()}"
@@ -43,18 +32,41 @@ def carregar_dados_csv():
 
 df_csv = carregar_dados_csv()
 
+# --- SIDEBAR E NAVEGAÇÃO ---
 st.sidebar.title("🏆 Master Luciano")
+if st.sidebar.button("🔄 Atualizar Dados"):
+    st.cache_data.clear()
+    st.rerun()
 
 opcoes_menu = ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "🧪 Backtest", "📝 Registro", "📂 Histórico", "🏦 Bancas", "🎯 Metas"]
-
 if 'menu_ativo' not in st.session_state:
     st.session_state.menu_ativo = "📊 Dashboard"
 
 menu = st.sidebar.radio("Navegação", opcoes_menu, index=opcoes_menu.index(st.session_state.menu_ativo))
 st.session_state.menu_ativo = menu
 
+# --- RENDERIZAÇÃO DAS PÁGINAS (CORRIGIDO) ---
 if st.session_state.menu_ativo == "🔎 Scout":
     scout.mostrar_scout(df_csv)
+
 elif st.session_state.menu_ativo == "📊 Dashboard":
     dashboard.mostrar_dashboard()
-# ... (demais elifs mantidos conforme seu app.py original)
+
+elif st.session_state.menu_ativo == "📅 Jogos":
+    # Aqui estava o erro: a página Jogos precisa do df_csv para filtrar as partidas
+    jogos.mostrar_jogos(df_csv) 
+
+elif st.session_state.menu_ativo == "📝 Registro":
+    registro.mostrar_registro(df_csv)
+
+elif st.session_state.menu_ativo == "📂 Histórico":
+    historico.mostrar_historico()
+
+elif st.session_state.menu_ativo == "🏦 Bancas":
+    bancas.mostrar_bancas()
+
+elif st.session_state.menu_ativo == "🎯 Metas":
+    metas.mostrar_metas()
+
+elif st.session_state.menu_ativo == "🧪 Backtest":
+    backtest.mostrar_backtest()
