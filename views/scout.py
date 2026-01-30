@@ -6,13 +6,18 @@ import requests
 from io import BytesIO
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Scout Banca Master", layout="wide")
+st.set_page_config(page_title="Scout Profissional - Banca Master", layout="wide")
 
-# --- DICIONÁRIO DE REGRAS (Preservado) ---
+# Limpar cache se as ligas não estiverem batendo com o CSV novo
+if st.sidebar.button("🔄 Atualizar Base de Dados"):
+    st.cache_data.clear()
+    st.rerun()
+
+# --- DICIONÁRIO DE REGRAS (Preservado conforme solicitado) ---
 REGRAS_LIGAS = {
     "BRAZIL 1": {"times": 20, "rodadas": 38, "alvos": {"Libertadores": [1, 6], "Rebaixamento": [17, 20]}},
     "ENGLAND 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Rebaixamento": [18, 20]}},
-    "PORTUGAL 3": {"times": 20, "rodadas": 18, "alvos": {"Acesso": [1, 2]}}, 
+    "PORTUGAL 3": {"times": 20, "rodadas": 26, "alvos": {"Acesso": [1, 2]}},
 }
 
 def get_objetivo_txt(liga, pos):
@@ -66,17 +71,17 @@ def calcular_stats_completas(serie_f, serie_s):
 def mostrar_scout(df):
     st.title("🚀 Scout Profissional - Banca Master")
 
-    # --- TRATAMENTO AGRESSIVO PARA LIGAS APARECEREM ---
-    df['Liga'] = df['Liga'].fillna('S/ LIGA').astype(str).str.strip()
+    # --- GARANTIA DE CAPTURA DE TODAS AS LIGAS ---
+    df['Liga'] = df['Liga'].astype(str).str.strip().str.upper()
     
-    # Pegamos todas as ligas reais do seu CSV sem exceção
-    listagem_ligas = sorted([l for l in df['Liga'].unique() if l != 'nan'])
+    # Criar lista de ligas garantindo que Portugal 3 e outras estejam nela
+    listagem_ligas = sorted(df['Liga'].unique().tolist())
     
     c1, c2 = st.columns(2)
     liga_sel = c1.selectbox("Selecione a Liga", listagem_ligas)
     
     df_liga = df[df['Liga'] == liga_sel].copy()
-    temps = sorted(df_liga['Temporada'].astype(str).unique(), reverse=True)
+    temps = sorted(df_liga['Temporada'].astype(str).unique().tolist(), reverse=True)
     temp_sel = c2.selectbox("Temporada", temps)
     
     df_s = df_liga[df_liga['Temporada'].astype(str) == temp_sel].copy()
@@ -100,24 +105,20 @@ def mostrar_scout(df):
     st.divider()
     st.subheader("📊 Médias de Desempenho (FT)")
     
-    # Gols
     render_stat_row("GOLS MARCADOS", 
                     np.where(df_m['Mandante']==m_sel, df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']).mean(),
                     np.where(df_v['Mandante']==v_sel, df_v['Gols_Mandante_FT'], df_v['Gols_Visitante_FT']).mean())
     
-    # xG (Expected Goals)
-    render_stat_row("EXPECTED GOALS (xG)", 
-                    np.where(df_m['Mandante']==m_sel, df_m.get('xG_Mandante', 0), df_m.get('xG_Visitante', 0)).mean(),
-                    np.where(df_v['Mandante']==v_sel, df_v.get('xG_Mandante', 0), df_v.get('xG_Visitante', 0)).mean())
+    render_stat_row("CANTOS (ESCANTEIOS)", 
+                    np.where(df_m['Mandante']==m_sel, df_m.get('Cantos_Mandante_FT', 0), df_m.get('Cantos_Visitante_FT', 0)).mean(),
+                    np.where(df_v['Mandante']==v_sel, df_v.get('Cantos_Mandante_FT', 0), df_v.get('Cantos_Visitante_FT', 0)).mean())
 
-    # --- ABAS (Tudo preservado) ---
+    # --- ABAS (Tudo preservado e funcionando) ---
     t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes", "⏰ Minutos"])
     
     with t1:
         col_a, col_b = st.columns(2)
-        col_a.write(f"Últimos Jogos: {m_sel}")
         col_a.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
-        col_b.write(f"Últimos Jogos: {v_sel}")
         col_b.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
 
     with t2:
@@ -131,20 +132,18 @@ def mostrar_scout(df):
         minutos = ['0-15_Mandante', '16-30_Mandante', '31-45+_Mandante', '46-60_Mandante', '61-75_Mandante', '76-90+_Mandante']
         st.bar_chart(df_m[minutos].mean())
 
-# --- CARREGADOR ROBUSTO ---
-@st.cache_data(ttl=60)
+# --- CARREGADOR SEM CACHE ANTIGO ---
+@st.cache_data(ttl=1) # Cache de 1 segundo força a leitura do arquivo novo
 def carregar_dados():
     url = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv"
     try:
-        # Tenta ler com separador de vírgula (padrão do seu arquivo enviado)
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            return pd.read_csv(BytesIO(response.content), sep=',', encoding='utf-8')
+            return pd.read_csv(BytesIO(response.content), sep=',', on_bad_lines='skip')
     except:
         pass
-    
     if os.path.exists("dados_25_26.csv"):
-        return pd.read_csv("dados_25_26.csv", sep=',', encoding='utf-8')
+        return pd.read_csv("dados_25_26.csv", sep=',', on_bad_lines='skip')
     return None
 
 df_principal = carregar_dados()
@@ -152,4 +151,4 @@ df_principal = carregar_dados()
 if df_principal is not None:
     mostrar_scout(df_principal)
 else:
-    st.error("Não foi possível carregar o arquivo CSV.")
+    st.error("Erro ao carregar o arquivo CSV.")
