@@ -4,12 +4,11 @@ import numpy as np
 import os
 import requests
 from io import BytesIO
-import time
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
+# --- CONFIGURAÇÃO ---
 st.set_page_config(page_title="Scout Banca Master", layout="wide")
 
-# --- REGRAS DAS LIGAS (Preservadas) ---
+# --- DICIONÁRIO DE REGRAS (Preservado) ---
 REGRAS_LIGAS = {
     "BRAZIL 1": {"times": 20, "rodadas": 38, "alvos": {"Libertadores": [1, 6], "Rebaixamento": [17, 20]}},
     "ENGLAND 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Rebaixamento": [18, 20]}},
@@ -59,15 +58,19 @@ def calcular_tabela_classificacao(df_liga):
 def mostrar_scout(df):
     st.title("🚀 Scout Profissional - Banca Master")
 
-    # --- FORÇAR RECONHECIMENTO DE TODAS AS LIGAS ---
-    # Limpa nomes, remove nulos e garante que Portugal 3 apareça
+    # --- FORÇAR RECONHECIMENTO TOTAL ---
+    # Convertemos tudo para string e limpamos espaços para garantir que Portugal 3 apareça
     df['Liga'] = df['Liga'].astype(str).str.strip()
-    listagem_ligas = sorted([l for l in df['Liga'].unique() if l != 'nan' and l != 'None'])
+    
+    # Criamos a lista de ligas pegando TODOS os valores únicos presentes na coluna
+    todas_ligas = sorted(df['Liga'].unique().tolist())
     
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", listagem_ligas, index=0)
+    liga_sel = c1.selectbox("Selecione a Liga", todas_ligas)
     
+    # Filtragem por liga selecionada
     df_liga = df[df['Liga'] == liga_sel].copy()
+    
     temps = sorted(df_liga['Temporada'].astype(str).unique().tolist(), reverse=True)
     temp_sel = c2.selectbox("Temporada", temps)
     
@@ -111,32 +114,31 @@ def mostrar_scout(df):
         st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True, hide_index=True)
 
     with t3:
-        def calc_stats(s1, s2):
-            m = s1.mean(); dp = s1.std() if len(s1)>1 else 0
-            return pd.DataFrame({"Média": [m], "DP": [dp]}, index=["Marcados"])
-        st.table(calc_stats(df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']))
+        def calc_stats(s1):
+            return pd.DataFrame({"Média": [s1.mean()], "Máximo": [s1.max()]}, index=["Gols"])
+        st.table(calc_stats(df_m['Gols_Mandante_FT']))
 
     with t4:
         minutos = ['0-15_Mandante', '16-30_Mandante', '31-45+_Mandante', '46-60_Mandante', '61-75_Mandante', '76-90+_Mandante']
         st.bar_chart(df_m[minutos].mean())
 
-# --- CARREGAMENTO FORÇADO ---
-@st.cache_data(ttl=5) # Cache de apenas 5 segundos
+# --- CARREGAMENTO DEFINITIVO ---
+@st.cache_data(ttl=2)
 def carregar_dados():
-    # Usando timestamp para enganar o cache do navegador/github
-    url = f"https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv?v={time.time()}"
+    url = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv"
     try:
+        # IMPORTANTE: Forçamos as colunas de texto para garantir que as ligas novas sejam lidas
         response = requests.get(url, timeout=15)
         if response.status_code == 200:
-            return pd.read_csv(BytesIO(response.content))
+            return pd.read_csv(BytesIO(response.content), dtype={'Liga': str, 'Temporada': str, 'Mandante': str, 'Visitante': str})
     except:
         pass
     if os.path.exists("dados_25_26.csv"):
-        return pd.read_csv("dados_25_26.csv")
+        return pd.read_csv("dados_25_26.csv", dtype={'Liga': str, 'Temporada': str})
     return None
 
-# Botão na lateral para garantir o reset
-if st.sidebar.button("🗑️ Limpar Tudo e Recarregar"):
+# Botão de reset na sidebar
+if st.sidebar.button("♻️ Recarregar Ligas do CSV"):
     st.cache_data.clear()
     st.rerun()
 
@@ -145,4 +147,4 @@ df_principal = carregar_dados()
 if df_principal is not None:
     mostrar_scout(df_principal)
 else:
-    st.error("Erro ao localizar o arquivo CSV.")
+    st.error("Não foi possível ler o arquivo. Verifique se ele está no GitHub.")
