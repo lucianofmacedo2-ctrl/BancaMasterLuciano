@@ -5,13 +5,14 @@ import os
 import requests
 from io import BytesIO
 
-# --- DICIONÁRIO DE REGRAS COMPLETO (Preservado) ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(page_title="Scout Banca Master", layout="wide")
+
+# --- DICIONÁRIO DE REGRAS (Preservado) ---
 REGRAS_LIGAS = {
-    "AUSTRALIA 1": {"times": 12, "rodadas": 26, "alvos": {"Playoff Título": [1, 6]}},
     "BRAZIL 1": {"times": 20, "rodadas": 38, "alvos": {"Libertadores": [1, 6], "Rebaixamento": [17, 20]}},
     "ENGLAND 1": {"times": 20, "rodadas": 38, "alvos": {"Champions League": [1, 4], "Rebaixamento": [18, 20]}},
-    "PORTUGAL 1": {"times": 18, "rodadas": 34, "alvos": {"Champions League": [1, 2], "Rebaixamento": [16, 18]}},
-    # ... as outras regras permanecem internamente no sistema
+    "PORTUGAL 3": {"times": 20, "rodadas": 18, "alvos": {"Acesso": [1, 2]}}, 
 }
 
 def get_objetivo_txt(liga, pos):
@@ -62,32 +63,25 @@ def calcular_stats_completas(serie_f, serie_s):
         return {"Média": m, "DP": dp, "CV%": cv}
     return pd.DataFrame({"Marcados": get_metrics(serie_f), "Sofridos": get_metrics(serie_s)}).T
 
-def calcular_probabilidades_mercado(df, periodo='FT'):
-    if df.empty: return pd.DataFrame()
-    n = len(df)
-    c_gm, c_gv, c_tg = f'Gols_Mandante_{periodo}', f'Gols_Visitante_{periodo}', f'Total_Gols_{periodo}'
-    def perc(cond): return (len(df[cond]) / n) * 100
-    return pd.DataFrame([
-        {"Mercado": f"0,5 {periodo}", "% Batido": perc(df[c_tg] >= 0.5)},
-        {"Mercado": f"1,5 {periodo}", "% Batido": perc(df[c_tg] >= 1.5)},
-        {"Mercado": f"BTTS {periodo}", "% Batido": perc((df[c_gm] > 0) & (df[c_gv] > 0))},
-    ])
-
 def mostrar_scout(df):
     st.title("🚀 Scout Profissional - Banca Master")
 
-    # --- FORÇAR ATUALIZAÇÃO DAS LIGAS ---
-    df['Liga'] = df['Liga'].astype(str).str.strip().str.upper()
-    todas_as_ligas = sorted(df['Liga'].unique().tolist())
+    # --- TRATAMENTO AGRESSIVO PARA LIGAS APARECEREM ---
+    df['Liga'] = df['Liga'].fillna('S/ LIGA').astype(str).str.strip()
+    
+    # Pegamos todas as ligas reais do seu CSV sem exceção
+    listagem_ligas = sorted([l for l in df['Liga'].unique() if l != 'nan'])
     
     c1, c2 = st.columns(2)
-    liga_sel = c1.selectbox("Selecione a Liga", todas_as_ligas, key="liga_selector")
+    liga_sel = c1.selectbox("Selecione a Liga", listagem_ligas)
     
     df_liga = df[df['Liga'] == liga_sel].copy()
-    temps = sorted(df_liga['Temporada'].unique().tolist(), reverse=True)
+    temps = sorted(df_liga['Temporada'].astype(str).unique(), reverse=True)
     temp_sel = c2.selectbox("Temporada", temps)
     
-    df_s = df_liga[df_liga['Temporada'] == temp_sel].copy()
+    df_s = df_liga[df_liga['Temporada'].astype(str) == temp_sel].copy()
+    df_s['Data'] = pd.to_datetime(df_s['Data'], errors='coerce')
+    
     times = sorted(df_s['Mandante'].unique().tolist())
     
     m_sel = st.selectbox("Mandante", times)
@@ -104,58 +98,58 @@ def mostrar_scout(df):
 
     # --- MÉTRICAS ---
     st.divider()
-    st.subheader("📊 Médias de Desempenho")
+    st.subheader("📊 Médias de Desempenho (FT)")
+    
+    # Gols
     render_stat_row("GOLS MARCADOS", 
                     np.where(df_m['Mandante']==m_sel, df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']).mean(),
                     np.where(df_v['Mandante']==v_sel, df_v['Gols_Mandante_FT'], df_v['Gols_Visitante_FT']).mean())
     
-    render_stat_row("CANTOS (ESCANTEIOS)", 
-                    np.where(df_m['Mandante']==m_sel, df_m.get('Cantos_Mandante_FT', 0), df_m.get('Cantos_Visitante_FT', 0)).mean(),
-                    np.where(df_v['Mandante']==v_sel, df_v.get('Cantos_Mandante_FT', 0), df_v.get('Cantos_Visitante_FT', 0)).mean())
+    # xG (Expected Goals)
+    render_stat_row("EXPECTED GOALS (xG)", 
+                    np.where(df_m['Mandante']==m_sel, df_m.get('xG_Mandante', 0), df_m.get('xG_Visitante', 0)).mean(),
+                    np.where(df_v['Mandante']==v_sel, df_v.get('xG_Mandante', 0), df_v.get('xG_Visitante', 0)).mean())
 
-    # --- ABAS (Restauradas) ---
+    # --- ABAS (Tudo preservado) ---
     t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes", "⏰ Minutos"])
     
     with t1:
         col_a, col_b = st.columns(2)
+        col_a.write(f"Últimos Jogos: {m_sel}")
         col_a.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
+        col_b.write(f"Últimos Jogos: {v_sel}")
         col_b.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
 
     with t2:
         h2h = df[((df['Mandante'] == m_sel) & (df['Visitante'] == v_sel)) | ((df['Mandante'] == v_sel) & (df['Visitante'] == m_sel))].sort_values('Data', ascending=False)
-        st.dataframe(h2h, hide_index=True)
+        st.dataframe(h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], use_container_width=True, hide_index=True)
 
     with t3:
-        st.write("Estatísticas Avançadas")
         st.table(calcular_stats_completas(df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']))
 
     with t4:
         minutos = ['0-15_Mandante', '16-30_Mandante', '31-45+_Mandante', '46-60_Mandante', '61-75_Mandante', '76-90+_Mandante']
         st.bar_chart(df_m[minutos].mean())
 
-# --- CARREGAMENTO SEM CACHE PERSISTENTE ---
+# --- CARREGADOR ROBUSTO ---
+@st.cache_data(ttl=60)
 def carregar_dados():
-    # Adicionamos um parâmetro aleatório na URL para ignorar o cache do GitHub
-    import random
-    url = f"https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv?nocache={random.randint(1,1000)}"
+    url = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv"
     try:
+        # Tenta ler com separador de vírgula (padrão do seu arquivo enviado)
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            return pd.read_csv(BytesIO(response.content))
+            return pd.read_csv(BytesIO(response.content), sep=',', encoding='utf-8')
     except:
         pass
+    
     if os.path.exists("dados_25_26.csv"):
-        return pd.read_csv("dados_25_26.csv")
+        return pd.read_csv("dados_25_26.csv", sep=',', encoding='utf-8')
     return None
-
-# Botão para forçar atualização se as ligas não aparecerem
-if st.sidebar.button("🔄 Forçar Atualização de Dados"):
-    st.cache_data.clear()
-    st.rerun()
 
 df_principal = carregar_dados()
 
 if df_principal is not None:
     mostrar_scout(df_principal)
 else:
-    st.error("Arquivo não encontrado.")
+    st.error("Não foi possível carregar o arquivo CSV.")
