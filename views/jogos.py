@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import numpy as np  # Adicionado para corrigir o NameError
+import numpy as np
 from datetime import datetime, timedelta
 
 # Links dos arquivos
@@ -117,6 +117,7 @@ def mostrar_jogos(df_hist):
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
+    # --- RANKINGS DE PERFORMANCE EXPANDIDOS ---
     if not df_hist.empty and times_no_dia:
         st.divider()
         st.subheader(f"📊 Rankings de Performance - {st.session_state.data_exibicao}")
@@ -124,38 +125,66 @@ def mostrar_jogos(df_hist):
         times_dia_unicos = list(set(times_no_dia))
         rank_data = []
 
-        col_ch_h = 'ShotsOnTarget_H' if 'ShotsOnTarget_H' in df_hist.columns else 'Chutes_Gol_Mandante'
-        col_ch_a = 'ShotsOnTarget_A' if 'ShotsOnTarget_A' in df_hist.columns else 'Chutes_Gol_Visitante'
-        col_cn_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
-        col_cn_a = 'Corners_A' if 'Corners_A' in df_hist.columns else 'Cantos_Visitante'
+        # Mapeamento dinâmico de colunas
+        c_cn_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
+        c_cn_a = 'Corners_A' if 'Corners_A' in df_hist.columns else 'Cantos_Visitante'
+        c_cn_ht_h = 'Corners_HT_H' if 'Corners_HT_H' in df_hist.columns else None
+        c_cn_ht_a = 'Corners_HT_A' if 'Corners_HT_A' in df_hist.columns else None
+        c_sh_h = 'Shots_H' if 'Shots_H' in df_hist.columns else 'Finalizacoes_Mandante'
+        c_sh_a = 'Shots_A' if 'Shots_A' in df_hist.columns else 'Finalizacoes_Visitante'
+        c_cd_h = 'Cards_Total_H' if 'Cards_Total_H' in df_hist.columns else 'Cartoes_Mandante'
+        c_cd_a = 'Cards_Total_A' if 'Cards_Total_A' in df_hist.columns else 'Cartoes_Visitante'
 
         for t in times_dia_unicos:
             df_t = df_hist[(df_hist['Mandante'] == t) | (df_hist['Visitante'] == t)]
             if not df_t.empty:
-                gm = np.where(df_t['Mandante']==t, df_t['Gols_Mandante_FT'], df_t['Gols_Visitante_FT']).mean()
-                gs = np.where(df_t['Mandante']==t, df_t['Gols_Visitante_FT'], df_t['Gols_Mandante_FT']).mean()
-                gm_ht = np.where(df_t['Mandante']==t, df_t['Gols_Mandante_HT'], df_t['Gols_Visitante_HT']).mean()
-                gs_ht = np.where(df_t['Mandante']==t, df_t['Gols_Visitante_HT'], df_t['Gols_Mandante_HT']).mean()
+                # Função interna para calcular Feitos e Sofridos
+                def get_fs(df_local, time_ref, col_h, col_a):
+                    if col_h not in df_local.columns: return 0.0, 0.0
+                    f = np.where(df_local['Mandante']==time_ref, df_local[col_h], df_local[col_a]).mean()
+                    s = np.where(df_local['Mandante']==time_ref, df_local[col_a], df_local[col_h]).mean()
+                    return f, s
+
+                gm_f, gm_s = get_fs(df_t, t, 'Gols_Mandante_FT', 'Gols_Visitante_FT')
+                ght_f, ght_s = get_fs(df_t, t, 'Gols_Mandante_HT', 'Gols_Visitante_HT')
+                cn_f, cn_s = get_fs(df_t, t, c_cn_h, c_cn_a)
+                sh_f, sh_s = get_fs(df_t, t, c_sh_h, c_sh_a)
+                cd_f, cd_s = get_fs(df_t, t, c_cd_h, c_cd_a)
                 
-                cm = 0; chm = 0
-                if col_cn_h in df_hist.columns:
-                    cm = np.where(df_t['Mandante']==t, df_t[col_cn_h], df_t[col_cn_a]).mean()
-                if col_ch_h in df_hist.columns:
-                    chm = np.where(df_t['Mandante']==t, df_t[col_ch_h], df_t[col_ch_a]).mean()
+                # Cantos HT (Opcional)
+                cnht_f, cnht_s = (0, 0)
+                if c_cn_ht_h: cnht_f, cnht_s = get_fs(df_t, t, c_cn_ht_h, c_cn_ht_a)
 
                 rank_data.append({
                     "Time": t,
-                    "Gols FT M": gm, "Gols FT S": gs,
-                    "Gols HT M": gm_ht, "Gols HT S": gs_ht,
-                    "Cantos M": cm, "Chutes M": chm
+                    "Gols FT F": gm_f, "Gols FT S": gm_s,
+                    "Gols HT F": ght_f, "Gols HT S": ght_s,
+                    "Cantos FT F": cn_f, "Cantos FT S": cn_s,
+                    "Cantos HT F": cnht_f, "Cantos HT S": cnht_s,
+                    "Chutes F": sh_f, "Chutes S": sh_s,
+                    "Cartões F": cd_f, "Cartões S": cd_s
                 })
         
         if rank_data:
             df_rank = pd.DataFrame(rank_data)
-            c_rank1, c_rank2 = st.columns(2)
-            with c_rank1:
-                st.markdown("#### ⚽ Top Gols FT (Marcados)")
-                st.dataframe(df_rank.sort_values("Gols FT M", ascending=False).head(5)[["Time", "Gols FT M"]], hide_index=True)
-            with c_rank2:
-                st.markdown("#### 🚩 Top Cantos (Médias)")
-                st.dataframe(df_rank.sort_values("Cantos M", ascending=False).head(5)[["Time", "Cantos M"]], hide_index=True)
+            
+            def plot_rank_cols(titulo, col_f, col_s):
+                st.markdown(f"#### {titulo}")
+                c_a, c_b = st.columns(2)
+                with c_a:
+                    st.caption("🔝 Maiores Médias (Feitos)")
+                    st.dataframe(df_rank.sort_values(col_f, ascending=False).head(5)[["Time", col_f]], hide_index=True, use_container_width=True)
+                with c_b:
+                    st.caption("⚠️ Maiores Médias (Sofridos)")
+                    st.dataframe(df_rank.sort_values(col_s, ascending=False).head(5)[["Time", col_s]], hide_index=True, use_container_width=True)
+
+            # Renderização das Categorias Pedidas
+            plot_rank_cols("⚽ Gols FT (Jogo Todo)", "Gols FT F", "Gols FT S")
+            plot_rank_cols("⏱️ Gols HT (1º Tempo)", "Gols HT F", "Gols HT S")
+            plot_rank_cols("🚩 Cantos FT (Escanteios)", "Cantos FT F", "Cantos FT S")
+            
+            if c_cn_ht_h:
+                plot_rank_cols("🚩 Cantos HT (1º Tempo)", "Cantos HT F", "Cantos HT S")
+            
+            plot_rank_cols("👟 Chutes (Finalizações)", "Chutes F", "Chutes S")
+            plot_rank_cols("🟨 Cartões (Total)", "Cartões F", "Cartões S")
