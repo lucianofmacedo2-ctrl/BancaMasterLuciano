@@ -5,7 +5,7 @@ import os
 import requests
 from io import BytesIO
 
-# --- DICIONÁRIO DE REGRAS COMPLETO (Preservado) ---
+# --- DICIONÁRIO DE REGRAS COMPLETO (Preservado e Intacto) ---
 REGRAS_LIGAS = {
     "AUSTRALIA 1": {"times": 12, "rodadas": 26, "alvos": {"Playoff Título": [1, 6]}},
     "AUSTRIA 1": {"times": 12, "rodadas": 22, "alvos": {"Champions League": [1, 1], "Europa League": [2, 2], "Conference League": [3, 3], "Rebaixamento": [12, 12]}},
@@ -110,11 +110,20 @@ def mostrar_scout(df):
     st.markdown("<style>.golden-container { border: 2px solid #FFD700; border-radius: 10px; padding: 15px; background-color: rgba(255, 215, 0, 0.05); margin-bottom: 20px;}</style>", unsafe_allow_html=True)
     st.title("🚀 Scout Profissional - Banca Master")
 
+    # --- LIMPEZA PARA GARANTIR TODAS AS LIGAS ---
+    df['Liga'] = df['Liga'].astype(str).str.strip()
+    df['Temporada'] = df['Temporada'].astype(str).str.strip()
     df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+    
+    # Lista todas as ligas únicas do CSV
     ligas_list = sorted(df['Liga'].unique())
+    
     c1, c2 = st.columns(2)
     liga_sel = c1.selectbox("Selecione a Liga", ligas_list)
-    temp_sel = c2.selectbox("Temporada", sorted(df[df['Liga'] == liga_sel]['Temporada'].unique(), reverse=True))
+    
+    # Filtra temporadas baseadas na liga selecionada
+    temps_disponiveis = sorted(df[df['Liga'] == liga_sel]['Temporada'].unique(), reverse=True)
+    temp_sel = c2.selectbox("Temporada", temps_disponiveis)
     
     df_s = df[(df['Liga'] == liga_sel) & (df['Temporada'] == temp_sel)].copy()
     times_liga = sorted(df_s['Mandante'].unique())
@@ -139,7 +148,7 @@ def mostrar_scout(df):
     df_m = filtrar_por_n(df_m, n_jogos)
     df_v = filtrar_por_n(df_v, n_jogos)
 
-    # --- MÉTRICAS COM COLUNAS REAIS ---
+    # --- MÉTRICAS (Cantos, xG, etc.) ---
     st.subheader("🔥 Médias de Volume por Partida")
     gm_m = np.where(df_m['Mandante']==m_sel, df_m['Gols_Mandante_FT'], df_m['Gols_Visitante_FT']).mean()
     gm_v = np.where(df_v['Mandante']==v_sel, df_v['Gols_Mandante_FT'], df_v['Gols_Visitante_FT']).mean()
@@ -153,7 +162,7 @@ def mostrar_scout(df):
     xg_v = np.where(df_v['Mandante']==v_sel, df_v.get('xG_Mandante', 0), df_v.get('xG_Visitante', 0)).mean()
     render_stat_row("EXPECTED GOALS (xG)", xg_m, xg_v)
 
-    # --- TABELA DE CLASSIFICAÇÃO ---
+    # --- CLASSIFICAÇÃO ---
     tab_geral = calcular_tabela_classificacao(df_s)
     ci1, ci2 = st.columns(2)
     for col, t_name in zip([ci1, ci2], [m_sel, v_sel]):
@@ -162,7 +171,7 @@ def mostrar_scout(df):
             pos = pos_list[0]+1 if pos_list else 0
             st.info(f"**{t_name}** | 🏆 {pos}º Lugar - {get_objetivo_txt(liga_sel, pos)}")
 
-    # --- ABAS DE DETALHES RESTAURADAS ---
+    # --- ABAS DE DETALHES ---
     t1, t2, t3, t4 = st.tabs(["🕒 Forma", "⚔️ H2H", "📊 Detalhes", "⏰ Minutos"])
     
     with t1:
@@ -186,22 +195,18 @@ def mostrar_scout(df):
     with t3:
         st.write("**Estatísticas de Gols FT**")
         ca, cb = st.columns(2)
-        with ca: 
-            st.write(f"Médias {m_sel}")
-            st.dataframe(calcular_stats_completas(df_m.get('Gols_Mandante_FT', 0), df_m.get('Gols_Visitante_FT', 0)), use_container_width=True)
-        with cb: 
-            st.write(f"Médias {v_sel}")
-            st.dataframe(calcular_stats_completas(df_v.get('Gols_Visitante_FT', 0), df_v.get('Gols_Mandante_FT', 0)), use_container_width=True)
+        with ca: st.dataframe(calcular_stats_completas(df_m.get('Gols_Mandante_FT', 0), df_m.get('Gols_Visitante_FT', 0)), use_container_width=True)
+        with cb: st.dataframe(calcular_stats_completas(df_v.get('Gols_Visitante_FT', 0), df_v.get('Gols_Mandante_FT', 0)), use_container_width=True)
 
     with t4:
         st.subheader("⏰ Distribuição de Gols (Minutos)")
-        col_m1, col_v1 = st.columns(2)
         minutos_cols = ['0-15_Mandante', '16-30_Mandante', '31-45+_Mandante', '46-60_Mandante', '61-75_Mandante', '76-90+_Mandante']
-        with col_m1:
-            st.write(m_sel)
+        cm1, cv1 = st.columns(2)
+        with cm1: 
+            st.write(f"Gols de {m_sel}")
             st.bar_chart(df_m[minutos_cols].mean())
-        with col_v1:
-            st.write(v_sel)
+        with cv1: 
+            st.write(f"Gols de {v_sel}")
             st.bar_chart(df_v[[c.replace('Mandante', 'Visitante') for c in minutos_cols]].mean())
 
     st.divider()
@@ -213,7 +218,7 @@ def mostrar_scout(df):
         with cp2: st.dataframe(calcular_probabilidades_mercado(df_v, p), use_container_width=True, hide_index=True)
 
 # --- CARREGAMENTO DO ARQUIVO (SISTEMA DE SEGURANÇA CSV) ---
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def carregar_dados():
     url = "https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv"
     try:
@@ -222,10 +227,8 @@ def carregar_dados():
             return pd.read_csv(BytesIO(response.content))
     except:
         pass
-    caminhos_possiveis = ["dados_25_26.csv", "views/dados_25_26.csv", "../dados_25_26.csv"]
-    for caminho in caminhos_possiveis:
-        if os.path.exists(caminho):
-            return pd.read_csv(caminho)
+    if os.path.exists("dados_25_26.csv"):
+        return pd.read_csv("dados_25_26.csv")
     return None
 
 df_principal = carregar_dados()
@@ -234,7 +237,3 @@ if df_principal is not None:
     mostrar_scout(df_principal)
 else:
     st.error("❌ ERRO: O ficheiro 'dados_25_26.csv' não foi encontrado.")
-    uploaded = st.sidebar.file_uploader("Faça upload do arquivo .csv manualmente aqui:", type="csv")
-    if uploaded:
-        df_manual = pd.read_csv(uploaded)
-        mostrar_scout(df_manual)
