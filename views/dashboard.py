@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 from supabase import create_client
 from datetime import datetime, date, timedelta
-import pytz # Adicionado para fuso horário
+import pytz 
 import calendar
 
 # --- CONFIGURAÇÃO SUPABASE ---
@@ -40,10 +40,16 @@ def mostrar_dashboard():
         return
 
     if not df_ap.empty:
-        # CONVERSÃO DE DATA COM FUSO HORÁRIO
+        # CONVERSÃO DE DATA CORRIGIDA PARA EVITAR TYPEERROR
         df_ap['data'] = pd.to_datetime(df_ap['data'])
-        # Converte para o fuso do Brasil caso venha com timezone do banco
-        df_ap['data'] = df_ap['data'].dt.tz_convert(brasil_tz).dt.tz_localize(None)
+        
+        # Verifica se a coluna de data já tem fuso horário
+        if df_ap['data'].dt.tz is None:
+            # Se não tem fuso (naive), localizamos como UTC e depois convertemos para Brasil
+            df_ap['data'] = df_ap['data'].dt.tz_localize('UTC').dt.tz_convert(brasil_tz).dt.tz_localize(None)
+        else:
+            # Se já tem fuso, apenas convertemos para Brasil
+            df_ap['data'] = df_ap['data'].dt.tz_convert(brasil_tz).dt.tz_localize(None)
 
     # --- FILTROS ---
     c_f1, c_f2 = st.columns(2)
@@ -53,12 +59,12 @@ def mostrar_dashboard():
     with c_f2:
         tipo_filtro = st.radio("Tipo de Filtro de Data:", ["Intervalo", "Dia Único"], horizontal=True)
         
-        # Pega a data de hoje correta no Brasil
+        # Data de hoje correta no Brasil
         hoje_br = datetime.now(brasil_tz).date()
         
         if not df_ap.empty:
-            d_min, d_max = df_ap['data'].min().date(), df_ap['data'].max().date()
-            # Garante que o default não passe de hoje no fuso BR
+            d_min = df_ap['data'].min().date()
+            d_max = df_ap['data'].max().date()
             d_max_default = min(d_max, hoje_br)
         else:
             d_min, d_max_default = hoje_br, hoje_br
@@ -95,7 +101,6 @@ def mostrar_dashboard():
     lucro_total = df_f['lucro'].sum() if not df_f.empty else 0
     greens_df = df_f[df_f['status'].str.contains('Green', na=False)]
     reds_df = df_f[df_f['status'].str.contains('Red', na=False)]
-    devolvidas_df = df_f[df_f['status'].str.contains('Devolvida', na=False)]
     
     total_apostas = len(df_f)
     win_rate = (len(greens_df) / total_apostas * 100) if total_apostas > 0 else 0
@@ -117,18 +122,12 @@ def mostrar_dashboard():
 
     # --- GRÁFICOS ---
     if not df_f.empty:
-        # Evolução Patrimonial
         df_ev = df_f.sort_values('data')
         df_ev['Evolução'] = s_ini + df_ev['lucro'].cumsum()
         st.plotly_chart(px.line(df_ev, x='data', y='Evolução', title="Curva de Património", markers=True), use_container_width=True)
 
-        # Performance por Método
-        st.subheader("🏆 Performance por Método (Top 5 Melhores vs Piores)")
-        df_met = df_f.groupby('metodo').agg({
-            'lucro': 'sum',
-            'stake': 'sum'
-        }).reset_index()
-        
+        st.subheader("🏆 Performance por Método")
+        df_met = df_f.groupby('metodo').agg({'lucro': 'sum', 'stake': 'sum'}).reset_index()
         df_met['ROI %'] = (df_met['lucro'] / df_met['stake']) * 100
         
         melhores = df_met.nlargest(5, 'lucro')
@@ -136,21 +135,16 @@ def mostrar_dashboard():
         df_top10 = pd.concat([melhores, piores]).drop_duplicates().sort_values(by="lucro", ascending=False)
         
         fig_met = px.bar(
-            df_top10, 
-            x='metodo', 
-            y='lucro', 
-            color='ROI %',
+            df_top10, x='metodo', y='lucro', color='ROI %',
             text=df_top10['ROI %'].apply(lambda x: f"ROI: {x:.1f}%"),
-            title="Lucro por Método (Barras) e ROI % (Cores)",
+            title="Lucro por Método e ROI %",
             color_continuous_scale="RdYlGn"
         )
         st.plotly_chart(fig_met, use_container_width=True)
 
-        # Distribuição de Odds
         st.divider()
         st.subheader("🎯 Distribuição de Odds dos Greens")
         fig_odd = px.histogram(greens_df, x="odd", nbins=15, title="Onde estão seus acertos?", color_discrete_sequence=['#002b5c'])
         st.plotly_chart(fig_odd, use_container_width=True)
-
     else:
         st.info("Nenhuma aposta encontrada para este filtro.")
