@@ -82,7 +82,6 @@ def mostrar_dashboard():
     lucro_total = df_f['lucro'].sum() if not df_f.empty else 0
     greens_df = df_f[df_f['status'].str.contains('Green', na=False)]
     reds_df = df_f[df_f['status'].str.contains('Red', na=False)]
-    devolvidas_df = df_f[df_f['status'].str.contains('Devolvida', na=False)]
     
     total_apostas = len(df_f)
     win_rate = (len(greens_df) / total_apostas * 100) if total_apostas > 0 else 0
@@ -106,44 +105,41 @@ def mostrar_dashboard():
     st.divider()
     st.subheader("👤 Performance por Operador")
     
-    operadores_alvo = ["Douglas", "Fabio", "Fernando", "Luciano"]
-    
     if not df_f.empty and 'operador' in df_f.columns:
-        # Filtrar apenas os operadores desejados que existem nos dados
-        df_op_f = df_f[df_f['operador'].isin(operadores_alvo)]
+        # Padronizando para maiúsculas para evitar erro de digitação
+        df_f['operador'] = df_f['operador'].astype(str).str.upper()
+        # Lista com a grafia correta (FÁBIO com acento)
+        operadores_alvo = ["DOUGLAS", "FÁBIO", "FERNANDO", "LUCIANO"]
         
-        if not df_op_f.empty:
-            stats_op = []
-            for op in operadores_alvo:
-                df_o = df_f[df_f['operador'] == op]
-                if not df_o.empty:
-                    g_op = df_o[df_o['status'].str.contains('Green', na=False)]
-                    r_op = df_o[df_o['status'].str.contains('Red', na=False)]
-                    wr_op = (len(g_op) / len(df_o) * 100)
-                    om_op = g_op['odd'].mean() if not g_op.empty else 0
-                    stats_op.append({
-                        "Operador": op,
-                        "Entradas": len(df_o),
-                        "Greens ✅": len(g_op),
-                        "Reds ❌": len(r_op),
-                        "Win Rate %": f"{wr_op:.1f}%",
-                        "Odd Média (G)": f"{om_op:.2f}",
-                        "Lucro": f"R$ {df_o['lucro'].sum():.2f}"
-                    })
-            
-            if stats_op:
-                st.table(pd.DataFrame(stats_op))
-            else:
-                st.info("Nenhum dado encontrado para os operadores Douglas, Fabio, Fernando ou Luciano.")
+        stats_op = []
+        for op in operadores_alvo:
+            df_o = df_f[df_f['operador'] == op]
+            if not df_o.empty:
+                g_op = df_o[df_o['status'].str.contains('Green', na=False)]
+                r_op = df_o[df_o['status'].str.contains('Red', na=False)]
+                wr_op = (len(g_op) / len(df_o) * 100)
+                om_op = g_op['odd'].mean() if not g_op.empty else 0
+                stats_op.append({
+                    "Operador": op,
+                    "Entradas": len(df_o),
+                    "Greens ✅": len(g_op),
+                    "Reds ❌": len(r_op),
+                    "Win Rate %": f"{wr_op:.1f}%",
+                    "Odd Média (G)": f"{om_op:.2f}",
+                    "Lucro": f"R$ {df_o['lucro'].sum():.2f}"
+                })
+        
+        if stats_op:
+            st.dataframe(pd.DataFrame(stats_op), use_container_width=True, hide_index=True)
         else:
-            st.info("Coluna 'operador' encontrada, mas sem registros para os nomes especificados.")
+            st.info("Nenhum dado encontrado para os operadores no período selecionado.")
     else:
-        st.warning("Coluna 'operador' não encontrada na tabela 'apostas'. Verifique seu banco de dados.")
+        st.warning("Coluna 'operador' não encontrada ou filtros retornaram vazio.")
 
     # --- GRÁFICOS ---
     if not df_f.empty:
-        # Evolução Patrimonial
         st.divider()
+        # Evolução Patrimonial
         df_ev = df_f.sort_values('data')
         df_ev['Evolução'] = s_ini + df_ev['lucro'].cumsum()
         st.plotly_chart(px.line(df_ev, x='data', y='Evolução', title="Curva de Património", markers=True), use_container_width=True)
@@ -155,14 +151,11 @@ def mostrar_dashboard():
             'stake': 'sum'
         }).reset_index()
         
-        # Cálculo do ROI: (Lucro / Valor Apostado) * 100
         df_met['ROI %'] = (df_met['lucro'] / df_met['stake']) * 100
-        
         melhores = df_met.nlargest(5, 'lucro')
         piores = df_met.nsmallest(5, 'lucro')
         df_top10 = pd.concat([melhores, piores]).drop_duplicates().sort_values(by="lucro", ascending=False)
         
-        # Gráfico de Lucro com ROI no texto
         fig_met = px.bar(
             df_top10, 
             x='metodo', 
