@@ -3,12 +3,16 @@ import pandas as pd
 import plotly.express as px
 from supabase import create_client
 from datetime import datetime, date, timedelta
+import pytz # Adicionado para fuso horário
 import calendar
 
 # --- CONFIGURAÇÃO SUPABASE ---
 URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
 KEY = "sb_publishable_pM5xDBpqZzo7h5SQqiFcfQ_ixbbydIB"
 supabase = create_client(URL, KEY)
+
+# --- FUSO HORÁRIO ---
+brasil_tz = pytz.timezone('America/Sao_Paulo')
 
 def carregar_tudo():
     try:
@@ -36,7 +40,10 @@ def mostrar_dashboard():
         return
 
     if not df_ap.empty:
-        df_ap['data'] = pd.to_datetime(df_ap['data']).dt.tz_localize(None)
+        # CONVERSÃO DE DATA COM FUSO HORÁRIO
+        df_ap['data'] = pd.to_datetime(df_ap['data'])
+        # Converte para o fuso do Brasil caso venha com timezone do banco
+        df_ap['data'] = df_ap['data'].dt.tz_convert(brasil_tz).dt.tz_localize(None)
 
     # --- FILTROS ---
     c_f1, c_f2 = st.columns(2)
@@ -45,15 +52,21 @@ def mostrar_dashboard():
     
     with c_f2:
         tipo_filtro = st.radio("Tipo de Filtro de Data:", ["Intervalo", "Dia Único"], horizontal=True)
+        
+        # Pega a data de hoje correta no Brasil
+        hoje_br = datetime.now(brasil_tz).date()
+        
         if not df_ap.empty:
             d_min, d_max = df_ap['data'].min().date(), df_ap['data'].max().date()
+            # Garante que o default não passe de hoje no fuso BR
+            d_max_default = min(d_max, hoje_br)
         else:
-            d_min, d_max = date.today(), date.today()
+            d_min, d_max_default = hoje_br, hoje_br
 
         if tipo_filtro == "Intervalo":
-            periodo = st.date_input("Selecione o Período", value=(d_min, d_max))
+            periodo = st.date_input("Selecione o Período", value=(d_min, hoje_br))
         else:
-            periodo = st.date_input("Selecione o Dia", value=d_max)
+            periodo = st.date_input("Selecione o Dia", value=hoje_br)
 
     # Aplicar Filtro de Data
     df_f = df_ap.copy()
@@ -109,21 +122,19 @@ def mostrar_dashboard():
         df_ev['Evolução'] = s_ini + df_ev['lucro'].cumsum()
         st.plotly_chart(px.line(df_ev, x='data', y='Evolução', title="Curva de Património", markers=True), use_container_width=True)
 
-        # Cálculo de Lucro e ROI por Método
+        # Performance por Método
         st.subheader("🏆 Performance por Método (Top 5 Melhores vs Piores)")
         df_met = df_f.groupby('metodo').agg({
             'lucro': 'sum',
             'stake': 'sum'
         }).reset_index()
         
-        # Cálculo do ROI: (Lucro / Valor Apostado) * 100
         df_met['ROI %'] = (df_met['lucro'] / df_met['stake']) * 100
         
         melhores = df_met.nlargest(5, 'lucro')
         piores = df_met.nsmallest(5, 'lucro')
         df_top10 = pd.concat([melhores, piores]).drop_duplicates().sort_values(by="lucro", ascending=False)
         
-        # Gráfico de Lucro com ROI no texto
         fig_met = px.bar(
             df_top10, 
             x='metodo', 
