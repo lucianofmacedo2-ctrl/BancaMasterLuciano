@@ -6,8 +6,13 @@ from datetime import datetime
 import requests
 from io import BytesIO
 import time
+import pytz  # Adicionado para correção de fuso horário
 from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest
 import styles
+
+# --- CONFIGURAÇÃO DE FUSO HORÁRIO (GMT-3) ---
+brasil_tz = pytz.timezone('America/Sao_Paulo')
+agora_br = datetime.now(brasil_tz)
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Master Luciano - Banca", layout="wide", page_icon="⚽")
@@ -34,6 +39,10 @@ df_csv = carregar_dados_csv()
 
 # --- SIDEBAR E NAVEGAÇÃO ---
 st.sidebar.title("🏆 Master Luciano")
+
+# Mostra a hora atual do Brasil na sidebar para conferência
+st.sidebar.write(f"🕒 {agora_br.strftime('%d/%m/%Y %H:%M')}")
+
 if st.sidebar.button("🔄 Atualizar Dados"):
     st.cache_data.clear()
     st.rerun()
@@ -45,7 +54,7 @@ if 'menu_ativo' not in st.session_state:
 menu = st.sidebar.radio("Navegação", opcoes_menu, index=opcoes_menu.index(st.session_state.menu_ativo))
 st.session_state.menu_ativo = menu
 
-# --- RENDERIZAÇÃO DAS PÁGINAS (CORRIGIDO) ---
+# --- RENDERIZAÇÃO DAS PÁGINAS ---
 if st.session_state.menu_ativo == "🔎 Scout":
     scout.mostrar_scout(df_csv)
 
@@ -53,7 +62,7 @@ elif st.session_state.menu_ativo == "📊 Dashboard":
     dashboard.mostrar_dashboard()
 
 elif st.session_state.menu_ativo == "📅 Jogos":
-    # Aqui estava o erro: a página Jogos precisa do df_csv para filtrar as partidas
+    # A página Jogos agora recebe o df_csv conforme corrigido anteriormente
     jogos.mostrar_jogos(df_csv) 
 
 elif st.session_state.menu_ativo == "📝 Registro":
