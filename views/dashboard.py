@@ -1,289 +1,184 @@
 import streamlit as st
-
 import pandas as pd
-
 import plotly.express as px
-
 from supabase import create_client
-
 from datetime import datetime, date, timedelta
-
 import calendar
 
-
-
 # --- CONFIGURAÇÃO SUPABASE ---
-
 URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
-
 KEY = "sb_publishable_pM5xDBpqZzo7h5SQqiFcfQ_ixbbydIB"
-
 supabase = create_client(URL, KEY)
 
-
-
 def carregar_tudo():
-
     try:
-
         res_a = supabase.table("apostas").select("*").execute()
-
         res_b = supabase.table("bancas").select("*").execute()
-
         res_m = supabase.table("movimentacoes").select("*").execute()
-
         return pd.DataFrame(res_a.data), pd.DataFrame(res_b.data), pd.DataFrame(res_m.data)
-
     except:
-
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-
-
 def mostrar_dashboard():
-
     st.markdown("""
-
         <style>
-
             [data-testid="stMetricValue"] { color: #002b5c !important; font-weight: bold; font-size: 28px; }
-
             [data-testid="stMetricLabel"] { color: #1a1a1a !important; font-weight: 500; }
-
             .stSubheader { color: #002b5c !important; }
-
         </style>
-
     """, unsafe_allow_html=True)
 
-
-
     st.title("📊 Dashboard de Performance")
-
     df_ap, df_ba, df_mov = carregar_tudo()
 
-
-
     if df_ba.empty:
-
         st.warning("Cadastre uma banca para ver os gráficos.")
-
         return
 
-
-
     if not df_ap.empty:
-
         df_ap['data'] = pd.to_datetime(df_ap['data']).dt.tz_localize(None)
 
-
-
     # --- FILTROS ---
-
     c_f1, c_f2 = st.columns(2)
-
     with c_f1:
-
         banca_sel = st.selectbox("Filtrar por Banca", ["Todas"] + df_ba["nome"].tolist())
-
     
-
     with c_f2:
-
         tipo_filtro = st.radio("Tipo de Filtro de Data:", ["Intervalo", "Dia Único"], horizontal=True)
-
         if not df_ap.empty:
-
             d_min, d_max = df_ap['data'].min().date(), df_ap['data'].max().date()
-
         else:
-
             d_min, d_max = date.today(), date.today()
 
-
-
         if tipo_filtro == "Intervalo":
-
             periodo = st.date_input("Selecione o Período", value=(d_min, d_max))
-
         else:
-
             periodo = st.date_input("Selecione o Dia", value=d_max)
 
-
-
     # Aplicar Filtro de Data
-
     df_f = df_ap.copy()
-
     if tipo_filtro == "Intervalo" and isinstance(periodo, tuple) and len(periodo) == 2:
-
         df_f = df_f[(df_f['data'].dt.date >= periodo[0]) & (df_f['data'].dt.date <= periodo[1])]
-
     elif tipo_filtro == "Dia Único":
-
         df_f = df_f[df_f['data'].dt.date == periodo]
 
-
-
     # --- LÓGICA DE SALDO ---
-
     if banca_sel != "Todas":
-
         row_banca = df_ba[df_ba["nome"] == banca_sel]
-
         id_banca = row_banca["id"].iloc[0]
-
         s_base = row_banca["saldo_inicial"].iloc[0]
-
         df_f = df_f[df_f['banca_nome'] == banca_sel]
-
         
-
         if not df_mov.empty:
-
             movs = df_mov[df_mov['banca_id'] == id_banca]
-
             s_ini = s_base + movs[movs['tipo'] == 'Aporte']['valor'].sum() - movs[movs['tipo'] == 'Saque']['valor'].sum()
-
         else:
-
             s_ini = s_base
-
     else:
-
         s_base_total = df_ba["saldo_inicial"].sum()
-
         s_ini = s_base_total + (df_mov[df_mov['tipo'] == 'Aporte']['valor'].sum() if not df_mov.empty else 0) - (df_mov[df_mov['tipo'] == 'Saque']['valor'].sum() if not df_mov.empty else 0)
 
-
-
     # --- CÁLCULOS ---
-
     lucro_total = df_f['lucro'].sum() if not df_f.empty else 0
-
     greens_df = df_f[df_f['status'].str.contains('Green', na=False)]
-
     reds_df = df_f[df_f['status'].str.contains('Red', na=False)]
-
     devolvidas_df = df_f[df_f['status'].str.contains('Devolvida', na=False)]
-
     
-
     total_apostas = len(df_f)
-
     win_rate = (len(greens_df) / total_apostas * 100) if total_apostas > 0 else 0
-
     odd_media_greens = greens_df['odd'].mean() if not greens_df.empty else 0
 
-
-
     # --- MÉTRICAS DE TOPO ---
-
     c1, c2, c3 = st.columns(3)
-
     c1.metric("Saldo Atualizado", f"R$ {s_ini + lucro_total:.2f}")
-
     c2.metric("Lucro Líquido", f"R$ {lucro_total:.2f}")
-
     c3.metric("Win Rate", f"{win_rate:.1f}%")
 
-
-
     st.divider()
-
     st.subheader(f"📋 Resumo do Período")
-
     r1, r2, r3, r4 = st.columns(4)
-
     r1.metric("Entradas", total_apostas)
-
     r2.metric("Greens ✅", len(greens_df))
-
     r3.metric("Reds ❌", len(reds_df))
-
     r4.metric("Odd Média (Greens)", f"{odd_media_greens:.2f}")
 
-
+    # --- RELATÓRIO POR OPERADOR ---
+    st.divider()
+    st.subheader("👤 Performance por Operador")
+    
+    operadores_alvo = ["Douglas", "Fabio", "Fernando", "Luciano"]
+    
+    if not df_f.empty and 'operador' in df_f.columns:
+        # Filtrar apenas os operadores desejados que existem nos dados
+        df_op_f = df_f[df_f['operador'].isin(operadores_alvo)]
+        
+        if not df_op_f.empty:
+            stats_op = []
+            for op in operadores_alvo:
+                df_o = df_f[df_f['operador'] == op]
+                if not df_o.empty:
+                    g_op = df_o[df_o['status'].str.contains('Green', na=False)]
+                    r_op = df_o[df_o['status'].str.contains('Red', na=False)]
+                    wr_op = (len(g_op) / len(df_o) * 100)
+                    om_op = g_op['odd'].mean() if not g_op.empty else 0
+                    stats_op.append({
+                        "Operador": op,
+                        "Entradas": len(df_o),
+                        "Greens ✅": len(g_op),
+                        "Reds ❌": len(r_op),
+                        "Win Rate %": f"{wr_op:.1f}%",
+                        "Odd Média (G)": f"{om_op:.2f}",
+                        "Lucro": f"R$ {df_o['lucro'].sum():.2f}"
+                    })
+            
+            if stats_op:
+                st.table(pd.DataFrame(stats_op))
+            else:
+                st.info("Nenhum dado encontrado para os operadores Douglas, Fabio, Fernando ou Luciano.")
+        else:
+            st.info("Coluna 'operador' encontrada, mas sem registros para os nomes especificados.")
+    else:
+        st.warning("Coluna 'operador' não encontrada na tabela 'apostas'. Verifique seu banco de dados.")
 
     # --- GRÁFICOS ---
-
     if not df_f.empty:
-
         # Evolução Patrimonial
-
+        st.divider()
         df_ev = df_f.sort_values('data')
-
         df_ev['Evolução'] = s_ini + df_ev['lucro'].cumsum()
-
         st.plotly_chart(px.line(df_ev, x='data', y='Evolução', title="Curva de Património", markers=True), use_container_width=True)
 
-
-
         # Cálculo de Lucro e ROI por Método
-
         st.subheader("🏆 Performance por Método (Top 5 Melhores vs Piores)")
-
         df_met = df_f.groupby('metodo').agg({
-
             'lucro': 'sum',
-
             'stake': 'sum'
-
         }).reset_index()
-
         
-
         # Cálculo do ROI: (Lucro / Valor Apostado) * 100
-
         df_met['ROI %'] = (df_met['lucro'] / df_met['stake']) * 100
-
         
-
         melhores = df_met.nlargest(5, 'lucro')
-
         piores = df_met.nsmallest(5, 'lucro')
-
         df_top10 = pd.concat([melhores, piores]).drop_duplicates().sort_values(by="lucro", ascending=False)
-
         
-
         # Gráfico de Lucro com ROI no texto
-
         fig_met = px.bar(
-
             df_top10, 
-
             x='metodo', 
-
             y='lucro', 
-
             color='ROI %',
-
             text=df_top10['ROI %'].apply(lambda x: f"ROI: {x:.1f}%"),
-
             title="Lucro por Método (Barras) e ROI % (Cores)",
-
             color_continuous_scale="RdYlGn"
-
         )
-
         st.plotly_chart(fig_met, use_container_width=True)
 
-
-
         # Distribuição de Odds
-
         st.divider()
-
         st.subheader("🎯 Distribuição de Odds dos Greens")
-
         fig_odd = px.histogram(greens_df, x="odd", nbins=15, title="Onde estão seus acertos?", color_discrete_sequence=['#002b5c'])
-
         st.plotly_chart(fig_odd, use_container_width=True)
 
-
-
     else:
-
         st.info("Nenhuma aposta encontrada para este filtro.")
