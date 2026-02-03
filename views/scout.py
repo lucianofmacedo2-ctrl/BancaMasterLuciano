@@ -2,10 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# --- CONFIGURAÇÃO DE LIGAS ---
+# --- CONFIGURAÇÃO DE OBJETIVOS ---
 REGRAS_LIGAS = {
     "BRAZIL 1": {"alvos": {"Libertadores": [1, 6], "Sul-Americana": [7, 12], "Rebaixamento": [17, 20]}},
-    "BRAZIL 2": {"alvos": {"Acesso": [1, 4], "Rebaixamento": [17, 20]}},
     "PORTUGAL 1": {"alvos": {"Champions League": [1, 3], "Rebaixamento": [16, 18]}},
 }
 
@@ -49,76 +48,70 @@ def render_stat_row(label, val_h, val_v, format_str="{:.2f}"):
     with col3: st.markdown(f"<p style='text-align:left;font-weight:bold;font-size:18px;margin:0;'>{format_str.format(vv)}</p>", unsafe_allow_html=True)
 
 def get_avg(df_t, team, col_h, col_a):
-    """Função segura para calcular média sem dar KeyError"""
-    if df_t.empty: return 0.0
-    if col_h not in df_t.columns or col_a not in df_t.columns: return 0.0
-    
-    # Filtra onde o time é mandante e onde é visitante
+    if df_t.empty or col_h not in df_t.columns or col_a not in df_t.columns: return 0.0
     vals_m = df_t[df_t['Mandante'] == team][col_h]
     vals_v = df_t[df_t['Visitante'] == team][col_a]
-    
     combined = pd.concat([vals_m, vals_v])
     return combined.mean() if not combined.empty else 0.0
 
 def mostrar_scout(df):
     if df.empty:
-        st.error("Base de dados vazia.")
+        st.error("Erro: Base de dados vazia.")
         return
 
-    # Limpeza e padronização
+    # Garante que as colunas numéricas estão corretas
     df.columns = [c.strip() for c in df.columns]
     
-    st.title("🔎 Scout Detalhado")
+    st.title("🔎 Scout de Elite - Master Luciano")
 
     # Filtros
     liga_sel = st.selectbox("Selecione a Liga", sorted(df['Liga'].unique()))
     df_l = df[df['Liga'] == liga_sel].copy()
     
     times = sorted(df_l['Mandante'].unique())
-    col_a, col_b = st.columns(2)
-    m_sel = col_a.selectbox("Time Mandante", times)
-    v_sel = col_b.selectbox("Time Visitante", [t for t in times if t != m_sel])
+    col1, col2 = st.columns(2)
+    m_sel = col1.selectbox("Time da Casa", times)
+    v_sel = col2.selectbox("Time de Fora", [t for t in times if t != m_sel])
     
-    n_jogos = st.sidebar.slider("Quantidade de Jogos", 5, 20, 10)
+    n_jogos = st.sidebar.slider("Amostragem (Últimos Jogos)", 5, 20, 10)
 
-    # Amostragem (Últimos jogos de cada time)
+    # Filtro de Amostragem (Geral: Casa + Fora)
     df_m = df_l[(df_l['Mandante'] == m_sel) | (df_l['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
     df_v = df_l[(df_l['Mandante'] == v_sel) | (df_l['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(n_jogos)
 
-    # --- ÁREA DE SCOUTS ---
-    st.subheader("⚽ Expectativa e Gols")
-    render_stat_row("xG (Gols Esperados)", get_avg(df_m, m_sel, 'xG_Mandante', 'xG_Visitante'), get_avg(df_v, v_sel, 'xG_Mandante', 'xG_Visitante'))
+    # --- ÁREA DE COMPARAÇÃO ---
+    st.markdown("### 📊 Comparativo de Médias")
+    
     render_stat_row("Gols Marcados FT", get_avg(df_m, m_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT'), get_avg(df_v, v_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT'))
-    render_stat_row("PPG (Pontos p/ Jogo)", get_avg(df_m, m_sel, 'PPG_H_Pre', 'PPG_A_Pre'), get_avg(df_v, v_sel, 'PPG_H_Pre', 'PPG_A_Pre'))
-
-    st.subheader("🚩 Estatísticas de Jogo")
-    render_stat_row("Escanteios (Cantos)", get_avg(df_m, m_sel, 'Corners_H', 'Corners_A'), get_avg(df_v, v_sel, 'Corners_H', 'Corners_A'))
+    render_stat_row("Expectativa de Gols (xG)", get_avg(df_m, m_sel, 'xG_Mandante', 'xG_Visitante'), get_avg(df_v, v_sel, 'xG_Mandante', 'xG_Visitante'))
+    render_stat_row("Escanteios (Corners)", get_avg(df_m, m_sel, 'Corners_H', 'Corners_A'), get_avg(df_v, v_sel, 'Corners_H', 'Corners_A'))
     render_stat_row("Ataques Perigosos", get_avg(df_m, m_sel, 'DangerousAttacks_H', 'DangerousAttacks_A'), get_avg(df_v, v_sel, 'DangerousAttacks_H', 'DangerousAttacks_A'))
     render_stat_row("Chutes no Gol", get_avg(df_m, m_sel, 'ShotsOnTarget_H', 'ShotsOnTarget_A'), get_avg(df_v, v_sel, 'ShotsOnTarget_H', 'ShotsOnTarget_A'))
-
-    st.subheader("🟨 Disciplina e Posse")
-    render_stat_row("Cartões Amarelos", get_avg(df_m, m_sel, 'Yellow_Cards_H', 'Yellow_Cards_A'), get_avg(df_v, v_sel, 'Yellow_Cards_H', 'Yellow_Cards_A'))
-    render_stat_row("Posse de Bola (%)", get_avg(df_m, m_sel, 'Possession_H', 'Possession_A'), get_avg(df_v, v_sel, 'Possession_H', 'Possession_A'), "{:.1f}%")
-    render_stat_row("Faltas Cometidas", get_avg(df_m, m_sel, 'Fouls_H', 'Fouls_A'), get_avg(df_v, v_sel, 'Fouls_H', 'Fouls_A'))
+    render_stat_row("Posse de Bola", get_avg(df_m, m_sel, 'Possession_H', 'Possession_A'), get_avg(df_v, v_sel, 'Possession_H', 'Possession_A'), "{:.1f}%")
 
     st.divider()
 
-    tab1, tab2, tab3 = st.tabs(["🕒 Últimos Jogos", "🏆 Tabela", "🎯 Pênaltis"])
-    
-    with tab1:
-        c1, c2 = st.columns(2)
-        cols_show = ['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']
-        c1.write(f"Últimos de {m_sel}")
-        c1.dataframe(df_m[cols_show], hide_index=True)
-        c2.write(f"Últimos de {v_sel}")
-        c2.dataframe(df_v[cols_show], hide_index=True)
+    # --- ABAS ---
+    t_hist, t_minutos, t_class = st.tabs(["🕒 Últimos Jogos", "⏰ Minutos dos Gols", "🏆 Tabela"])
 
-    with tab2:
+    with t_hist:
+        c_h1, c_h2 = st.columns(2)
+        cols_hist = ['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']
+        c_h1.write(f"Histórico: {m_sel}")
+        c_h1.dataframe(df_m[cols_hist], hide_index=True)
+        c_h2.write(f"Histórico: {v_sel}")
+        c_h2.dataframe(df_v[cols_hist], hide_index=True)
+
+    with t_minutos:
+        st.subheader("Frequência de Gols por Intervalo")
+        faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
+        for f in faixas:
+            m_f = get_avg(df_m, m_sel, f"{f}_Mandante", f"{f}_Visitante")
+            v_f = get_avg(df_v, v_sel, f"{f}_Mandante", f"{f}_Visitante")
+            render_stat_row(f"Gols entre {f} min", m_f, v_f)
+
+    with t_class:
         tabela = calcular_tabela(df_l)
         if not tabela.empty:
             tabela['Objetivo'] = tabela.apply(lambda r: get_objetivo_txt(liga_sel, r['Pos']), axis=1)
             st.dataframe(tabela.sort_values('Pos'), use_container_width=True, hide_index=True)
-
-    with tab3:
-        st.write("Média de Pênaltis Ganhos")
-        render_stat_row("Pênaltis", get_avg(df_m, m_sel, 'Penalties_Won_H', 'Penalties_Won_A'), get_avg(df_v, v_sel, 'Penalties_Won_H', 'Penalties_Won_A'))
