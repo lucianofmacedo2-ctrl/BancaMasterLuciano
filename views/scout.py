@@ -6,7 +6,7 @@ import numpy as np
 REGRAS_LIGAS = {
     "BRAZIL 1": {"alvos": {"Libertadores": [1, 6], "Sul-Americana": [7, 12], "Rebaixamento": [17, 20]}},
     "BRAZIL 2": {"alvos": {"Acesso": [1, 4], "Rebaixamento": [17, 20]}},
-    "PORTUGAL 3": {"alvos": {"Acesso": [1, 2], "Playoff Acesso": [3, 4], "Rebaixamento": [7, 10]}},
+    "PORTUGAL 1": {"alvos": {"Champions League": [1, 3], "Conference": [4, 5], "Rebaixamento": [16, 18]}},
     "ENGLAND 1": {"alvos": {"Champions League": [1, 4], "Europa League": [5, 5], "Rebaixamento": [18, 20]}},
 }
 
@@ -21,7 +21,6 @@ def get_objetivo_txt(liga, pos):
     return "⚪ Meio"
 
 def calcular_tabela_completa(df_liga):
-    """Calcula a tabela Geral, Casa e Fora separadamente"""
     stats = {}
     for _, r in df_liga.iterrows():
         m, v = r['Mandante'], r['Visitante']
@@ -30,10 +29,8 @@ def calcular_tabela_completa(df_liga):
             if t not in stats:
                 stats[t] = {'P':0,'J':0,'V':0,'SG':0, 'P_Casa':0,'J_Casa':0, 'P_Fora':0,'J_Fora':0}
         
-        # Geral
         stats[m]['J']+=1; stats[v]['J']+=1
         stats[m]['SG']+=(gm-gv); stats[v]['SG']+=(gv-gm)
-        # Específico Mando
         stats[m]['J_Casa']+=1; stats[v]['J_Fora']+=1
         
         if gm > gv: 
@@ -44,38 +41,34 @@ def calcular_tabela_completa(df_liga):
             stats[v]['P']+=3; stats[v]['V']+=1; stats[v]['P_Fora']+=3
             
     df = pd.DataFrame.from_dict(stats, orient='index').reset_index().rename(columns={'index':'Time'})
-    
-    # Rankings
     df['Pos_Geral'] = df[['P', 'V', 'SG']].apply(tuple, axis=1).rank(method='min', ascending=False)
     df['Pos_Casa'] = df[['P_Casa', 'J_Casa']].apply(tuple, axis=1).rank(method='min', ascending=False)
     df['Pos_Fora'] = df[['P_Fora', 'J_Fora']].apply(tuple, axis=1).rank(method='min', ascending=False)
-    
     return df
 
 def calcular_metricas_completas(series, prefixo):
     if len(series) == 0:
-        return {f"{prefixo} Média": 0, f"{prefixo} Mediana": 0, f"{prefixo} DP": 0, f"{prefixo} CV%": 0}
+        return {f"{prefixo} Média": 0, f"{prefixo} DP": 0}
     return {
         f"{prefixo} Média": series.mean(),
         f"{prefixo} Mediana": series.median(),
-        f"{prefixo} Moda": series.mode().iloc[0] if not series.mode().empty else series.mean(),
-        f"{prefixo} DP": series.std(),
-        f"{prefixo} CV%": (series.std() / series.mean() * 100) if series.mean() != 0 else 0,
+        f"{prefixo} Max": series.max(),
+        f"{prefixo} Min": series.min(),
         f"{prefixo} 0.5+ (%)": (series > 0.5).mean() * 100,
         f"{prefixo} 1.5+ (%)": (series > 1.5).mean() * 100,
         f"{prefixo} 2.5+ (%)": (series > 2.5).mean() * 100,
     }
 
-def render_stat_row(label, val_h, val_v):
+def render_stat_row(label, val_h, val_v, format_str="{:.2f}"):
     col1, col2, col3 = st.columns([1, 2, 1])
     vh, vv = float(val_h or 0), float(val_v or 0)
     total = vh + vv
     perc = vh / total if total > 0 else 0.5
-    with col1: st.markdown(f"<p style='text-align:right;font-weight:bold;font-size:18px;margin:0;'>{vh:.2f}</p>", unsafe_allow_html=True)
+    with col1: st.markdown(f"<p style='text-align:right;font-weight:bold;font-size:18px;margin:0;'>{format_str.format(vh)}</p>", unsafe_allow_html=True)
     with col2:
         st.markdown(f"<p style='text-align:center;font-size:11px;color:gray;margin:0;'>{label}</p>", unsafe_allow_html=True)
         st.progress(max(0.0, min(1.0, perc)))
-    with col3: st.markdown(f"<p style='text-align:left;font-weight:bold;font-size:18px;margin:0;'>{vv:.2f}</p>", unsafe_allow_html=True)
+    with col3: st.markdown(f"<p style='text-align:left;font-weight:bold;font-size:18px;margin:0;'>{format_str.format(vv)}</p>", unsafe_allow_html=True)
 
 def extrair_dados_mercado(df_team, team, col_h, col_a):
     feitos = np.where(df_team['Mandante'] == team, df_team[col_h], df_team[col_a])
@@ -118,11 +111,9 @@ def mostrar_scout(df):
     # --- CÁLCULO DE POSIÇÕES ---
     df_ranking = calcular_tabela_completa(df_s)
     pos_m_geral = int(df_ranking[df_ranking['Time']==m_sel]['Pos_Geral'].values[0])
-    pos_m_casa = int(df_ranking[df_ranking['Time']==m_sel]['Pos_Casa'].values[0])
     pos_v_geral = int(df_ranking[df_ranking['Time']==v_sel]['Pos_Geral'].values[0])
-    pos_v_fora = int(df_ranking[df_ranking['Time']==v_sel]['Pos_Fora'].values[0])
 
-    st.info(f"📍 **{m_sel}**: {pos_m_geral}º Geral | {pos_m_casa}º em Casa --- **{v_sel}**: {pos_v_geral}º Geral | {pos_v_fora}º Fora")
+    st.info(f"📍 **{m_sel}**: {pos_m_geral}º Geral | **{v_sel}**: {pos_v_geral}º Geral")
 
     if mando_sel == "Geral (Todos)":
         df_m = df_s[(df_s['Mandante'] == m_sel) | (df_s['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
@@ -131,58 +122,79 @@ def mostrar_scout(df):
         df_m = df_s[df_s['Mandante'] == m_sel].sort_values('Data', ascending=False).head(n_jogos)
         df_v = df_s[df_s['Visitante'] == v_sel].sort_values('Data', ascending=False).head(n_jogos)
 
-    # --- POWER STATS (MÉDIAS RECONFIGURADAS) ---
-    st.markdown("### 📊 Médias de Desempenho")
-    
+    # --- FUNÇÃO HELPER PARA MÉDIAS ---
     def get_avg(df_t, team, col_h, col_a):
+        if col_h not in df_t.columns or col_a not in df_t.columns: return 0.0
         return np.where(df_t['Mandante']==team, df_t[col_h], df_t[col_a]).mean()
 
-    # Gols
-    render_stat_row("MÉDIA GOLS HT", get_avg(df_m, m_sel, 'Gols_Mandante_HT', 'Gols_Visitante_HT'), get_avg(df_v, v_sel, 'Gols_Mandante_HT', 'Gols_Visitante_HT'))
-    render_stat_row("MÉDIA GOLS FT", get_avg(df_m, m_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT'), get_avg(df_v, v_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT'))
+    # --- POWER STATS (MÉDIAS) ---
+    st.markdown("### 📊 Power Stats (Médias)")
     
-    # Pressão
-    if 'Attacks_H' in df.columns:
-        render_stat_row("ATAQUES", get_avg(df_m, m_sel, 'Attacks_H', 'Attacks_A'), get_avg(df_v, v_sel, 'Attacks_H', 'Attacks_A'))
-        render_stat_row("ATAQUES PERIGOSOS", get_avg(df_m, m_sel, 'DangerousAttacks_H', 'DangerousAttacks_A'), get_avg(df_v, v_sel, 'DangerousAttacks_H', 'DangerousAttacks_A'))
-    
-    # Posse e Finalizações
-    if 'Possession_H' in df.columns:
-        render_stat_row("POSSE DE BOLA (%)", get_avg(df_m, m_sel, 'Possession_H', 'Possession_A'), get_avg(df_v, v_sel, 'Possession_H', 'Possession_A'))
-        render_stat_row("FINALIZAÇÕES (CHUTES)", get_avg(df_m, m_sel, 'Shots_H', 'Shots_A'), get_avg(df_v, v_sel, 'Shots_H', 'Shots_A'))
+    # Aba de Categorias de Médias
+    cat_stats = st.radio("Escolha a Categoria de Scout:", ["Ofensivo / xG", "Defensivo / Cartões", "Cantos / HT", "Técnico"], horizontal=True)
+
+    if cat_stats == "Ofensivo / xG":
+        render_stat_row("EXPECTATIVA DE GOLS (xG)", get_avg(df_m, m_sel, 'xG_Mandante', 'xG_Visitante'), get_avg(df_v, v_sel, 'xG_Mandante', 'xG_Visitante'))
+        render_stat_row("GOLS FT", get_avg(df_m, m_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT'), get_avg(df_v, v_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT'))
+        render_stat_row("CHUTES TOTAIS", get_avg(df_m, m_sel, 'Shots_H', 'Shots_A'), get_avg(df_v, v_sel, 'Shots_H', 'Shots_A'))
         render_stat_row("CHUTES NO GOL", get_avg(df_m, m_sel, 'ShotsOnTarget_H', 'ShotsOnTarget_A'), get_avg(df_v, v_sel, 'ShotsOnTarget_H', 'ShotsOnTarget_A'))
+        render_stat_row("ATAQUES PERIGOSOS", get_avg(df_m, m_sel, 'DangerousAttacks_H', 'DangerousAttacks_A'), get_avg(df_v, v_sel, 'DangerousAttacks_H', 'DangerousAttacks_A'))
+        render_stat_row("PONTOS POR JOGO (PPG)", get_avg(df_m, m_sel, 'PPG_H_Pre', 'PPG_A_Pre'), get_avg(df_v, v_sel, 'PPG_H_Pre', 'PPG_A_Pre'))
 
-    # Disciplina
-    if 'Cards_Total_H' in df.columns:
-        render_stat_row("CARTÕES (TOTAL)", get_avg(df_m, m_sel, 'Cards_Total_H', 'Cards_Total_A'), get_avg(df_v, v_sel, 'Cards_Total_H', 'Cards_Total_A'))
-        render_stat_row("FALTAS", get_avg(df_m, m_sel, 'Fouls_H', 'Fouls_A'), get_avg(df_v, v_sel, 'Fouls_H', 'Fouls_A'))
+    elif cat_stats == "Defensivo / Cartões":
+        render_stat_row("CARTÕES AMARELOS", get_avg(df_m, m_sel, 'Yellow_Cards_H', 'Yellow_Cards_A'), get_avg(df_v, v_sel, 'Yellow_Cards_H', 'Yellow_Cards_A'))
+        render_stat_row("CARTÕES VERMELHOS", get_avg(df_m, m_sel, 'Red_Cards_H', 'Red_Cards_A'), get_avg(df_v, v_sel, 'Red_Cards_H', 'Red_Cards_A'))
+        render_stat_row("FALTAS COMETIDAS", get_avg(df_m, m_sel, 'Fouls_H', 'Fouls_A'), get_avg(df_v, v_sel, 'Fouls_H', 'Fouls_A'))
+        render_stat_row("PENALTIS CONCEDIDOS", get_avg(df_m, m_sel, 'Penalties_Won_A', 'Penalties_Won_H'), get_avg(df_v, v_sel, 'Penalties_Won_A', 'Penalties_Won_H')) # Invertido pois é defensivo
 
-    # --- ABAS DE ANÁLISE ---
-    t_forma, t_stats, t_minutos, t_class = st.tabs(["🕒 Forma", "📊 Stats Detalhadas", "⏰ Minutos", "🏆 Tabela"])
+    elif cat_stats == "Cantos / HT":
+        render_stat_row("CANTOS FT", get_avg(df_m, m_sel, 'Corners_H', 'Corners_A'), get_avg(df_v, v_sel, 'Corners_H', 'Corners_A'))
+        render_stat_row("CANTOS HT (1ºT)", get_avg(df_m, m_sel, 'Corners_H_HT', 'Corners_A_HT'), get_avg(df_v, v_sel, 'Corners_H_HT', 'Corners_A_HT'))
+        render_stat_row("GOLS HT (1ºT)", get_avg(df_m, m_sel, 'Gols_Mandante_HT', 'Gols_Visitante_HT'), get_avg(df_v, v_sel, 'Gols_Mandante_HT', 'Gols_Visitante_HT'))
 
-    with t_forma:
+    elif cat_stats == "Técnico":
+        render_stat_row("POSSE DE BOLA (%)", get_avg(df_m, m_sel, 'Possession_H', 'Possession_A'), get_avg(df_v, v_sel, 'Possession_H', 'Possession_A'), "{:.1f}%")
+        render_stat_row("IMPEDIMENTOS", get_avg(df_m, m_sel, 'Offsides_H', 'Offsides_A'), get_avg(df_v, v_sel, 'Offsides_H', 'Offsides_A'))
+        render_stat_row("LATERAIS (THROW-INS)", get_avg(df_m, m_sel, 'Throwins_H', 'Throwins_A'), get_avg(df_v, v_sel, 'Throwins_H', 'Throwins_A'))
+        render_stat_row("TIROS DE META", get_avg(df_m, m_sel, 'Goalkicks_H', 'Goalkicks_A'), get_avg(df_v, v_sel, 'Goalkicks_H', 'Goalkicks_A'))
+
+    # --- ABAS DE ANÁLISE DETALHADA ---
+    t_detalhes, t_mercados, t_minutos, t_class = st.tabs(["📋 Últimos Jogos", "💰 Mercados Detalhados", "⏰ Minutos", "🏆 Tabela"])
+
+    with t_detalhes:
+        st.markdown("#### Histórico Recente de Confrontos")
         c_m, c_v = st.columns(2)
-        c_m.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
-        c_v.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
+        c_m.write(f"**{m_sel}** (Últimos {n_jogos})")
+        c_m.dataframe(df_m[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante', 'Total_Corners']], hide_index=True)
+        c_v.write(f"**{v_sel}** (Últimos {n_jogos})")
+        c_v.dataframe(df_v[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante', 'Total_Corners']], hide_index=True)
 
-    with t_stats:
-        gerar_tabela_segmentada(df_m, df_v, m_sel, v_sel, 'Gols_Mandante_HT', 'Gols_Visitante_HT', "⚽ Gols HT")
-        gerar_tabela_segmentada(df_m, df_v, m_sel, v_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT', "⚽ Gols FT")
-        if 'Corners_H' in df.columns:
-            gerar_tabela_segmentada(df_m, df_v, m_sel, v_sel, 'Corners_H', 'Corners_A', "🚩 Cantos")
+    with t_mercados:
+        gerar_tabela_segmentada(df_m, df_v, m_sel, v_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT', "⚽ Gols FT & BTTS")
+        gerar_tabela_segmentada(df_m, df_v, m_sel, v_sel, 'Corners_H', 'Corners_A', "🚩 Escanteios FT")
+        gerar_tabela_segmentada(df_m, df_v, m_sel, v_sel, 'Total_Cards_H', 'Total_Cards_A', "🟨 Cartões Totais")
+        gerar_tabela_segmentada(df_m, df_v, m_sel, v_sel, 'xG_Mandante', 'xG_Visitante', "📈 Expectativa de Gols (xG)")
 
     with t_minutos:
         faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
         def calc_min(df_t, team):
             data = []
             for f in faixas:
-                if f"{f}_Mandante" in df.columns:
-                    f_g = np.where(df_t['Mandante']==team, df_t[f"{f}_Mandante"], df_t[f"{f}_Visitante"]).sum()
-                    s_g = np.where(df_t['Mandante']==team, df_t[f"{f}_Visitante"], df_t[f"{f}_Mandante"]).sum()
-                    data.append({"Minutos": f, "Feitos": f_g, "Sofridos": s_g, "Total": f_g+s_g})
+                col_h, col_a = f"{f}_Mandante", f"{f}_Visitante"
+                if col_h in df_t.columns:
+                    f_g = np.where(df_t['Mandante']==team, df_t[col_h], df_t[col_a]).sum()
+                    s_g = np.where(df_t['Mandante']==team, df_t[col_a], df_t[col_h]).sum()
+                    data.append({"Minutos": f, "Gols Feitos": f_g, "Gols Sofridos": s_g})
             return pd.DataFrame(data)
+        
         cm1, cm2 = st.columns(2)
-        cm1.table(calc_min(df_m, m_sel)); cm2.table(calc_min(df_v, v_sel))
+        cm1.subheader(f"Gols por Minuto: {m_sel}")
+        cm1.table(calc_min(df_m, m_sel))
+        cm2.subheader(f"Gols por Minuto: {v_sel}")
+        cm2.table(calc_min(df_v, v_sel))
 
     with t_class:
-        st.dataframe(df_ranking.sort_values('Pos_Geral'), use_container_width=True, hide_index=True)
+        st.subheader(f"Classificação: {liga_sel}")
+        df_rank_show = df_ranking.sort_values('Pos_Geral').copy()
+        df_rank_show['Objetivo'] = df_rank_show.apply(lambda r: get_objetivo_txt(liga_sel, r['Pos_Geral']), axis=1)
+        st.dataframe(df_rank_show[['Pos_Geral', 'Time', 'P', 'J', 'V', 'SG', 'Objetivo']], use_container_width=True, hide_index=True)
