@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 def mostrar_ranking(df):
     st.markdown("## 🏆 Ranking de Ligas")
@@ -38,21 +39,30 @@ def mostrar_ranking(df):
     def calcular_stats_ligas(df_input, periodo):
         df_proc = df_input.copy()
         
-        # Filtro de Temporada (Ajuste a lógica da sua coluna Season se necessário)
-        # Se no seu CSV a coluna for 'Season' e o valor for 2025 ou '25/26'
+        # Mapeamento Dinâmico de Colunas (Evita o KeyError)
+        col_cn_h = 'Corners_H' if 'Corners_H' in df_proc.columns else 'Cantos_Mandante'
+        col_cn_a = 'Corners_A' if 'Corners_A' in df_proc.columns else 'Cantos_Visitante'
+        
+        # Filtro de Temporada
         if periodo == "Temporada Atual (25/26)":
             if 'Season' in df_proc.columns:
                 df_proc = df_proc[df_proc['Season'].astype(str).str.contains('25|26')]
             else:
-                # Caso não tenha a coluna Season, podemos filtrar pela Data se existir
-                df_proc['Data'] = pd.to_datetime(df_proc['Data'])
-                df_proc = df_proc[df_proc['Data'] >= '2025-07-01']
+                # Caso não tenha a coluna Season, tenta pela Data
+                if 'Data' in df_proc.columns:
+                    df_proc['Data'] = pd.to_datetime(df_proc['Data'], errors='coerce')
+                    df_proc = df_proc[df_proc['Data'] >= '2025-07-01']
 
-        # Cálculos de base
+        # Cálculos de base com proteção contra colunas ausentes
         df_proc['Total_FT'] = df_proc['Gols_Mandante_FT'] + df_proc['Gols_Visitante_FT']
         df_proc['Total_HT'] = df_proc['Gols_Mandante_HT'] + df_proc['Gols_Visitante_HT']
         df_proc['BTTS'] = (df_proc['Gols_Mandante_FT'] > 0) & (df_proc['Gols_Visitante_FT'] > 0)
-        df_proc['Total_Cantos'] = df_proc['Corners_H'] + df_proc['Corners_A']
+        
+        # Cálculo de Cantos usando o mapeamento dinâmico
+        if col_cn_h in df_proc.columns and col_cn_a in df_proc.columns:
+            df_proc['Total_Cantos'] = df_proc[col_cn_h] + df_proc[col_cn_a]
+        else:
+            df_proc['Total_Cantos'] = 0 # Valor padrão caso não existam colunas de cantos
 
         grupos = df_proc.groupby('Liga')
         ranking_data = []
