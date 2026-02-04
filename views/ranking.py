@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from scipy.stats import poisson
 
 def mostrar_ranking(df):
     st.markdown("## 🏆 Ranking de Ligas & Times")
-    st.write("Compare o desempenho das ligas e clubes para encontrar as melhores oportunidades.")
+    st.write("Compare o desempenho das ligas e clubes com probabilidades estimadas.")
 
     # 1. Limpeza e Preparação
     df.columns = [c.strip() for c in df.columns]
@@ -59,27 +60,47 @@ def mostrar_ranking(df):
 
     df_base, c_h, c_a = processar_dados_base(df, temp_sel)
 
-    # --- 3. RANKING DE LIGAS (LÓGICA EXISTENTE) ---
+    # --- FUNÇÃO AUXILIAR POISSON ---
+    def prob_poisson(media, linha):
+        # Calcula 1 - Probabilidade acumulada até a linha (Ex: 1 - P(X<=8) = P(X>8.5))
+        return (1 - poisson.cdf(linha, media)) * 100
+
+    # --- 3. RANKING DE LIGAS ---
     def calcular_ranking_ligas(df_p):
         grupos = df_p.groupby('Liga')
         ranking_data = []
         for liga, dados in grupos:
             if len(dados) < 5: continue 
+            
+            media_cantos_liga = dados['Total_Cantos'].mean()
+            
             stats = {
-                "Over 0.5 FT": (dados['Total_FT'] > 0.5).mean(),
-                "Over 1.5 FT": (dados['Total_FT'] > 1.5).mean(),
-                "Over 2.5 FT": (dados['Total_FT'] > 2.5).mean(),
-                "Over 3.5 FT": (dados['Total_FT'] > 3.5).mean(),
-                "Over 0.5 HT": (dados['Total_HT'] > 0.5).mean(),
-                "BTTS FT": dados['BTTS'].mean(),
-                "Cantos +8.5": (dados['Total_Cantos'] > 8.5).mean(),
-                "Cantos +9.5": (dados['Total_Cantos'] > 9.5).mean(),
-                "Cantos +10.5": (dados['Total_Cantos'] > 10.5).mean(),
+                "Over 0.5 FT": (dados['Total_FT'] > 0.5).mean() * 100,
+                "Over 1.5 FT": (dados['Total_FT'] > 1.5).mean() * 100,
+                "Over 2.5 FT": (dados['Total_FT'] > 2.5).mean() * 100,
+                "Over 3.5 FT": (dados['Total_FT'] > 3.5).mean() * 100,
+                "Over 0.5 HT": (dados['Total_HT'] > 0.5).mean() * 100,
+                "BTTS FT": dados['BTTS'].mean() * 100,
+                "Cantos +8.5": (dados['Total_Cantos'] > 8.5).mean() * 100,
+                "Cantos +9.5": (dados['Total_Cantos'] > 9.5).mean() * 100,
+                "Cantos +10.5": (dados['Total_Cantos'] > 10.5).mean() * 100,
             }
-            ranking_data.append({"🏆 Liga": liga, "📊 Jogos": len(dados), "📈 Incidência": stats[mercado_sel] * 100})
+            
+            ranking_data.append({
+                "🏆 Liga": liga, 
+                "📊 Jogos": len(dados), 
+                "📈 Incidência": stats[mercado_sel],
+                "Prob 8.5": prob_poisson(media_cantos_liga, 8),
+                "Prob 9.5": prob_poisson(media_cantos_liga, 9),
+                "Prob 10.5": prob_poisson(media_cantos_liga, 10)
+            })
         return pd.DataFrame(ranking_data)
 
     df_rank_ligas = calcular_ranking_ligas(df_base)
+
+    def color_incidencia(val):
+        color = 'red' if val < 40 else 'orange' if val < 70 else 'green'
+        return f'color: {color}; font-weight: bold; text-align: center;'
 
     if not df_rank_ligas.empty:
         df_rank_ligas = df_rank_ligas.sort_values(by="📈 Incidência", ascending=False).reset_index(drop=True)
@@ -88,16 +109,16 @@ def mostrar_ranking(df):
         st.divider()
         st.markdown(f"### Top Ligas - {mercado_sel}")
         
-        def color_incidencia(val):
-            color = 'red' if val < 40 else 'orange' if val < 70 else 'green'
-            return f'color: {color}; font-weight: bold; text-align: center;'
-
-        st.table(df_rank_ligas.style.format({"📈 Incidência": "{:.2f}%"}).applymap(color_incidencia, subset=['📈 Incidência']))
+        st.table(df_rank_ligas.style.format({
+            "📈 Incidência": "{:.2f}%",
+            "Prob 8.5": "{:.2f}%",
+            "Prob 9.5": "{:.2f}%",
+            "Prob 10.5": "{:.2f}%"
+        }).applymap(color_incidencia, subset=['📈 Incidência']))
     
-    # --- 4. NOVO: RANKING DE TIMES POR LIGA ---
+    # --- 4. RANKING DE TIMES POR LIGA ---
     st.divider()
     st.markdown("### ⚽ Ranking de Times por Liga")
-    st.write("Selecione uma liga para ver o desempenho individual dos clubes.")
     
     lista_ligas_filtro = sorted(df_base['Liga'].unique())
     liga_escolhida = st.selectbox("Escolha a Liga para detalhar", lista_ligas_filtro)
@@ -111,28 +132,38 @@ def mostrar_ranking(df):
             df_t = df_liga_v[(df_liga_v['Mandante'] == t) | (df_liga_v['Visitante'] == t)]
             if len(df_t) < 3: continue
             
+            media_cantos_time = df_t['Total_Cantos'].mean()
+            
             stats_t = {
-                "Over 0.5 FT": (df_t['Total_FT'] > 0.5).mean(),
-                "Over 1.5 FT": (df_t['Total_FT'] > 1.5).mean(),
-                "Over 2.5 FT": (df_t['Total_FT'] > 2.5).mean(),
-                "Over 3.5 FT": (df_t['Total_FT'] > 3.5).mean(),
-                "Over 0.5 HT": (df_t['Total_HT'] > 0.5).mean(),
-                "BTTS FT": df_t['BTTS'].mean(),
-                "Cantos +8.5": (df_t['Total_Cantos'] > 8.5).mean(),
-                "Cantos +9.5": (df_t['Total_Cantos'] > 9.5).mean(),
-                "Cantos +10.5": (df_t['Total_Cantos'] > 10.5).mean(),
+                "Over 0.5 FT": (df_t['Total_FT'] > 0.5).mean() * 100,
+                "Over 1.5 FT": (df_t['Total_FT'] > 1.5).mean() * 100,
+                "Over 2.5 FT": (df_t['Total_FT'] > 2.5).mean() * 100,
+                "Over 3.5 FT": (df_t['Total_FT'] > 3.5).mean() * 100,
+                "Over 0.5 HT": (df_t['Total_HT'] > 0.5).mean() * 100,
+                "BTTS FT": df_t['BTTS'].mean() * 100,
+                "Cantos +8.5": (df_t['Total_Cantos'] > 8.5).mean() * 100,
+                "Cantos +9.5": (df_t['Total_Cantos'] > 9.5).mean() * 100,
+                "Cantos +10.5": (df_t['Total_Cantos'] > 10.5).mean() * 100,
             }
             
             ranking_times.append({
                 "Time": t,
                 "Jogos": len(df_t),
-                "Incidência": stats_t[mercado_sel] * 100
+                "Incidência": stats_t[mercado_sel],
+                "Prob 8.5": prob_poisson(media_cantos_time, 8),
+                "Prob 9.5": prob_poisson(media_cantos_time, 9),
+                "Prob 10.5": prob_poisson(media_cantos_time, 10)
             })
         
         df_rank_times = pd.DataFrame(ranking_times)
         if not df_rank_times.empty:
             df_rank_times = df_rank_times.sort_values(by="Incidência", ascending=False).reset_index(drop=True)
             df_rank_times.index += 1
-            st.table(df_rank_times.style.format({"Incidência": "{:.2f}%"}).applymap(color_incidencia, subset=['Incidência']))
+            st.table(df_rank_times.style.format({
+                "Incidência": "{:.2f}%",
+                "Prob 8.5": "{:.2f}%",
+                "Prob 9.5": "{:.2f}%",
+                "Prob 10.5": "{:.2f}%"
+            }).applymap(color_incidencia, subset=['Incidência']))
         else:
             st.warning("Dados insuficientes para os times desta liga.")
