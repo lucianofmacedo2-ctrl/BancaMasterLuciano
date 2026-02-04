@@ -58,9 +58,50 @@ def mostrar_jogos(df_hist):
 
     st.info(f"Mostrando jogos de: **{st.session_state.data_exibicao}**")
 
+    # --- FILTRO DO DIA ---
     df_dia = df_agenda[df_agenda['Data'].isin(st.session_state.data_sel_formatos)]
     times_no_dia = [] 
 
+    # --- NOVO: LÓGICA DE SUGESTÕES (OVER GOLS E CANTOS) ---
+    if not df_dia.empty and not df_hist.empty:
+        sugestoes_gols = []
+        sugestoes_cantos = []
+        
+        col_c_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
+        col_c_a = 'Corners_A' if 'Corners_A' in df_hist.columns else 'Cantos_Visitante'
+
+        for _, row in df_dia.iterrows():
+            m, v = row['Mandante'], row['Visitante']
+            df_m = df_hist[(df_hist['Mandante'] == m) | (df_hist['Visitante'] == m)]
+            df_v = df_hist[(df_hist['Mandante'] == v) | (df_hist['Visitante'] == v)]
+            
+            if not df_m.empty and not df_v.empty:
+                # Média de Gols Combinada
+                m_gols = (df_hist[df_hist['Mandante']==m]['Total_Gols_FT'].mean() + df_hist[df_hist['Visitante']==v]['Total_Gols_FT'].mean()) / 2
+                if m_gols > 2.0:
+                    sugestoes_gols.append({'Jogo': f"{m} x {v}", 'Média': m_gols})
+                
+                # Média de Cantos Combinada
+                if col_c_h in df_hist.columns:
+                    m_cantos = (df_hist[df_hist['Mandante']==m][col_c_h].mean() + df_hist[df_hist['Visitante']==v][col_c_a].mean())
+                    if m_cantos > 8.5:
+                        sugestoes_cantos.append({'Jogo': f"{m} x {v}", 'Média': m_cantos})
+
+        if sugestoes_gols or sugestoes_cantos:
+            with st.expander("🎯 Dicas de Ouro do Algoritmo (Top 5)", expanded=True):
+                c_sug1, c_sug2 = st.columns(2)
+                with c_sug1:
+                    st.markdown("🔥 **Top Over 2.5 Gols**")
+                    df_sg = pd.DataFrame(sugestoes_gols).sort_values(by='Média', ascending=False).head(5)
+                    if not df_sg.empty: st.dataframe(df_sg, hide_index=True, use_container_width=True)
+                    else: st.write("Nenhuma dica forte para gols.")
+                with c_sug2:
+                    st.markdown("🚩 **Top Over 9.5 Cantos**")
+                    df_sc = pd.DataFrame(sugestoes_cantos).sort_values(by='Média', ascending=False).head(5)
+                    if not df_sc.empty: st.dataframe(df_sc, hide_index=True, use_container_width=True)
+                    else: st.write("Nenhuma dica forte para cantos.")
+
+    # --- LISTAGEM DE JOGOS POR LIGA ---
     if df_dia.empty:
         st.warning(f"Nenhum jogo encontrado para {st.session_state.data_exibicao}.")
     else:
@@ -72,7 +113,6 @@ def mostrar_jogos(df_hist):
                 mandante, visitante = row['Mandante'], row['Visitante']
                 times_no_dia.extend([mandante, visitante])
                 
-                # --- LÓGICA DE TENDÊNCIAS (Radar de Valor) ---
                 tem_gol = False
                 tem_canto = False
                 tem_ambas = False
@@ -131,6 +171,7 @@ def mostrar_jogos(df_hist):
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
+    # --- RANKINGS DE PERFORMANCE ---
     if not df_hist.empty and times_no_dia:
         st.divider()
         st.subheader(f"📊 Rankings de Performance - {st.session_state.data_exibicao}")
