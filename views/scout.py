@@ -112,6 +112,8 @@ def mostrar_scout(df):
 
     st.divider()
     st.markdown("### 📉 Estatísticas Técnicas (Últimos Jogos)")
+    
+    # Filtro de amostragem
     df_m_last = df_l[(df_l['Mandante'] == m_sel) | (df_l['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
     df_v_last = df_l[(df_l['Mandante'] == v_sel) | (df_l['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(n_jogos)
 
@@ -123,20 +125,44 @@ def mostrar_scout(df):
         return [mean, median, mode, std, cv]
 
     def preparar_tabela_tecnica(df_hist, time):
+        # Mapeamento Dinâmico de Colunas para evitar KeyError
+        col_cn_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
+        col_cn_a = 'Corners_A' if 'Corners_A' in df_hist.columns else 'Cantos_Visitante'
+        col_sh_h = 'ShotsOnTarget_H' if 'ShotsOnTarget_H' in df_hist.columns else 'Finalizacoes_Mandante'
+        col_sh_a = 'ShotsOnTarget_A' if 'ShotsOnTarget_A' in df_hist.columns else 'Finalizacoes_Visitante'
+
         g_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
         g_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_FT']])
         g_pro_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_HT']])
         g_con_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_HT']])
-        c_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_H'], df_hist[df_hist['Visitante'] == time]['Corners_A']])
-        c_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_A'], df_hist[df_hist['Visitante'] == time]['Corners_H']])
-        ch_pro = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_H'], df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_A']])
-        ch_con = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_A'], df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_H']])
-        data = [['Gols Marcados (FT)']+get_stats_combo(g_pro_ft), ['Gols Sofridos (FT)']+get_stats_combo(g_con_ft), ['Gols Marcados (HT)']+get_stats_combo(g_pro_ht), ['Gols Sofridos (HT)']+get_stats_combo(g_con_ht), ['Cantos FT (Pro)']+get_stats_combo(c_pro_ft), ['Cantos FT (Contra)']+get_stats_combo(c_con_ft), ['Chutes no Gol (Pro)']+get_stats_combo(ch_pro), ['Chutes no Gol (Contra)']+get_stats_combo(ch_con)]
+        
+        # Cantos com Fallback
+        c_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_a, pd.Series(0))])
+        c_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_h, pd.Series(0))])
+        
+        # Chutes com Fallback
+        ch_pro = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_sh_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_sh_a, pd.Series(0))])
+        ch_con = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_sh_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_sh_h, pd.Series(0))])
+        
+        data = [
+            ['Gols Marcados (FT)']+get_stats_combo(g_pro_ft), 
+            ['Gols Sofridos (FT)']+get_stats_combo(g_con_ft), 
+            ['Gols Marcados (HT)']+get_stats_combo(g_pro_ht), 
+            ['Gols Sofridos (HT)']+get_stats_combo(g_con_ht), 
+            ['Cantos FT (Pro)']+get_stats_combo(c_pro_ft), 
+            ['Cantos FT (Contra)']+get_stats_combo(c_con_ft), 
+            ['Chutes no Gol (Pro)']+get_stats_combo(ch_pro), 
+            ['Chutes no Gol (Contra)']+get_stats_combo(ch_con)
+        ]
         return pd.DataFrame(data, columns=['Métrica', 'Média', 'Mediana', 'Moda', 'DP', 'CV'])
 
     col_t1, col_t2 = st.columns(2)
-    with col_t1: st.table(preparar_tabela_tecnica(df_m_last, m_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
-    with col_t2: st.table(preparar_tabela_tecnica(df_v_last, v_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
+    with col_t1: 
+        st.write(f"📈 **Estatísticas: {m_sel}**")
+        st.table(preparar_tabela_tecnica(df_m_last, m_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
+    with col_t2: 
+        st.write(f"📈 **Estatísticas: {v_sel}**")
+        st.table(preparar_tabela_tecnica(df_v_last, v_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
 
     st.divider()
     st.markdown("### 💰 Incidência de Mercados (%)")
@@ -166,13 +192,19 @@ def mostrar_scout(df):
     def preparar_minutos(df_hist, time):
         marc, sofr = [], []
         for f in faixas:
-            m = df_hist[df_hist['Mandante'] == time][f'{f}_Mandante'].sum() + df_hist[df_hist['Visitante'] == time][f'{f}_Visitante'].sum()
-            s = df_hist[df_hist['Mandante'] == time][f'{f}_Visitante'].sum() + df_hist[df_hist['Visitante'] == time][f'{f}_Mandante'].sum()
+            # Verifica se as colunas de minutos existem
+            col_m = f'{f}_Mandante'; col_v = f'{f}_Visitante'
+            m = 0; s = 0
+            if col_m in df_hist.columns and col_v in df_hist.columns:
+                m = df_hist[df_hist['Mandante'] == time][col_m].sum() + df_hist[df_hist['Visitante'] == time][col_v].sum()
+                s = df_hist[df_hist['Mandante'] == time][col_v].sum() + df_hist[df_hist['Visitante'] == time][col_m].sum()
             marc.append(int(m)); sofr.append(int(s))
         return pd.DataFrame({'Intervalo': faixas, 'Gols Marcados': marc, 'Gols Sofridos': sofr})
+    
     def highlight_max(s):
         is_max = s == s.max()
         return ['background-color: #1f77b4; color: white; font-weight: bold' if v and v > 0 else '' for v in is_max]
+    
     cmin1, cmin2 = st.columns(2)
     with cmin1: st.table(preparar_minutos(df_m_last, m_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
     with cmin2: st.table(preparar_minutos(df_v_last, v_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
@@ -181,14 +213,19 @@ def mostrar_scout(df):
     st.markdown("### 📝 Histórico Detalhado (Últimos 10 Jogos)")
     
     def preparar_historico_lista(df_hist, time):
-        df_hist['Data'] = pd.to_datetime(df_hist['Data'])
+        df_hist = df_hist.copy()
+        df_hist['Data'] = pd.to_datetime(df_hist['Data'], errors='coerce')
         df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
         jogos = []
         for _, r in df_f.iterrows():
             oponente = r['Visitante'] if r['Mandante'] == time else r['Mandante']
             mando = "Casa" if r['Mandante'] == time else "Fora"
-            placar = f"{int(r['Gols_Mandante_FT'])} x {int(r['Gols_Visitante_FT'])}"
-            jogos.append({'Data': r['Data'].strftime('%d/%m/%Y'), 'Mando': mando, 'Oponente': oponente, 'Placar': placar})
+            try:
+                placar = f"{int(r['Gols_Mandante_FT'])} x {int(r['Gols_Visitante_FT'])}"
+            except:
+                placar = "N/A"
+            dt_str = r['Data'].strftime('%d/%m/%Y') if pd.notnull(r['Data']) else "N/A"
+            jogos.append({'Data': dt_str, 'Mando': mando, 'Oponente': oponente, 'Placar': placar})
         return pd.DataFrame(jogos)
 
     clist1, clist2 = st.columns(2)
