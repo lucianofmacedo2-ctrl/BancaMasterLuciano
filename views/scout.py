@@ -33,38 +33,31 @@ def mostrar_scout(df):
         for _, r in df_liga.iterrows():
             m, v = r['Mandante'], r['Visitante']
             gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
-            
             for t in [m, v]:
                 if t not in stats: stats[t] = {'P': 0, 'V': 0, 'SG': 0}
-            
             stats[m]['SG'] += (gm - gv)
             stats[v]['SG'] += (gv - gm)
-            
             if gm > gv:
-                stats[m]['P'] += 3
-                stats[m]['V'] += 1
+                stats[m]['P'] += 3; stats[m]['V'] += 1
             elif gm == gv:
-                stats[m]['P'] += 1
-                stats[v]['P'] += 1
+                stats[m]['P'] += 1; stats[v]['P'] += 1
             else:
-                stats[v]['P'] += 3
-                stats[v]['V'] += 1
+                stats[v]['P'] += 3; stats[v]['V'] += 1
         
         tab = pd.DataFrame.from_dict(stats, orient='index').reset_index().rename(columns={'index':'Time'})
         tab = tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
         tab['Pos'] = tab.index + 1
         return tab
 
-    # Execução do cálculo
+    # Execução do cálculo de posições
     tabela_liga = calcular_posicoes(df_l)
     
     try:
-        # Busca a posição exata de cada time
         pos_m = tabela_liga[tabela_liga['Time'] == m_sel]['Pos'].values[0]
         pos_v = tabela_liga[tabela_liga['Time'] == v_sel]['Pos'].values[0]
         dif = abs(pos_m - pos_v)
 
-        # 5. ESTILO E EXIBIÇÃO DOS CARDS (Centralizados e Escuros)
+        # 5. ESTILO E EXIBIÇÃO DOS CARDS
         st.markdown("""
             <style>
             div[data-testid="stMetricValue"] > div {
@@ -78,23 +71,65 @@ def mostrar_scout(df):
                 justify-content: center !important;
                 color: #31333F !important;
             }
-            /* Garante que o container da métrica também centralize */
             [data-testid="stMetric"] {
                 text-align: center;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
             }
+            /* Centralização das tabelas */
+            .stTable td, .stTable th { text-align: center !important; }
             </style>
             """, unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric(label=f"Posição {m_sel}", value=f"{pos_m}º")
-        with c2:
-            st.metric(label=f"Posição {v_sel}", value=f"{pos_v}º")
-        with c3:
-            st.metric(label="Diferença de Tabela", value=f"{dif} pos.")
+        with c1: st.metric(label=f"Posição {m_sel}", value=f"{pos_m}º")
+        with c2: st.metric(label=f"Posição {v_sel}", value=f"{pos_v}º")
+        with c3: st.metric(label="Diferença de Tabela", value=f"{dif} pos.")
             
-    except Exception as e:
-        st.info("Aguardando seleção de times para calcular posições.")
+    except:
+        st.info("Selecione os times para calcular posições.")
+
+    # --- 6. BLOCO: ESTATÍSTICA TÉCNICA DETALHADA ---
+    st.divider()
+    st.markdown("### 📉 Estatísticas Técnicas (Últimos Jogos)")
+
+    def get_stats_combo(series):
+        if series.empty: return [0.0]*5
+        mean = series.mean()
+        median = series.median()
+        mode = series.mode().iloc[0] if not series.mode().empty else 0.0
+        std = series.std()
+        cv = (std / mean) if mean != 0 else 0.0
+        return [mean, median, mode, std, cv]
+
+    # Filtrar amostragem para as tabelas
+    df_m_last = df_l[(df_l['Mandante'] == m_sel) | (df_l['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
+    df_v_last = df_l[(df_l['Mandante'] == v_sel) | (df_l['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(n_jogos)
+
+    def preparar_tabela_tecnica(df_hist, time):
+        # Séries: Gols Pro, Cantos, Chutes no Gol
+        gols_pro = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], 
+                             df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
+        cantos = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_H'], 
+                            df_hist[df_hist['Visitante'] == time]['Corners_A']])
+        chutes = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_H'], 
+                            df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_A']])
+        
+        data = [
+            ['Gols Marcados'] + get_stats_combo(gols_pro),
+            ['Cantos (Escanteios)'] + get_stats_combo(cantos),
+            ['Chutes no Gol'] + get_stats_combo(chutes)
+        ]
+        return pd.DataFrame(data, columns=['Métrica', 'Média', 'Mediana', 'Moda', 'DP', 'CV'])
+
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        st.markdown(f"**{m_sel}**")
+        tab_m = preparar_tabela_tecnica(df_m_last, m_sel)
+        st.table(tab_m.style.format({c: "{:.2f}" for c in tab_m.columns if c != 'Métrica'}))
+
+    with col_t2:
+        st.markdown(f"**{v_sel}**")
+        tab_v = preparar_tabela_tecnica(df_v_last, v_sel)
+        st.table(tab_v.style.format({c: "{:.2f}" for c in tab_v.columns if c != 'Métrica'}))
