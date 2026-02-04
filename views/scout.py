@@ -72,7 +72,7 @@ def mostrar_scout(df):
         for _, r in df_f.iterrows():
             if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT']: resultados.append("🟡")
             elif (r['Mandante'] == time and r['Gols_Mandante_FT'] > r['Gols_Visitante_FT']) or \
-                 (r['Visitante'] == time and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']): resultados.append("🟢")
+                 (r['Visitante'] == time and r['Gols_Visitante_FT'] > r['Gols_Visitante_FT']): resultados.append("🟢")
             else: resultados.append("🔴")
         return " ".join(resultados)
 
@@ -125,34 +125,47 @@ def mostrar_scout(df):
         return [mean, median, mode, std, cv]
 
     def preparar_tabela_tecnica(df_hist, time):
-        # Mapeamento Dinâmico de Colunas para evitar KeyError
+        # Mapeamento Dinâmico de Colunas
         col_cn_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
         col_cn_a = 'Corners_A' if 'Corners_A' in df_hist.columns else 'Cantos_Visitante'
-        col_sh_h = 'ShotsOnTarget_H' if 'ShotsOnTarget_H' in df_hist.columns else 'Finalizacoes_Mandante'
-        col_sh_a = 'ShotsOnTarget_A' if 'ShotsOnTarget_A' in df_hist.columns else 'Finalizacoes_Visitante'
+        col_sh_h = 'Shots_H' if 'Shots_H' in df_hist.columns else 'Finalizacoes_Mandante'
+        col_sh_a = 'Shots_A' if 'Shots_A' in df_hist.columns else 'Finalizacoes_Visitante'
+        
+        # --- COLUNAS DE CARTÕES ---
+        col_yc_h = 'Cards_Yellow_H' if 'Cards_Yellow_H' in df_hist.columns else 'Cartoes_Amarelos_Mandante'
+        col_yc_a = 'Cards_Yellow_A' if 'Cards_Yellow_A' in df_hist.columns else 'Cartoes_Amarelos_Visitante'
+        col_rc_h = 'Cards_Red_H' if 'Cards_Red_H' in df_hist.columns else 'Cartoes_Vermelhos_Mandante'
+        col_rc_a = 'Cards_Red_A' if 'Cards_Red_A' in df_hist.columns else 'Cartoes_Vermelhos_Visitante'
+        col_tc_h = 'Cards_Total_H' if 'Cards_Total_H' in df_hist.columns else 'Cartoes_Total_Mandante'
+        col_tc_a = 'Cards_Total_A' if 'Cards_Total_A' in df_hist.columns else 'Cartoes_Total_Visitante'
 
         g_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
         g_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_FT']])
-        g_pro_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_HT']])
-        g_con_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_HT']])
         
-        # Cantos com Fallback
         c_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_a, pd.Series(0))])
         c_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_h, pd.Series(0))])
+
+        # Cartões Cometidos (Pro) e Causados (Contra)
+        y_cometidos = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_yc_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_yc_a, pd.Series(0))])
+        y_causados = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_yc_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_yc_h, pd.Series(0))])
         
-        # Chutes com Fallback
-        ch_pro = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_sh_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_sh_a, pd.Series(0))])
-        ch_con = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_sh_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_sh_h, pd.Series(0))])
-        
+        r_cometidos = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_rc_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_rc_a, pd.Series(0))])
+        r_causados = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_rc_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_rc_h, pd.Series(0))])
+
+        t_cometidos = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_tc_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_tc_a, pd.Series(0))])
+        t_causados = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_tc_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_tc_h, pd.Series(0))])
+
         data = [
             ['Gols Marcados (FT)']+get_stats_combo(g_pro_ft), 
             ['Gols Sofridos (FT)']+get_stats_combo(g_con_ft), 
-            ['Gols Marcados (HT)']+get_stats_combo(g_pro_ht), 
-            ['Gols Sofridos (HT)']+get_stats_combo(g_con_ht), 
             ['Cantos FT (Pro)']+get_stats_combo(c_pro_ft), 
-            ['Cantos FT (Contra)']+get_stats_combo(c_con_ft), 
-            ['Chutes no Gol (Pro)']+get_stats_combo(ch_pro), 
-            ['Chutes no Gol (Contra)']+get_stats_combo(ch_con)
+            ['Cantos FT (Contra)']+get_stats_combo(c_con_ft),
+            ['Amarelos (Cometidos)']+get_stats_combo(y_cometidos),
+            ['Amarelos (Causados)']+get_stats_combo(y_causados),
+            ['Vermelhos (Cometidos)']+get_stats_combo(r_cometidos),
+            ['Vermelhos (Causados)']+get_stats_combo(r_causados),
+            ['Total Cartões (Cometidos)']+get_stats_combo(t_cometidos),
+            ['Total Cartões (Causados)']+get_stats_combo(t_causados)
         ]
         return pd.DataFrame(data, columns=['Métrica', 'Média', 'Mediana', 'Moda', 'DP', 'CV'])
 
@@ -168,20 +181,29 @@ def mostrar_scout(df):
     st.markdown("### 💰 Incidência de Mercados (%)")
     def calcular_incidencia(df_hist):
         df_hist = df_hist.copy()
-        df_hist['Gols_M_ST'] = df_hist['Gols_Mandante_FT'] - df_hist['Gols_Mandante_HT']
-        df_hist['Gols_V_ST'] = df_hist['Gols_Visitante_FT'] - df_hist['Gols_Visitante_HT']
-        df_hist['Total_HT'] = df_hist['Gols_Mandante_HT'] + df_hist['Gols_Visitante_HT']
+        
+        # Mapeamento para Cartões Total no DataFrame
+        col_tc_h = 'Cards_Total_H' if 'Cards_Total_H' in df_hist.columns else 'Cartoes_Total_Mandante'
+        col_tc_a = 'Cards_Total_A' if 'Cards_Total_A' in df_hist.columns else 'Cartoes_Total_Visitante'
+        
         df_hist['Total_FT'] = df_hist['Gols_Mandante_FT'] + df_hist['Gols_Visitante_FT']
-        df_hist['Total_ST'] = df_hist['Gols_M_ST'] + df_hist['Gols_V_ST']
-        df_hist['BTTS_HT'] = (df_hist['Gols_Mandante_HT'] > 0) & (df_hist['Gols_Visitante_HT'] > 0)
         df_hist['BTTS_FT'] = (df_hist['Gols_Mandante_FT'] > 0) & (df_hist['Gols_Visitante_FT'] > 0)
-        df_hist['BTTS_ST'] = (df_hist['Gols_M_ST'] > 0) & (df_hist['Gols_V_ST'] > 0)
-        mercados = [0.5, 1.5, 2.5, 3.5]
-        linhas = []
-        for m in mercados:
-            linhas.append({'Mercado': f'Over {m} Gols', 'HT': f"{(df_hist['Total_HT'] > m).mean()*100:.2f}%", 'ST': f"{(df_hist['Total_ST'] > m).mean()*100:.2f}%", 'FT': f"{(df_hist['Total_FT'] > m).mean()*100:.2f}%"})
-        linhas.append({'Mercado': 'BTTS (Ambas)', 'HT': f"{df_hist['BTTS_HT'].mean()*100:.2f}%", 'ST': f"{df_hist['BTTS_ST'].mean()*100:.2f}%", 'FT': f"{df_hist['BTTS_FT'].mean()*100:.2f}%"})
+        
+        if col_tc_h in df_hist.columns and col_tc_a in df_hist.columns:
+            df_hist['Total_Cartoes'] = df_hist[col_tc_h] + df_hist[col_tc_a]
+        else:
+            df_hist['Total_Cartoes'] = 0
+
+        linhas = [
+            {'Mercado': 'Over 1.5 Gols', 'Freq (%)': f"{(df_hist['Total_FT'] > 1.5).mean()*100:.2f}%"},
+            {'Mercado': 'Over 2.5 Gols', 'Freq (%)': f"{(df_hist['Total_FT'] > 2.5).mean()*100:.2f}%"},
+            {'Mercado': 'Ambas Marcam', 'Freq (%)': f"{df_hist['BTTS_FT'].mean()*100:.2f}%"},
+            {'Mercado': 'Over 3.5 Cartões', 'Freq (%)': f"{(df_hist['Total_Cartoes'] > 3.5).mean()*100:.2f}%"},
+            {'Mercado': 'Over 4.5 Cartões', 'Freq (%)': f"{(df_hist['Total_Cartoes'] > 4.5).mean()*100:.2f}%"},
+            {'Mercado': 'Over 5.5 Cartões', 'Freq (%)': f"{(df_hist['Total_Cartoes'] > 5.5).mean()*100:.2f}%"}
+        ]
         return pd.DataFrame(linhas)
+
     cm1, cm2 = st.columns(2)
     with cm1: st.table(calcular_incidencia(df_m_last))
     with cm2: st.table(calcular_incidencia(df_v_last))
@@ -192,7 +214,6 @@ def mostrar_scout(df):
     def preparar_minutos(df_hist, time):
         marc, sofr = [], []
         for f in faixas:
-            # Verifica se as colunas de minutos existem
             col_m = f'{f}_Mandante'; col_v = f'{f}_Visitante'
             m = 0; s = 0
             if col_m in df_hist.columns and col_v in df_hist.columns:
@@ -216,16 +237,23 @@ def mostrar_scout(df):
         df_hist = df_hist.copy()
         df_hist['Data'] = pd.to_datetime(df_hist['Data'], errors='coerce')
         df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
+        
+        # Mapeamento para cartões no histórico
+        c_tot_h = 'Cards_Total_H' if 'Cards_Total_H' in df_hist.columns else 'Cartoes_Total_Mandante'
+        c_tot_a = 'Cards_Total_A' if 'Cards_Total_A' in df_hist.columns else 'Cartoes_Total_Visitante'
+        
         jogos = []
         for _, r in df_f.iterrows():
             oponente = r['Visitante'] if r['Mandante'] == time else r['Mandante']
             mando = "Casa" if r['Mandante'] == time else "Fora"
             try:
                 placar = f"{int(r['Gols_Mandante_FT'])} x {int(r['Gols_Visitante_FT'])}"
+                cartoes = f"{int(r[c_tot_h]) + int(r[c_tot_a])}"
             except:
                 placar = "N/A"
+                cartoes = "N/A"
             dt_str = r['Data'].strftime('%d/%m/%Y') if pd.notnull(r['Data']) else "N/A"
-            jogos.append({'Data': dt_str, 'Mando': mando, 'Oponente': oponente, 'Placar': placar})
+            jogos.append({'Data': dt_str, 'Mando': mando, 'Oponente': oponente, 'Placar': placar, 'Cartões T.': cartoes})
         return pd.DataFrame(jogos)
 
     clist1, clist2 = st.columns(2)
