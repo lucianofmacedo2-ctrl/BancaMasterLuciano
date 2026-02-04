@@ -52,13 +52,10 @@ def mostrar_scout(df):
         
         resultados = []
         for _, r in df_f.iterrows():
-            if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT']:
-                resultados.append("🟡")
+            if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT']: resultados.append("🟡")
             elif (r['Mandante'] == time and r['Gols_Mandante_FT'] > r['Gols_Visitante_FT']) or \
-                 (r['Visitante'] == time and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']):
-                resultados.append("🟢")
-            else:
-                resultados.append("🔴")
+                 (r['Visitante'] == time and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']): resultados.append("🟢")
+            else: resultados.append("🔴")
         return " ".join(resultados)
 
     # Execução das Posições
@@ -84,7 +81,7 @@ def mostrar_scout(df):
     except:
         st.info("Selecione os times.")
 
-    # --- 5. BLOCO: FORMA RECENTE (LAST 5) ---
+    # --- 5. BLOCO: FORMA RECENTE ---
     st.divider()
     st.markdown("### 📈 Forma Recente (Últimos 5 Jogos)")
     cf1, cf2 = st.columns(2)
@@ -119,16 +116,7 @@ def mostrar_scout(df):
         c_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_A'], df_hist[df_hist['Visitante'] == time]['Corners_H']])
         ch_pro = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_H'], df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_A']])
         ch_con = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_A'], df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_H']])
-        data = [
-            ['Gols Marcados (FT)'] + get_stats_combo(g_pro_ft),
-            ['Gols Sofridos (FT)'] + get_stats_combo(g_con_ft),
-            ['Gols Marcados (HT)'] + get_stats_combo(g_pro_ht),
-            ['Gols Sofridos (HT)'] + get_stats_combo(g_con_ht),
-            ['Cantos FT (Pro)'] + get_stats_combo(c_pro_ft),
-            ['Cantos FT (Contra)'] + get_stats_combo(c_con_ft),
-            ['Chutes no Gol (Pro)'] + get_stats_combo(ch_pro),
-            ['Chutes no Gol (Contra)'] + get_stats_combo(ch_con)
-        ]
+        data = [['Gols Marcados (FT)']+get_stats_combo(g_pro_ft), ['Gols Sofridos (FT)']+get_stats_combo(g_con_ft), ['Gols Marcados (HT)']+get_stats_combo(g_pro_ht), ['Gols Sofridos (HT)']+get_stats_combo(g_con_ht), ['Cantos FT (Pro)']+get_stats_combo(c_pro_ft), ['Cantos FT (Contra)']+get_stats_combo(c_con_ft), ['Chutes no Gol (Pro)']+get_stats_combo(ch_pro), ['Chutes no Gol (Contra)']+get_stats_combo(ch_con)]
         return pd.DataFrame(data, columns=['Métrica', 'Média', 'Mediana', 'Moda', 'DP', 'CV'])
 
     col_t1, col_t2 = st.columns(2)
@@ -175,3 +163,25 @@ def mostrar_scout(df):
     cmin1, cmin2 = st.columns(2)
     with cmin1: st.table(preparar_minutos(df_m_last, m_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
     with cmin2: st.table(preparar_minutos(df_v_last, v_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
+
+    # --- 9. BLOCO: ÚLTIMOS 10 JOGOS DETALHADOS ---
+    st.divider()
+    st.markdown("### 📝 Histórico Detalhado (Últimos 10 Jogos)")
+    
+    def preparar_historico_lista(df_hist, time):
+        df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
+        jogos = []
+        for _, r in df_f.iterrows():
+            oponente = r['Visitante'] if r['Mandante'] == time else r['Mandante']
+            mando = "Casa" if r['Mandante'] == time else "Fora"
+            placar = f"{int(r['Gols_Mandante_FT'])} x {int(r['Gols_Visitante_FT'])}"
+            jogos.append({'Data': r['Data'].strftime('%d/%m/%Y'), 'Mando': mando, 'Oponente': oponente, 'Placar': placar})
+        return pd.DataFrame(jogos)
+
+    clist1, clist2 = st.columns(2)
+    with clist1:
+        st.write(f"**Jogos de {m_sel}**")
+        st.table(preparar_historico_lista(df_l, m_sel))
+    with clist2:
+        st.write(f"**Jogos de {v_sel}**")
+        st.table(preparar_historico_lista(df_l, v_sel))
