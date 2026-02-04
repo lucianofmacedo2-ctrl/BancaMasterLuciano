@@ -2,12 +2,15 @@ name: Atualizar Base de Dados Diária
 
 on:
   schedule:
-    - cron: '0 9 * * *' # Roda todo dia às 09:00 UTC (06:00 Brasília)
-  workflow_dispatch: # Permite rodar manualmente apertando um botão
+    - cron: '0 5 * * *' # Roda todo dia às 05:00 AM
+  workflow_dispatch: # Permite rodar manualmente
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # IMPORTANTE: Permissão para o bot salvar arquivos
+
     steps:
       - name: Checkout do repositório
         uses: actions/checkout@v3
@@ -15,19 +18,20 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Instalar dependências
         run: |
-          pip install pandas numpy requests
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Executar script de atualização
         run: python atualizar_dados.py
 
-      - name: Salvar alterações no GitHub
+      - name: Commitar e dar Push nas alterações
         run: |
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add dados_25_26.csv
           git commit -m "Atualização automática dos dados: $(date +'%d/%m/%Y')" || exit 0
           git push
