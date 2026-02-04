@@ -8,15 +8,33 @@ def mostrar_scout(df):
     # 1. Ajuste das colunas
     df.columns = [c.strip() for c in df.columns]
 
-    # 2. SELEÇÃO DA LIGA
+    # --- LÓGICA DE INDEXAÇÃO AUTOMÁTICA ---
     lista_ligas = sorted(df['Liga'].unique())
-    liga_sel = st.selectbox("🏆 Escolha a Liga", lista_ligas)
+    idx_liga = 0
+    if 'liga_scout' in st.session_state:
+        if st.session_state.liga_scout in lista_ligas:
+            idx_liga = lista_ligas.index(st.session_state.liga_scout)
+
+    # 2. SELEÇÃO DA LIGA
+    liga_sel = st.selectbox("🏆 Escolha a Liga", lista_ligas, index=idx_liga)
     df_l = df[df['Liga'] == liga_sel].copy()
 
-    # 3. SELEÇÃO DOS TIMES
+    # --- TIMES DA LIGA SELECIONADA ---
     lista_times = sorted(df_l['Mandante'].unique())
-    m_sel = st.selectbox("🏠 Time da Casa", lista_times)
-    v_sel = st.selectbox("🚌 Time de Fora", [t for t in lista_times if t != m_sel])
+    
+    idx_casa = 0
+    if 'time_casa_scout' in st.session_state and st.session_state.time_casa_scout in lista_times:
+        idx_casa = lista_times.index(st.session_state.time_casa_scout)
+
+    # 3. SELEÇÃO DOS TIMES
+    m_sel = st.selectbox("🏠 Time da Casa", lista_times, index=idx_casa)
+    
+    visitantes_disp = [t for t in lista_times if t != m_sel]
+    idx_fora = 0
+    if 'time_fora_scout' in st.session_state and st.session_state.time_fora_scout in visitantes_disp:
+        idx_fora = visitantes_disp.index(st.session_state.time_fora_scout)
+
+    v_sel = st.selectbox("🚌 Time de Fora", visitantes_disp, index=idx_fora)
 
     # 4. CONFIGURAÇÃO (Sidebar)
     n_jogos = st.sidebar.slider("Amostragem (Últimos Jogos)", 5, 50, 10)
@@ -58,7 +76,6 @@ def mostrar_scout(df):
             else: resultados.append("🔴")
         return " ".join(resultados)
 
-    # Execução das Posições
     tabela_liga = calcular_posicoes(df_l)
     try:
         pos_m = tabela_liga[tabela_liga['Time'] == m_sel]['Pos'].values[0]
@@ -81,7 +98,6 @@ def mostrar_scout(df):
     except:
         st.info("Selecione os times.")
 
-    # --- 5. BLOCO: FORMA RECENTE ---
     st.divider()
     st.markdown("### 📈 Forma Recente (Últimos 5 Jogos)")
     cf1, cf2 = st.columns(2)
@@ -94,7 +110,6 @@ def mostrar_scout(df):
         st.write(f"Geral: {get_forma(df_l, v_sel)}")
         st.write(f"Fora: {get_forma(df_l, v_sel, True, 'Fora')}")
 
-    # --- 6. BLOCO: ESTATÍSTICA TÉCNICA ---
     st.divider()
     st.markdown("### 📉 Estatísticas Técnicas (Últimos Jogos)")
     df_m_last = df_l[(df_l['Mandante'] == m_sel) | (df_l['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
@@ -123,7 +138,6 @@ def mostrar_scout(df):
     with col_t1: st.table(preparar_tabela_tecnica(df_m_last, m_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
     with col_t2: st.table(preparar_tabela_tecnica(df_v_last, v_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
 
-    # --- 7. BLOCO: INCIDÊNCIA DE MERCADOS ---
     st.divider()
     st.markdown("### 💰 Incidência de Mercados (%)")
     def calcular_incidencia(df_hist):
@@ -146,7 +160,6 @@ def mostrar_scout(df):
     with cm1: st.table(calcular_incidencia(df_m_last))
     with cm2: st.table(calcular_incidencia(df_v_last))
 
-    # --- 8. BLOCO: MINUTOS ---
     st.divider()
     st.markdown("### ⏰ Distribuição de Gols por Minutos")
     faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
@@ -164,18 +177,16 @@ def mostrar_scout(df):
     with cmin1: st.table(preparar_minutos(df_m_last, m_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
     with cmin2: st.table(preparar_minutos(df_v_last, v_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
 
-    # --- 9. BLOCO: ÚLTIMOS 10 JOGOS DETALHADOS (CORRIGIDO) ---
     st.divider()
     st.markdown("### 📝 Histórico Detalhado (Últimos 10 Jogos)")
     
     def preparar_historico_lista(df_hist, time):
-        df_hist['Data'] = pd.to_datetime(df_hist['Data']) # Garante que é data
+        df_hist['Data'] = pd.to_datetime(df_hist['Data'])
         df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
         jogos = []
         for _, r in df_f.iterrows():
             oponente = r['Visitante'] if r['Mandante'] == time else r['Mandante']
             mando = "Casa" if r['Mandante'] == time else "Fora"
-            # Formata placar sem o .0
             placar = f"{int(r['Gols_Mandante_FT'])} x {int(r['Gols_Visitante_FT'])}"
             jogos.append({'Data': r['Data'].strftime('%d/%m/%Y'), 'Mando': mando, 'Oponente': oponente, 'Placar': placar})
         return pd.DataFrame(jogos)
