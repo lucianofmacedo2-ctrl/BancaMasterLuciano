@@ -164,16 +164,18 @@ def mostrar_scout(df):
     with cmin1: st.table(preparar_minutos(df_m_last, m_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
     with cmin2: st.table(preparar_minutos(df_v_last, v_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
 
-    # --- 9. BLOCO: ÚLTIMOS 10 JOGOS DETALHADOS ---
+    # --- 9. BLOCO: ÚLTIMOS 10 JOGOS DETALHADOS (CORRIGIDO) ---
     st.divider()
     st.markdown("### 📝 Histórico Detalhado (Últimos 10 Jogos)")
     
     def preparar_historico_lista(df_hist, time):
+        df_hist['Data'] = pd.to_datetime(df_hist['Data']) # Garante que é data
         df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
         jogos = []
         for _, r in df_f.iterrows():
             oponente = r['Visitante'] if r['Mandante'] == time else r['Mandante']
             mando = "Casa" if r['Mandante'] == time else "Fora"
+            # Formata placar sem o .0
             placar = f"{int(r['Gols_Mandante_FT'])} x {int(r['Gols_Visitante_FT'])}"
             jogos.append({'Data': r['Data'].strftime('%d/%m/%Y'), 'Mando': mando, 'Oponente': oponente, 'Placar': placar})
         return pd.DataFrame(jogos)
