@@ -6,7 +6,7 @@ from datetime import datetime
 import requests
 from io import BytesIO
 import time
-from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest, ranking
+from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest, ranking, simulador
 import styles
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -38,8 +38,19 @@ if st.sidebar.button("🔄 Atualizar Dados"):
     st.cache_data.clear()
     st.rerun()
 
-# Adicionado "🏆 Ranking" à lista de opções
-opcoes_menu = ["📊 Dashboard", "📅 Jogos", "🔎 Scout", "🏆 Ranking", "🧪 Backtest", "📝 Registro", "📂 Histórico", "🏦 Bancas", "🎯 Metas"]
+# Lista de opções atualizada com "🏆 Ranking" e "🎲 Simulador"
+opcoes_menu = [
+    "📊 Dashboard", 
+    "📅 Jogos", 
+    "🔎 Scout", 
+    "🏆 Ranking", 
+    "🎲 Simulador", 
+    "🧪 Backtest", 
+    "📝 Registro", 
+    "📂 Histórico", 
+    "🏦 Bancas", 
+    "🎯 Metas"
+]
 
 if 'menu_ativo' not in st.session_state:
     st.session_state.menu_ativo = "📊 Dashboard"
@@ -53,6 +64,9 @@ if st.session_state.menu_ativo == "🔎 Scout":
 
 elif st.session_state.menu_ativo == "🏆 Ranking":
     ranking.mostrar_ranking(df_csv)
+
+elif st.session_state.menu_ativo == "🎲 Simulador":
+    simulador.mostrar_simulador(df_csv)
 
 elif st.session_state.menu_ativo == "📊 Dashboard":
     dashboard.mostrar_dashboard()
