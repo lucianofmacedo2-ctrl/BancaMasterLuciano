@@ -1,83 +1,93 @@
 import pandas as pd
-import ast
-import numpy as np
+import io
 import requests
+import numpy as np
+from datetime import datetime
 
-# 1. LER CSV DO GITHUB
-url = "https://raw.githubusercontent.com/futpythontrader/YouTube/refs/heads/main/Bases_de_Dados/FootyStats/Base_de_Dados_FootyStats.csv"
-df = pd.read_csv(url)
+def atualizar_base():
+    print("Iniciando atualização da base de dados...")
+    
+    # 1. Carregar os dados (Fonte Parquet do FootyStats)
+    url = "https://github.com/futpythontrader/Bases_de_Dados/raw/refs/heads/main/Base_de_Dados_FootyStats.parquet"
+    response = requests.get(url)
+    df = pd.read_parquet(io.BytesIO(response.content))
 
-# 2. EXCLUIR COLUNAS
-colunas_excluir = [
-    "Id_Jogo", "PPG_Home_Pre", "PPG_Away_Pre", "PPG_Home", "PPG_Away",
-    "XG_Home_Pre", "XG_Away_Pre", "XG_Total_Pre", "Odd_Corners_H",
-    "Odd_Corners_D", "Odd_Corners_A", "Odd_Corners_Over75",
-    "Odd_Corners_Under75", "Odd_Corners_Over85", "Odd_Corners_Under85",
-    "Odd_Corners_Over95", "Odd_Corners_Under95", "Odd_Corners_Over105",
-    "Odd_Corners_Under105", "Odd_Corners_Over115", "Odd_Corners_Under115"
-]
-df = df.drop(columns=[c for c in colunas_excluir if c in df.columns])
+    # 2. Excluir as colunas indesejadas
+    colunas_para_excluir = [
+        'Id_Game', 'Id_League', 'Time', 'Status', 'Odd_Over35_FT', 'Odd_Over45_FT',
+        'Odd_Under35_FT', 'Odd_Under45_FT', 'Odd_DNB_H', 'Odd_DNB_A', 'PPG_H_Geral_Pre',
+        'PPG_A_Geral_Pre', 'xG_H_Pre', 'xG_A_Pre', 'Total_xG_Pre', 'Odd_Corners_H',
+        'Odd_Corners_D', 'Odd_Corners_A', 'Odd_Corners_Over75', 'Odd_Corners_Over85',
+        'Odd_Corners_Over95', 'Odd_Corners_Over105', 'Odd_Corners_Over115',
+        'Odd_Corners_Under75', 'Odd_Corners_Under85', 'Odd_Corners_Under95',
+        'Odd_Corners_Under105', 'Odd_Corners_Under115', 'Corners_H_2H',
+        'Corners_A_2H', 'Total_Corners_2H', 'Url_Jogo', 'Url_Home', 'Logo_Home',
+        'Url_Away', 'Logo_Away'
+    ]
+    df = df.drop(columns=colunas_para_excluir, errors='ignore')
 
-# 3. RENOMEAR COLUNAS
-mapa_colunas = {
-    "League": "Liga", "Season": "Temporada", "Date": "Data", "Round": "Rodada",
-    "Home": "Mandante", "Away": "Visitante",
-    "Goals_H_HT": "Gols_Mandante_HT", "Goals_A_HT": "Gols_Visitante_HT",
-    "TotalGoals_HT": "Total_Gols_HT", "Goals_H_FT": "Gols_Mandante_FT",
-    "Goals_A_FT": "Gols_Visitante_FT", "TotalGoals_FT": "Total_Gols_FT",
-    "Goals_H_Minutes": "Minutos_Gols_Mandante", "Goals_A_Minutes": "Minutos_Gols_Visitante",
-    "Odd_H_HT": "Odd_Mandante_HT", "Odd_D_HT": "Odd_Empate_HT", "Odd_A_HT": "Odd_Visitante_HT",
-    "Odd_Over05_HT": "Odd_Over_05Gols_HT", "Odd_Under05_HT": "Odd_Under_05Gols_HT",
-    "Odd_Over15_HT": "Odd_Over_15Gols_HT", "Odd_Under15_HT": "Odd_Under_15Gols_HT",
-    "Odd_Over25_HT": "Odd_Over_25Gols_HT", "Odd_Under25_HT": "Odd_Under_25Gols_HT",
-    "Odd_H_FT": "Odd_Mandante_FT", "Odd_D_FT": "Odd_Empate_FT", "Odd_A_FT": "Odd_Visitante_FT",
-    "Odd_Over05_FT": "Odd_Over_05Gols_FT", "Odd_Under05_FT": "Odd_Under_05Gols_FT",
-    "Odd_Over15_FT": "Odd_Over_15Gols_FT", "Odd_Under15_FT": "Odd_Under_15Gols_FT",
-    "Odd_Over25_FT": "Odd_Over_25Gols_FT", "Odd_Under25_FT": "Odd_Under_25Gols_FT",
-    "Odd_BTTS_Yes": "Odd_BTTS_Sim", "Odd_BTTS_No": "Odd_BTTS_Não",
-    "Odd_1X": "Odd_DC_1X", "Odd_12": "Odd_DC_12", "Odd_X2": "Odd_DC_X2",
-    "ShotsOnTarget_H": "Chutes_Gol_Mandante", "ShotsOnTarget_A": "Chutes_Gol_Visitante",
-    "ShotsOffTarget_H": "Chutes_Fora_Mandante", "ShotsOffTarget_A": "Chutes_Fora_Visitante",
-    "Shots_H": "Finalizações_Totais_Mandante", "Shots_A": "Finalizações_Totais_Visitante",
-    "Corners_H_FT": "Cantos_Mandante", "Corners_A_FT": "Cantos_Visitante",
-    "TotalCorners_FT": "Total_Cantos_FT"
-}
-df = df.rename(columns=mapa_colunas)
+    # 3. Renomear as colunas
+    dicionario_renomear = {
+        'League': 'Liga', 'Season': 'Temporada', 'Date': 'Data', 'Round': 'Rodada',
+        'Home': 'Mandante', 'Away': 'Visitante',
+        'Goals_H_HT': 'Gols_Mandante_HT', 'Goals_A_HT': 'Gols_Visitante_HT', 'TotalGoals_HT': 'Total_Gols_HT',
+        'Goals_H_FT': 'Gols_Mandante_FT', 'Goals_A_FT': 'Gols_Visitante_FT', 'TotalGoals_FT': 'Total_Gols_FT',
+        'Goals_H_Min': 'Minutos_Gols_Mandante', 'Goals_A_Min': 'Minutos_Gols_Visitante',
+        'Odd_H_FT': 'Odd_Mandante_FT', 'Odd_D_FT': 'Odd_Empate_FT', 'Odd_A_FT': 'Odd_Visitante_FT',
+        'Odd_BTTS_Yes': 'Odd_BTTS_Sim', 'Odd_BTTS_No': 'Odd_BTTS_Não',
+        'xG_H': 'xG_Mandante', 'xG_A': 'xG_Visitante', 'Total_xG': 'Total_xG'
+    }
+    df = df.rename(columns=dicionario_renomear)
 
-# 3.5 TRATAMENTO
-df['Data'] = pd.to_datetime(df['Data'], errors='coerce').dt.strftime('%d/%m/%Y')
-df = df.dropna(subset=['Gols_Mandante_FT', 'Gols_Visitante_FT'])
-cols_numericas = df.select_dtypes(include=[np.number]).columns
-df[cols_numericas] = df[cols_numericas].fillna(0)
+    # Ajuste de Data
+    df['Data'] = pd.to_datetime(df['Data'])
 
-# 4. FUNÇÃO FAIXAS
-def contar_gols_por_faixa(minutos_str):
-    faixas = {"0-15": 0, "16-30": 0, "31-45+": 0, "46-60": 0, "61-75": 0, "76-90+": 0}
-    if pd.isna(minutos_str) or minutos_str == "[]" or minutos_str == "":
-        return faixas
-    try:
-        if isinstance(minutos_str, str):
-            minutos = ast.literal_eval(minutos_str)
+    # 4. Remover temporadas antigas
+    temporadas_remover = [
+        '2019/2020', '2020/2021', '2021/2022', '2022/2023', '2023/2024',
+        '2019', '2020', '2021', '2022', '2023'
+    ]
+    df = df[~df['Temporada'].astype(str).isin(temporadas_remover)]
+
+    # 5. Função para faixas de gols
+    def calcular_faixas_gols(minutos_entrada):
+        faixas = {'0-15': 0, '16-30': 0, '31-45+': 0, '46-60': 0, '61-75': 0, '76-90+': 0}
+        if minutos_entrada is None: return pd.Series(faixas)
+        if isinstance(minutos_entrada, (list, np.ndarray)):
+            lista_minutos = minutos_entrada
+        elif isinstance(minutos_entrada, str):
+            if minutos_entrada in ['', '[]', 'nan']: return pd.Series(faixas)
+            minutos_limpos = minutos_entrada.replace('[', '').replace(']', '').replace(' ', '')
+            if minutos_limpos == '': return pd.Series(faixas)
+            lista_minutos = minutos_limpos.split(',')
         else:
-            minutos = minutos_str
-        minutos = [int(str(m).replace("'", "").replace("+", "")) for m in minutos]
-    except:
-        return faixas
-    for m in minutos:
-        if m <= 15: faixas["0-15"] += 1
-        elif m <= 30: faixas["16-30"] += 1
-        elif m <= 45: faixas["31-45+"] += 1
-        elif m <= 60: faixas["46-60"] += 1
-        elif m <= 75: faixas["61-75"] += 1
-        else: faixas["76-90+"] += 1
-    return faixas
+            if pd.isna(minutos_entrada): return pd.Series(faixas)
+            lista_minutos = [minutos_entrada]
 
-for mando in ["Mandante", "Visitante"]:
-    col_name = f"Minutos_Gols_{mando}"
-    res_faixas = df[col_name].apply(contar_gols_por_faixa).apply(pd.Series)
-    res_faixas.columns = [f"{c}_{mando}" for c in res_faixas.columns]
-    df = pd.concat([df, res_faixas], axis=1)
+        for m in lista_minutos:
+            m_str = str(m)
+            base = int(m_str.split('+')[0]) if '+' in m_str else None
+            try:
+                if base is None: base = int(float(m_str))
+                if 0 <= base <= 15: faixas['0-15'] += 1
+                elif 16 <= base <= 30: faixas['16-30'] += 1
+                elif 31 <= base <= 45: faixas['31-45+'] += 1
+                elif 46 <= base <= 60: faixas['46-60'] += 1
+                elif 61 <= base <= 75: faixas['61-75'] += 1
+                elif base >= 76: faixas['76-90+'] += 1
+            except: continue
+        return pd.Series(faixas)
 
-# 8. EXPORTAR
-df.to_csv("dados_25_26.csv", index=False, encoding='utf-8-sig')
-print("Arquivo dados_25_26.csv atualizado com sucesso!")
+    # 6. Aplicar faixas
+    faixas_h = df['Minutos_Gols_Mandante'].apply(calcular_faixas_gols)
+    faixas_h.columns = [f"{c}_Mandante" for c in faixas_h.columns]
+    faixas_a = df['Minutos_Gols_Visitante'].apply(calcular_faixas_gols)
+    faixas_a.columns = [f"{c}_Visitante" for c in faixas_a.columns]
+    df = pd.concat([df, faixas_h, faixas_a], axis=1)
+
+    # 7. Salvar
+    df.to_csv("dados_25_26.csv", index=False)
+    print(f"Sucesso! Base atualizada em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+
+if __name__ == "__main__":
+    atualizar_base()
