@@ -3,28 +3,28 @@ import pandas as pd
 import numpy as np
 
 def mostrar_scout(df):
-    st.title("🔎 Scout Profissional - Master Luciano")
+    st.markdown("## 🔎 Painel de Análise")
     
-    # Limpeza de nomes de colunas
+    # 1. Ajuste das colunas
     df.columns = [c.strip() for c in df.columns]
 
-    # --- FILTROS INICIAIS ---
-    col_f1, col_f2 = st.columns(2)
-    
-    # 1. Seleção da Liga
+    # 2. SELEÇÃO DA LIGA (Linha única para não ocupar espaço)
     lista_ligas = sorted(df['Liga'].unique())
-    liga_sel = col_f1.selectbox("1º Selecione a Liga", lista_ligas)
+    liga_sel = st.selectbox("🏆 Escolha a Liga", lista_ligas)
     
-    # Filtrar o dataframe pela liga para carregar os times dela
+    # Filtro imediato da liga
     df_l = df[df['Liga'] == liga_sel].copy()
 
-    # 2. Seleção dos Clubes
+    # 3. SELEÇÃO DOS TIMES (Um abaixo do outro)
     lista_times = sorted(df_l['Mandante'].unique())
-    m_sel = col_f1.selectbox("2º Time Mandante", lista_times)
-    v_sel = col_f2.selectbox("3º Time Visitante", [t for t in lista_times if t != m_sel])
-
-    # 3. Amostragem (Sidebar)
-    n_jogos = st.sidebar.slider("Amostragem de Jogos", 5, 50, 10)
+    m_sel = st.selectbox("🏠 Time da Casa", lista_times)
     
-    st.write(f"### Analisando: {m_sel} vs {v_sel}")
-    st.write(f"Liga: {liga_sel} | Últimos {n_jogos} jogos")
+    # Filtra a lista de visitantes para não repetir o mandante
+    visitantes_disponiveis = [t for t in lista_times if t != m_sel]
+    v_sel = st.selectbox("🚌 Time de Fora", visitantes_disponiveis)
+
+    # 4. CONFIGURAÇÃO (Na lateral para limpar o visual central)
+    n_jogos = st.sidebar.slider("Amostragem (Últimos Jogos)", 5, 50, 10)
+    
+    st.divider()
+    st.subheader(f"📊 {m_sel} vs {v_sel}")
