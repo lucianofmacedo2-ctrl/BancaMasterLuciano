@@ -72,7 +72,7 @@ def mostrar_scout(df):
         for _, r in df_f.iterrows():
             if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT']: resultados.append("🟡")
             elif (r['Mandante'] == time and r['Gols_Mandante_FT'] > r['Gols_Visitante_FT']) or \
-                 (r['Visitante'] == time and r['Gols_Visitante_FT'] > r['Gols_Visitante_FT']): resultados.append("🟢")
+                 (r['Visitante'] == time and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']): resultados.append("🟢")
             else: resultados.append("🔴")
         return " ".join(resultados)
 
@@ -113,31 +113,28 @@ def mostrar_scout(df):
     st.divider()
     st.markdown("### 📉 Estatísticas Técnicas (Últimos Jogos)")
     
-    # Filtro de amostragem
     df_m_last = df_l[(df_l['Mandante'] == m_sel) | (df_l['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
     df_v_last = df_l[(df_l['Mandante'] == v_sel) | (df_l['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(n_jogos)
 
     def get_stats_combo(series):
         if series.empty: return [0.0]*5
+        series = pd.to_numeric(series, errors='coerce').fillna(0)
         mean = series.mean(); median = series.median()
         mode = series.mode().iloc[0] if not series.mode().empty else 0.0
         std = series.std(); cv = (std / mean) if mean != 0 else 0.0
         return [mean, median, mode, std, cv]
 
     def preparar_tabela_tecnica(df_hist, time):
-        # Mapeamento Dinâmico de Colunas
+        # NOMES EXATOS DAS COLUNAS CONFORME SEU BANCO
         col_cn_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
         col_cn_a = 'Corners_A' if 'Corners_A' in df_hist.columns else 'Cantos_Visitante'
-        col_sh_h = 'Shots_H' if 'Shots_H' in df_hist.columns else 'Finalizacoes_Mandante'
-        col_sh_a = 'Shots_A' if 'Shots_A' in df_hist.columns else 'Finalizacoes_Visitante'
         
-        # --- COLUNAS DE CARTÕES ---
-        col_yc_h = 'Cards_Yellow_H' if 'Cards_Yellow_H' in df_hist.columns else 'Cartoes_Amarelos_Mandante'
-        col_yc_a = 'Cards_Yellow_A' if 'Cards_Yellow_A' in df_hist.columns else 'Cartoes_Amarelos_Visitante'
-        col_rc_h = 'Cards_Red_H' if 'Cards_Red_H' in df_hist.columns else 'Cartoes_Vermelhos_Mandante'
-        col_rc_a = 'Cards_Red_A' if 'Cards_Red_A' in df_hist.columns else 'Cartoes_Vermelhos_Visitante'
-        col_tc_h = 'Cards_Total_H' if 'Cards_Total_H' in df_hist.columns else 'Cartoes_Total_Mandante'
-        col_tc_a = 'Cards_Total_A' if 'Cards_Total_A' in df_hist.columns else 'Cartoes_Total_Visitante'
+        col_yc_h = 'Yellow_Cards_H'
+        col_yc_a = 'Yellow_Cards_A'
+        col_rc_h = 'Red_Cards_H'
+        col_rc_a = 'Red_Cards_A'
+        col_tc_h = 'Total_Cards_H'
+        col_tc_a = 'Total_Cards_A'
 
         g_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
         g_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_FT']])
@@ -181,26 +178,19 @@ def mostrar_scout(df):
     st.markdown("### 💰 Incidência de Mercados (%)")
     def calcular_incidencia(df_hist):
         df_hist = df_hist.copy()
+        df_hist['Total_FT'] = pd.to_numeric(df_hist['Gols_Mandante_FT'], errors='coerce') + pd.to_numeric(df_hist['Gols_Visitante_FT'], errors='coerce')
+        df_hist['BTTS_FT'] = (pd.to_numeric(df_hist['Gols_Mandante_FT']) > 0) & (pd.to_numeric(df_hist['Gols_Visitante_FT']) > 0)
         
-        # Mapeamento para Cartões Total no DataFrame
-        col_tc_h = 'Cards_Total_H' if 'Cards_Total_H' in df_hist.columns else 'Cartoes_Total_Mandante'
-        col_tc_a = 'Cards_Total_A' if 'Cards_Total_A' in df_hist.columns else 'Cartoes_Total_Visitante'
-        
-        df_hist['Total_FT'] = df_hist['Gols_Mandante_FT'] + df_hist['Gols_Visitante_FT']
-        df_hist['BTTS_FT'] = (df_hist['Gols_Mandante_FT'] > 0) & (df_hist['Gols_Visitante_FT'] > 0)
-        
-        if col_tc_h in df_hist.columns and col_tc_a in df_hist.columns:
-            df_hist['Total_Cartoes'] = df_hist[col_tc_h] + df_hist[col_tc_a]
-        else:
-            df_hist['Total_Cartoes'] = 0
+        # SOMA TOTAL DE CARTÕES NO JOGO
+        df_hist['Soma_Cartoes'] = pd.to_numeric(df_hist['Total_Cards_H'], errors='coerce').fillna(0) + pd.to_numeric(df_hist['Total_Cards_A'], errors='coerce').fillna(0)
 
         linhas = [
             {'Mercado': 'Over 1.5 Gols', 'Freq (%)': f"{(df_hist['Total_FT'] > 1.5).mean()*100:.2f}%"},
             {'Mercado': 'Over 2.5 Gols', 'Freq (%)': f"{(df_hist['Total_FT'] > 2.5).mean()*100:.2f}%"},
             {'Mercado': 'Ambas Marcam', 'Freq (%)': f"{df_hist['BTTS_FT'].mean()*100:.2f}%"},
-            {'Mercado': 'Over 3.5 Cartões', 'Freq (%)': f"{(df_hist['Total_Cartoes'] > 3.5).mean()*100:.2f}%"},
-            {'Mercado': 'Over 4.5 Cartões', 'Freq (%)': f"{(df_hist['Total_Cartoes'] > 4.5).mean()*100:.2f}%"},
-            {'Mercado': 'Over 5.5 Cartões', 'Freq (%)': f"{(df_hist['Total_Cartoes'] > 5.5).mean()*100:.2f}%"}
+            {'Mercado': 'Over 3.5 Cartões', 'Freq (%)': f"{(df_hist['Soma_Cartoes'] > 3.5).mean()*100:.2f}%"},
+            {'Mercado': 'Over 4.5 Cartões', 'Freq (%)': f"{(df_hist['Soma_Cartoes'] > 4.5).mean()*100:.2f}%"},
+            {'Mercado': 'Over 5.5 Cartões', 'Freq (%)': f"{(df_hist['Soma_Cartoes'] > 5.5).mean()*100:.2f}%"}
         ]
         return pd.DataFrame(linhas)
 
@@ -238,17 +228,13 @@ def mostrar_scout(df):
         df_hist['Data'] = pd.to_datetime(df_hist['Data'], errors='coerce')
         df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
         
-        # Mapeamento para cartões no histórico
-        c_tot_h = 'Cards_Total_H' if 'Cards_Total_H' in df_hist.columns else 'Cartoes_Total_Mandante'
-        c_tot_a = 'Cards_Total_A' if 'Cards_Total_A' in df_hist.columns else 'Cartoes_Total_Visitante'
-        
         jogos = []
         for _, r in df_f.iterrows():
             oponente = r['Visitante'] if r['Mandante'] == time else r['Mandante']
             mando = "Casa" if r['Mandante'] == time else "Fora"
             try:
                 placar = f"{int(r['Gols_Mandante_FT'])} x {int(r['Gols_Visitante_FT'])}"
-                cartoes = f"{int(r[c_tot_h]) + int(r[c_tot_a])}"
+                cartoes = f"{int(pd.to_numeric(r['Total_Cards_H'], errors='coerce')) + int(pd.to_numeric(r['Total_Cards_A'], errors='coerce'))}"
             except:
                 placar = "N/A"
                 cartoes = "N/A"
