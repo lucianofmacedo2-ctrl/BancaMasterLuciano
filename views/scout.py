@@ -75,3 +75,26 @@ def mostrar_scout(df):
         c3.metric("Diferença de Tabela", f"{dif} pos.")
     except:
         st.info("Selecione os times para visualizar as posições.")
+    # 5. EXIBIÇÃO DOS CARDS (Centralizados e Escuros)
+        st.markdown("""
+            <style>
+            [data-testid="stMetricValue"] {
+                text-align: center;
+                color: #000000 !important;
+                font-weight: bold;
+            }
+            [data-testid="stMetricLabel"] {
+                text-align: center;
+                color: #31333F;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric(label=f"Posição {m_sel}", value=f"{pos_m}º")
+        with c2:
+            st.metric(label=f"Posição {v_sel}", value=f"{pos_v}º")
+        with c3:
+            st.metric(label="Diferença de Tabela", value=f"{dif} pos.")
+
