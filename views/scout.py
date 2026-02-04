@@ -34,15 +34,12 @@ def mostrar_scout(df):
             m, v = r['Mandante'], r['Visitante']
             gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
             
-            # Inicializa times se não existirem no dicionário
             for t in [m, v]:
                 if t not in stats: stats[t] = {'P': 0, 'V': 0, 'SG': 0}
             
-            # Saldo de Gols
             stats[m]['SG'] += (gm - gv)
             stats[v]['SG'] += (gv - gm)
             
-            # Pontos e Vitórias
             if gm > gv:
                 stats[m]['P'] += 3
                 stats[m]['V'] += 1
@@ -53,7 +50,6 @@ def mostrar_scout(df):
                 stats[v]['P'] += 3
                 stats[v]['V'] += 1
         
-        # Transforma em DataFrame e ordena pelos critérios de desempate
         tab = pd.DataFrame.from_dict(stats, orient='index').reset_index().rename(columns={'index':'Time'})
         tab = tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
         tab['Pos'] = tab.index + 1
@@ -68,24 +64,26 @@ def mostrar_scout(df):
         pos_v = tabela_liga[tabela_liga['Time'] == v_sel]['Pos'].values[0]
         dif = abs(pos_m - pos_v)
 
-        # 5. EXIBIÇÃO DOS CARDS
-        c1, c2, c3 = st.columns(3)
-        c1.metric(f"Posição {m_sel}", f"{pos_m}º")
-        c2.metric(f"Posição {v_sel}", f"{pos_v}º")
-        c3.metric("Diferença de Tabela", f"{dif} pos.")
-    except:
-        st.info("Selecione os times para visualizar as posições.")
-    # 5. EXIBIÇÃO DOS CARDS (Centralizados e Escuros)
+        # 5. ESTILO E EXIBIÇÃO DOS CARDS (Centralizados e Escuros)
         st.markdown("""
             <style>
-            [data-testid="stMetricValue"] {
-                text-align: center;
+            div[data-testid="stMetricValue"] > div {
+                text-align: center !important;
                 color: #000000 !important;
-                font-weight: bold;
+                font-weight: bold !important;
+                justify-content: center !important;
             }
-            [data-testid="stMetricLabel"] {
+            div[data-testid="stMetricLabel"] > div {
+                text-align: center !important;
+                justify-content: center !important;
+                color: #31333F !important;
+            }
+            /* Garante que o container da métrica também centralize */
+            [data-testid="stMetric"] {
                 text-align: center;
-                color: #31333F;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }
             </style>
             """, unsafe_allow_html=True)
@@ -97,4 +95,6 @@ def mostrar_scout(df):
             st.metric(label=f"Posição {v_sel}", value=f"{pos_v}º")
         with c3:
             st.metric(label="Diferença de Tabela", value=f"{dif} pos.")
-
+            
+    except Exception as e:
+        st.info("Aguardando seleção de times para calcular posições.")
