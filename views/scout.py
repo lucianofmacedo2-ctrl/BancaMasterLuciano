@@ -109,19 +109,15 @@ def mostrar_scout(df):
 
     def preparar_tabela_tecnica(df_hist, time):
         # Auxiliares para filtrar Marcados (Pro) e Sofridos (Contra)
-        # GOLS FT
         gols_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
         gols_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_FT']])
         
-        # GOLS HT
         gols_pro_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_HT']])
         gols_con_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_HT']])
         
-        # CANTOS FT
         cant_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_H'], df_hist[df_hist['Visitante'] == time]['Corners_A']])
         cant_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_A'], df_hist[df_hist['Visitante'] == time]['Corners_H']])
         
-        # CANTOS HT (Verifica se a coluna existe)
         if 'Corners_H_HT' in df_hist.columns:
             cant_pro_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_H_HT'], df_hist[df_hist['Visitante'] == time]['Corners_A_HT']])
             cant_con_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_A_HT'], df_hist[df_hist['Visitante'] == time]['Corners_H_HT']])
@@ -130,6 +126,7 @@ def mostrar_scout(df):
             cant_con_ht = pd.Series(dtype=float)
             
         chutes_pro = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_H'], df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_A']])
+        chutes_con = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_A'], df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_H']])
         
         data = [
             ['Gols Marcados (FT)'] + get_stats_combo(gols_pro_ft),
@@ -140,7 +137,8 @@ def mostrar_scout(df):
             ['Cantos FT (Contra)'] + get_stats_combo(cant_con_ft),
             ['Cantos HT (Pro)'] + get_stats_combo(cant_pro_ht),
             ['Cantos HT (Contra)'] + get_stats_combo(cant_con_ht),
-            ['Chutes no Gol (Pro)'] + get_stats_combo(chutes_pro)
+            ['Chutes no Gol (Pro)'] + get_stats_combo(chutes_pro),
+            ['Chutes no Gol (Contra)'] + get_stats_combo(chutes_con)
         ]
         return pd.DataFrame(data, columns=['Métrica', 'Média', 'Mediana', 'Moda', 'DP', 'CV'])
 
