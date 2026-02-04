@@ -108,32 +108,39 @@ def mostrar_scout(df):
     df_v_last = df_l[(df_l['Mandante'] == v_sel) | (df_l['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(n_jogos)
 
     def preparar_tabela_tecnica(df_hist, time):
-        # Séries: Gols Marcados, Sofridos, HT, Cantos, Chutes
-        gols_pro = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], 
-                             df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
+        # Auxiliares para filtrar Marcados (Pro) e Sofridos (Contra)
+        # GOLS FT
+        gols_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
+        gols_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_FT']])
         
-        gols_contra = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_FT'], 
-                                df_hist[df_hist['Visitante'] == time]['Gols_Mandante_FT']])
+        # GOLS HT
+        gols_pro_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_HT']])
+        gols_con_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_HT']])
         
-        gols_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_HT'], 
-                            df_hist[df_hist['Visitante'] == time]['Gols_Visitante_HT']])
+        # CANTOS FT
+        cant_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_H'], df_hist[df_hist['Visitante'] == time]['Corners_A']])
+        cant_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_A'], df_hist[df_hist['Visitante'] == time]['Corners_H']])
         
-        cantos_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_H'], 
-                              df_hist[df_hist['Visitante'] == time]['Corners_A']])
-        
-        cantos_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_H_HT'], 
-                              df_hist[df_hist['Visitante'] == time]['Corners_A_HT']]) if 'Corners_H_HT' in df_hist.columns else pd.Series(dtype=float)
-        
-        chutes = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_H'], 
-                            df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_A']])
+        # CANTOS HT (Verifica se a coluna existe)
+        if 'Corners_H_HT' in df_hist.columns:
+            cant_pro_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_H_HT'], df_hist[df_hist['Visitante'] == time]['Corners_A_HT']])
+            cant_con_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Corners_A_HT'], df_hist[df_hist['Visitante'] == time]['Corners_H_HT']])
+        else:
+            cant_pro_ht = pd.Series(dtype=float)
+            cant_con_ht = pd.Series(dtype=float)
+            
+        chutes_pro = pd.concat([df_hist[df_hist['Mandante'] == time]['ShotsOnTarget_H'], df_hist[df_hist['Visitante'] == time]['ShotsOnTarget_A']])
         
         data = [
-            ['Gols Marcados (FT)'] + get_stats_combo(gols_pro),
-            ['Gols Sofridos (FT)'] + get_stats_combo(gols_contra),
-            ['Gols Marcados (HT)'] + get_stats_combo(gols_ht),
-            ['Cantos FT'] + get_stats_combo(cantos_ft),
-            ['Cantos HT'] + get_stats_combo(cantos_ht),
-            ['Chutes no Gol'] + get_stats_combo(chutes)
+            ['Gols Marcados (FT)'] + get_stats_combo(gols_pro_ft),
+            ['Gols Sofridos (FT)'] + get_stats_combo(gols_con_ft),
+            ['Gols Marcados (HT)'] + get_stats_combo(gols_pro_ht),
+            ['Gols Sofridos (HT)'] + get_stats_combo(gols_con_ht),
+            ['Cantos FT (Pro)'] + get_stats_combo(cant_pro_ft),
+            ['Cantos FT (Contra)'] + get_stats_combo(cant_con_ft),
+            ['Cantos HT (Pro)'] + get_stats_combo(cant_pro_ht),
+            ['Cantos HT (Contra)'] + get_stats_combo(cant_con_ht),
+            ['Chutes no Gol (Pro)'] + get_stats_combo(chutes_pro)
         ]
         return pd.DataFrame(data, columns=['Métrica', 'Média', 'Mediana', 'Moda', 'DP', 'CV'])
 
