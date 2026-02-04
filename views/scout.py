@@ -50,6 +50,10 @@ def mostrar_scout(df):
         cv = (std / mean) if mean != 0 else 0.0
         return [mean, median, mode, std, cv]
 
+    def highlight_max(s):
+        is_max = s == s.max()
+        return ['background-color: #1f77b4; color: white; font-weight: bold' if v and v > 0 else '' for v in is_max]
+
     # Execução do cálculo de posições
     tabela_liga = calcular_posicoes(df_l)
     
@@ -112,15 +116,12 @@ def mostrar_scout(df):
     st.markdown("### 💰 Incidência de Mercados (%)")
 
     def calcular_incidencia(df_hist):
-        # Cálculo de gols no 2º tempo (ST)
         df_hist = df_hist.copy()
         df_hist['Gols_M_ST'] = df_hist['Gols_Mandante_FT'] - df_hist['Gols_Mandante_HT']
         df_hist['Gols_V_ST'] = df_hist['Gols_Visitante_FT'] - df_hist['Gols_Visitante_HT']
         df_hist['Total_HT'] = df_hist['Gols_Mandante_HT'] + df_hist['Gols_Visitante_HT']
         df_hist['Total_FT'] = df_hist['Gols_Mandante_FT'] + df_hist['Gols_Visitante_FT']
         df_hist['Total_ST'] = df_hist['Gols_M_ST'] + df_hist['Gols_V_ST']
-        
-        # BTTS
         df_hist['BTTS_HT'] = (df_hist['Gols_Mandante_HT'] > 0) & (df_hist['Gols_Visitante_HT'] > 0)
         df_hist['BTTS_FT'] = (df_hist['Gols_Mandante_FT'] > 0) & (df_hist['Gols_Visitante_FT'] > 0)
         df_hist['BTTS_ST'] = (df_hist['Gols_M_ST'] > 0) & (df_hist['Gols_V_ST'] > 0)
@@ -134,19 +135,33 @@ def mostrar_scout(df):
                 'ST': f"{(df_hist['Total_ST'] > m).mean()*100:.2f}%",
                 'FT': f"{(df_hist['Total_FT'] > m).mean()*100:.2f}%"
             })
-        
-        linhas.append({
-            'Mercado': 'BTTS (Ambas)',
-            'HT': f"{df_hist['BTTS_HT'].mean()*100:.2f}%",
-            'ST': f"{df_hist['BTTS_ST'].mean()*100:.2f}%",
-            'FT': f"{df_hist['BTTS_FT'].mean()*100:.2f}%"
-        })
+        linhas.append({'Mercado': 'BTTS (Ambas)', 'HT': f"{df_hist['BTTS_HT'].mean()*100:.2f}%", 'ST': f"{df_hist['BTTS_ST'].mean()*100:.2f}%", 'FT': f"{df_hist['BTTS_FT'].mean()*100:.2f}%"})
         return pd.DataFrame(linhas)
 
     col_m1, col_m2 = st.columns(2)
-    with col_m1:
+    with col_m1: st.table(calcular_incidencia(df_m_last))
+    with col_m2: st.table(calcular_incidencia(df_v_last))
+
+    # --- 8. BLOCO: ANÁLISE DE MINUTOS (CALOR) ---
+    st.divider()
+    st.markdown("### ⏰ Distribuição de Gols por Minutos (Soma na Amostragem)")
+    
+    faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
+    
+    def preparar_minutos(df_hist, time):
+        marcados, sofridos = [], []
+        for f in faixas:
+            m = df_hist[df_hist['Mandante'] == time][f'{f}_Mandante'].sum() + df_hist[df_hist['Visitante'] == time][f'{f}_Visitante'].sum()
+            s = df_hist[df_hist['Mandante'] == time][f'{f}_Visitante'].sum() + df_hist[df_hist['Visitante'] == time][f'{f}_Mandante'].sum()
+            marcados.append(int(m)); sofridos.append(int(s))
+        return pd.DataFrame({'Intervalo': faixas, 'Gols Marcados': marcados, 'Gols Sofridos': sofridos})
+
+    c_min1, c_min2 = st.columns(2)
+    with c_min1:
         st.markdown(f"**{m_sel}**")
-        st.table(calcular_incidencia(df_m_last))
-    with col_m2:
+        df_min_m = preparar_minutos(df_m_last, m_sel)
+        st.table(df_min_m.style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
+    with c_min2:
         st.markdown(f"**{v_sel}**")
-        st.table(calcular_incidencia(df_v_last))
+        df_min_v = preparar_minutos(df_v_last, v_sel)
+        st.table(df_min_v.style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
