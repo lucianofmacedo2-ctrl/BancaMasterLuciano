@@ -78,12 +78,10 @@ def mostrar_jogos(df_hist):
                 tem_ambas = False
                 
                 if not df_hist.empty:
-                    # Filtra histórico de ambas as equipes (últimos jogos)
                     df_m = df_hist[(df_hist['Mandante'] == mandante) | (df_hist['Visitante'] == mandante)]
                     df_v = df_hist[(df_hist['Mandante'] == visitante) | (df_hist['Visitante'] == visitante)]
                     
                     if not df_m.empty and not df_v.empty:
-                        # Cálculo Gols e Cantos
                         m_gols = (df_hist[df_hist['Mandante']==mandante]['Total_Gols_FT'].mean() + df_hist[df_hist['Visitante']==visitante]['Total_Gols_FT'].mean()) / 2
                         if m_gols > 2.5: tem_gol = True
                         
@@ -93,8 +91,6 @@ def mostrar_jogos(df_hist):
                             m_cantos = (df_hist[df_hist['Mandante']==mandante][col_c_h].mean() + df_hist[df_hist['Visitante']==visitante][col_c_a].mean())
                             if m_cantos > 9.5: tem_canto = True
 
-                        # Cálculo Ambas Marcam (BTTS)
-                        # Verifica em quantos jogos AMBAS marcaram para cada time
                         def calc_btts(df_equipe):
                             if df_equipe.empty: return 0
                             btts_count = len(df_equipe[(df_equipe['Gols_Mandante_FT'] > 0) & (df_equipe['Gols_Visitante_FT'] > 0)])
@@ -103,7 +99,6 @@ def mostrar_jogos(df_hist):
                         btts_media = (calc_btts(df_m) + calc_btts(df_v)) / 2
                         if btts_media >= 60: tem_ambas = True
 
-                # --- LÓGICA DE ODDS E FAVORITISMO ---
                 icones = ""
                 if tem_gol: icones += " 🔥⚽"
                 if tem_canto: icones += " 🔥🚩"
@@ -116,14 +111,10 @@ def mostrar_jogos(df_hist):
                 try:
                     v_m = float(str(odd_m).replace(',', '.'))
                     v_v = float(str(odd_v).replace(',', '.'))
-                    
-                    # Favoritismo Mandante
-                    if v_m < 1.4: selo_favorito = " 🌟" # Super Favorito
-                    elif v_m <= 1.8: selo_favorito = " ⭐" # Favorito
-                    # Favoritismo Visitante
+                    if v_m < 1.4: selo_favorito = " 🌟"
+                    elif v_m <= 1.8: selo_favorito = " ⭐"
                     elif v_v < 1.4: selo_favorito = " 🌟"
                     elif v_v <= 1.8: selo_favorito = " ⭐"
-                    # Equilibrado
                     elif abs(v_m - v_v) <= 1.0: selo_favorito = " ⚖️"
                 except: pass
 
@@ -134,13 +125,12 @@ def mostrar_jogos(df_hist):
                     st.write(f"Odds: **{odd_m}** | **{row.get('Odd Empate',0)}** | **{odd_v}**")
                 with c3:
                     if st.button("Analisar 🔍", key=f"btn_ag_{idx}_{mandante[:3]}", use_container_width=True):
-                        st.session_state.liga_scout = row['Liga']
+                        st.session_state.liga_scout = str(row['Liga']).upper().strip()
                         st.session_state.time_casa_scout = mandante
                         st.session_state.time_fora_scout = visitante
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-    # --- RANKINGS DE PERFORMANCE (CONFORME SOLICITADO ANTERIORMENTE) ---
     if not df_hist.empty and times_no_dia:
         st.divider()
         st.subheader(f"📊 Rankings de Performance - {st.session_state.data_exibicao}")
