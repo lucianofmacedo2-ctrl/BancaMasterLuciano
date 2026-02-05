@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client
 import time
+from datetime import datetime
 
 # --- CONFIGURAÇÃO SUPABASE ---
 URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
@@ -17,6 +18,8 @@ def carregar_dados():
             # Limpa espaços em branco que podem vir do CSV ou do input
             for col in df.select_dtypes(['object']).columns:
                 df[col] = df[col].astype(str).str.strip()
+            # Garante que a coluna data seja datetime para o filtro funcionar
+            df['data'] = pd.to_datetime(df['data']).dt.date
         return df
     except Exception as e:
         st.error(f"Erro ao conectar com Supabase: {e}")
@@ -32,7 +35,6 @@ def mostrar_historico():
         return
 
     # Criamos a coluna de busca para os selects de Update e Delete
-    # Adicionamos a data para facilitar a identificação
     df['Busca'] = (
         df['id'].astype(str) + " | " + 
         df['mandante'].fillna('?') + " x " + df['visitante'].fillna('?') + " | " + 
@@ -88,20 +90,36 @@ def mostrar_historico():
 
     st.divider()
 
-    # --- 2. LISTA GERAL ---
+    # --- 2. LISTA GERAL COM FILTRO ---
     st.subheader("📋 Lista Geral de Registros")
     
+    # Filtro de Data
+    col_f1, col_f2 = st.columns([1, 2])
+    with col_f1:
+        data_filtro = st.date_input("📅 Filtrar por dia específica", value=None)
+    with col_f2:
+        st.write("") # Alinhamento visual
+        if data_filtro:
+            st.info(f"Exibindo apenas apostas de: **{data_filtro.strftime('%d/%m/%Y')}**")
+
+    # Colunas para exibir (Incluído 'operador')
     colunas_exibir = [
         'id', 'data', 'liga', 'mandante', 'visitante', 'mercado', 
-        'linha', 'metodo', 'stake', 'odd', 'status', 'lucro', 'banca_nome'
+        'linha', 'metodo', 'stake', 'odd', 'status', 'lucro', 'banca_nome', 'operador'
     ]
     
     # Exibimos apenas as colunas que existem no banco
     cols_existentes = [c for c in colunas_exibir if c in df.columns]
     
+    # Aplicação do filtro de data no DataFrame
+    df_filtrado = df.copy()
+    if data_filtro:
+        df_filtrado = df_filtrado[df_filtrado['data'] == data_filtro]
+
     # Ordenação: Mais recentes primeiro (Data e ID)
-    df_exibicao = df[cols_existentes].sort_values(by=['data', 'id'], ascending=[False, False])
+    df_exibicao = df_filtrado[cols_existentes].sort_values(by=['data', 'id'], ascending=[False, False])
     
+    # Exibição da Tabela
     st.dataframe(
         df_exibicao,
         use_container_width=True,
