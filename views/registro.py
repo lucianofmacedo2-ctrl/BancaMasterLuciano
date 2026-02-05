@@ -9,7 +9,7 @@ URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
 KEY = "sb_publishable_pM5xDBpqZzo7h5SQqiFcfQ_ixbbydIB"
 supabase = create_client(URL, KEY)
 
-# --- FUNÇÕES DE CARREGAMENTO (COM CACHE DESATIVADO PARA ATUALIZAÇÃO REAL-TIME) ---
+# --- FUNÇÕES DE CARREGAMENTO ---
 def carregar_aux(tipo, filtro_pais=None):
     try:
         query = supabase.table("config_auxiliares").select("*").eq("tipo", tipo)
@@ -38,9 +38,7 @@ def carregar_paises():
 def mostrar_registro(df_csv):
     st.title("📝 Registro de Aposta")
     
-    # ------------------------------------------------------------------
     # 1. SEÇÃO: CONFIGURAÇÕES (CADASTRO E EXCLUSÃO)
-    # ------------------------------------------------------------------
     st.subheader("⚙️ Configurações do Sistema")
     tab_cad, tab_exc = st.tabs(["➕ Adicionar Novo", "🗑️ Excluir Existente"])
     
@@ -63,7 +61,7 @@ def mostrar_registro(df_csv):
                         supabase.table("config_auxiliares").insert(payload).execute()
                     st.success(f"{tipo_novo} cadastrado com sucesso!")
                     time.sleep(1)
-                    st.rerun() # Força a página a recarregar e atualizar as listas
+                    st.rerun()
                 except Exception as e: st.error(f"Erro: {e}")
             else: st.warning("Preencha o nome!")
 
@@ -95,33 +93,53 @@ def mostrar_registro(df_csv):
 
     st.markdown("---")
 
-    # ------------------------------------------------------------------
     # 2. SEÇÃO: REGISTRO INDIVIDUAL (MANUAL)
-    # ------------------------------------------------------------------
     st.subheader("🎯 Registro Individual")
     
+    # Checkbox para habilitar modo manual (Fora da base)
+    fora_da_base = st.checkbox("🚩 Jogo fora da Base de Dados (Digitação Livre)")
+
     # Carregamento das listas
     lista_paises = carregar_paises()
     lista_mercados = [item['nome'] for item in carregar_aux("MERCADO")]
     lista_metodos = [item['nome'] for item in carregar_aux("METODO")]
     lista_operadores = [item['nome'] for item in carregar_operadores()]
 
-    # Usamos uma linha fora do formulário para o País para permitir que o selectbox da Liga atualize dinamicamente
     col_p1, col_p2, col_p3 = st.columns(3)
     with col_p1:
         data_m = st.date_input("Data da Aposta", datetime.now())
     with col_p2:
         pais_selecionado = st.selectbox("Selecione o País", ["-"] + lista_paises)
     with col_p3:
-        # Se um país for selecionado, busca as ligas. Se não, lista vazia.
         ligas_filtradas = carregar_aux("LIGA", filtro_pais=pais_selecionado) if pais_selecionado != "-" else []
         nomes_ligas = [item['nome'] for item in ligas_filtradas]
-        liga_selecionada = st.selectbox("Liga", nomes_ligas if nomes_ligas else ["Nenhuma liga cadastrada"])
+        liga_selecionada = st.selectbox("Liga", nomes_ligas if nomes_ligas else ["-"])
+
+    # Lógica de extração de times da base CSV baseado na Liga
+    times_mandantes = []
+    times_visitantes = []
+    
+    if not fora_da_base and liga_selecionada != "-":
+        # Filtra o CSV pela liga selecionada para pegar os times reais
+        df_filtrado = df_csv[df_csv['Liga'] == liga_selecionada]
+        if not df_filtrado.empty:
+            times_mandantes = sorted(df_filtrado['Mandante'].unique().tolist())
+            times_visitantes = sorted(df_filtrado['Visitante'].unique().tolist())
 
     with st.form("form_registro_manual", clear_on_submit=True):
         l2_c1, l2_c2, l2_c3 = st.columns(3)
-        with l2_c1: mandante_m = st.text_input("Time Mandante")
-        with l2_c2: visitante_m = st.text_input("Time Visitante")
+        with l2_c1: 
+            if fora_da_base:
+                mandante_m = st.text_input("Time Mandante")
+            else:
+                mandante_m = st.selectbox("Time Mandante", ["-"] + times_mandantes)
+                
+        with l2_c2: 
+            if fora_da_base:
+                visitante_m = st.text_input("Time Visitante")
+            else:
+                visitante_m = st.selectbox("Time Visitante", ["-"] + times_visitantes)
+                
         with l2_c3: entrada_m = st.text_input("Entrada (Minuto)", placeholder="Ex: 25'")
 
         l3_c1, l3_c2, l3_c3 = st.columns(3)
@@ -135,7 +153,6 @@ def mostrar_registro(df_csv):
         with l4_c3: operador_m = st.selectbox("Operador", lista_operadores if lista_operadores else ["-"])
 
         l5_c1, l5_c2, l5_c3 = st.columns(3)
-        # Busca bancas
         try:
             res_b = supabase.table("bancas").select("nome").execute()
             lista_bancas = [str(b['nome']) for b in res_b.data]
@@ -146,10 +163,12 @@ def mostrar_registro(df_csv):
         with l5_c3: obs_m = st.text_input("Observações")
 
         if st.form_submit_button("🚀 Salvar Aposta Individual"):
-            if not mandante_m or not visitante_m or liga_selecionada == "Nenhuma liga cadastrada":
-                st.warning("⚠️ Verifique se selecionou uma LIGA e preencheu os times.")
+            # Validação básica
+            if (not fora_da_base and (mandante_m == "-" or visitante_m == "-")) or (fora_da_base and (not mandante_m or not visitante_m)):
+                st.warning("⚠️ Preencha os nomes dos times.")
+            elif liga_selecionada == "-":
+                st.warning("⚠️ Selecione uma Liga.")
             else:
-                # Cálculo de lucro
                 lucro_calc = 0.0
                 if status_m == "Green": lucro_calc = stake_m * (odd_m - 1)
                 elif status_m == "Meio Green": lucro_calc = (stake_m * (odd_m - 1)) / 2
@@ -170,9 +189,7 @@ def mostrar_registro(df_csv):
 
     st.markdown("---")
 
-    # ------------------------------------------------------------------
     # 3. SEÇÃO: REGISTRO EM MASSA (CSV)
-    # ------------------------------------------------------------------
     with st.expander("📤 REGISTRO EM MASSA (CSV)"):
         arquivo_massa = st.file_uploader("Arquivo CSV", type=["csv"])
         if arquivo_massa:
