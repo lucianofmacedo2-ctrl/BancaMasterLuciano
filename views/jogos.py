@@ -28,13 +28,13 @@ def mostrar_jogos(df_hist):
     def carregar_agenda(url):
         try:
             df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8-sig')
-            # Limpeza rigorosa de colunas e textos
+            # Limpeza de espaços nos nomes das colunas da agenda
             df.columns = [str(c).strip() for c in df.columns]
             df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
             return df
         except: return pd.DataFrame()
 
-    # --- FUNÇÃO PARA CALCULAR CLASSIFICAÇÃO (TEMPORADA ATUAL) ---
+    # --- FUNÇÃO PARA CALCULAR CLASSIFICAÇÃO (CORREÇÃO DE ERROS E TEMPORADA ATUAL) ---
     def obter_classificacao(df):
         if df is None or df.empty: return {}
         
@@ -42,14 +42,13 @@ def mostrar_jogos(df_hist):
         df_c = df.copy()
         df_c.columns = [str(c).strip() for c in df_c.columns]
         
-        # Filtro de Temporada Atual (2025/2026 ou 2026)
+        # Filtro de Temporada Atual para o Ranking (Focar apenas no momento atual)
         temporadas_atuais = ['2025/2026', '2026']
         if 'Temporada' in df_c.columns:
-            df_c = df_c[df_c['Temporada'].astype(str).isin(temporadas_atuais)]
+            df_c = df_c[df_c['Temporada'].astype(str).str.strip().isin(temporadas_atuais)]
         
-        # Verificação de colunas mínimas
-        cols_necessarias = ['Liga', 'Mandante', 'Visitante', 'Gols_Mandante_FT', 'Gols_Visitante_FT']
-        if not all(col in df_c.columns for col in cols_necessarias):
+        # Verificação de colunas essenciais
+        if 'Liga' not in df_c.columns or 'Mandante' not in df_c.columns:
             return {}
 
         stats = {}
@@ -80,22 +79,21 @@ def mostrar_jogos(df_hist):
         
         posicoes_finais = {}
         for liga in stats:
-            # Ordenação: Pontos e depois Saldo de Gols
             ranking = sorted(stats[liga].items(), key=lambda x: (x[1]['pts'], x[1]['sg']), reverse=True)
             for i, (time, _) in enumerate(ranking):
                 posicoes_finais[f"{liga}_{time}"] = i + 1
         return posicoes_finais
 
+    # Carregamento e Preparação dos Dados
     df_agenda = carregar_agenda(URL_AGENDA)
     
-    # Preparamos o df_hist com colunas limpas para uso nos cálculos de média
+    # Preparamos o df_hist_clean para cálculos de média e ícones
     if not df_hist.empty:
-        df_hist.columns = [str(c).strip() for c in df_hist.columns]
         df_hist_clean = df_hist.copy()
-        # Filtramos para as médias considerarem a temporada atual também
+        df_hist_clean.columns = [str(c).strip() for c in df_hist_clean.columns]
         temporadas_atuais = ['2025/2026', '2026']
         if 'Temporada' in df_hist_clean.columns:
-            df_hist_clean = df_hist_clean[df_hist_clean['Temporada'].astype(str).isin(temporadas_atuais)]
+            df_hist_clean = df_hist_clean[df_hist_clean['Temporada'].astype(str).str.strip().isin(temporadas_atuais)]
     else:
         df_hist_clean = pd.DataFrame()
 
@@ -138,13 +136,13 @@ def mostrar_jogos(df_hist):
             st.markdown(f"#### 🏆 {liga}")
             
             for idx, row in df_l.iterrows():
-                mandante, visitante = row['Mandante'], row['Visitante']
+                mandante, visitante = str(row['Mandante']).strip(), str(row['Visitante']).strip()
                 times_no_dia.extend([mandante, visitante])
                 
-                m_upper = str(mandante).strip().upper()
-                v_upper = str(visitante).strip().upper()
+                m_upper = mandante.upper()
+                v_upper = visitante.upper()
                 
-                # Busca posição no dicionário de classificação
+                # Busca posição no ranking (Garante que Enppi e outros batam com o dicionário)
                 pos_m = dict_posicoes.get(f"{liga_upper}_{m_upper}", "?")
                 pos_v = dict_posicoes.get(f"{liga_upper}_{v_upper}", "?")
                 
@@ -213,39 +211,23 @@ def mostrar_jogos(df_hist):
 
         col_c_h = 'Corners_H' if 'Corners_H' in df_hist_clean.columns else 'Cantos_Mandante'
         col_c_a = 'Corners_A' if 'Corners_A' in df_hist_clean.columns else 'Cantos_Visitante'
-        col_sh_h = 'Shots_H' if 'Shots_H' in df_hist_clean.columns else 'Finalizacoes_Mandante'
-        col_sh_a = 'Shots_A' if 'Shots_A' in df_hist_clean.columns else 'Finalizacoes_Visitante'
 
         for t in times_dia_unicos:
             df_t = df_hist_clean[(df_hist_clean['Mandante'].astype(str).str.upper() == t) | (df_hist_clean['Visitante'].astype(str).str.upper() == t)]
             if not df_t.empty:
-                def get_fs(df_local, time_ref, c_h, c_a):
-                    if c_h not in df_local.columns: return 0.0, 0.0
-                    f = np.where(df_local['Mandante'].astype(str).str.upper()==time_ref, df_local[c_h], df_local[c_a]).mean()
-                    s = np.where(df_local['Mandante'].astype(str).str.upper()==time_ref, df_local[c_a], df_local[c_h]).mean()
-                    return f, s
-
-                gm_f, gm_s = get_fs(df_t, t, 'Gols_Mandante_FT', 'Gols_Visitante_FT')
-                cn_f, cn_s = get_fs(df_t, t, col_c_h, col_c_a)
-                sh_f, sh_s = get_fs(df_t, t, col_sh_h, col_sh_a)
-
-                rank_data.append({
-                    "Time": t, "Gols FT F": gm_f, "Gols FT S": gm_s,
-                    "Cantos FT F": cn_f, "Cantos FT S": cn_s,
-                    "Chutes F": sh_f, "Chutes S": sh_s
-                })
+                try:
+                    gm_f = df_t[df_t['Mandante'].astype(str).str.upper()==t]['Gols_Mandante_FT'].mean()
+                    gm_s = df_t[df_t['Visitante'].astype(str).str.upper()==t]['Gols_Visitante_FT'].mean()
+                    cn_f = df_t[df_t['Mandante'].astype(str).str.upper()==t][col_c_h].mean() if col_c_h in df_t.columns else 0
+                    rank_data.append({"Time": t, "Gols Marcados": gm_f, "Gols Sofridos": gm_s, "Cantos Pro": cn_f})
+                except: continue
         
         if rank_data:
-            df_rank = pd.DataFrame(rank_data)
-            def plot_rank_cols(titulo, col_f, col_s):
-                st.markdown(f"#### {titulo}")
-                c_a, c_b = st.columns(2)
-                with c_a:
-                    st.write("Top Favoráveis (Médias)")
-                    st.dataframe(df_rank.sort_values(col_f, ascending=False).head(5)[["Time", col_f]], hide_index=True, use_container_width=True)
-                with c_b:
-                    st.write("Top Sofridos (Médias)")
-                    st.dataframe(df_rank.sort_values(col_s, ascending=False).head(5)[["Time", col_s]], hide_index=True, use_container_width=True)
-
-            plot_rank_cols("⚽ Gols FT", "Gols FT F", "Gols FT S")
-            plot_rank_cols("🚩 Cantos FT", "Cantos FT F", "Cantos FT S")
+            df_r = pd.DataFrame(rank_data)
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                st.write("⚽ **Top Ataques (Médias)**")
+                st.dataframe(df_r.sort_values('Gols Marcados', ascending=False).head(5)[["Time", "Gols Marcados"]], hide_index=True, use_container_width=True)
+            with col_r2:
+                st.write("🚩 **Top Cantos (Médias)**")
+                st.dataframe(df_r.sort_values('Cantos Pro', ascending=False).head(5)[["Time", "Cantos Pro"]], hide_index=True, use_container_width=True)
