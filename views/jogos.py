@@ -41,6 +41,14 @@ def mostrar_jogos(df_hist):
             return df
         except: return pd.DataFrame()
 
+    # --- PRÉ-PROCESSAMENTO DO HISTÓRICO (IMPORTANTE) ---
+    if not df_hist.empty:
+        # Garantir que colunas de cantos sejam numéricas
+        cols_cantos = ['Corners_H', 'Corners_A', 'Total_Corners', 'Corners_H_HT', 'Corners_A_HT', 'Total_Corners_HT']
+        for col in cols_cantos:
+            if col in df_hist.columns:
+                df_hist[col] = pd.to_numeric(df_hist[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+
     def obter_classificacao(df_input):
         if df_input is None or df_input.empty: return {}, []
         df_c = df_input.copy()
@@ -54,7 +62,7 @@ def mostrar_jogos(df_hist):
             m, v = row['M_TRATADO'], row['V_TRATADO']
             todos_os_times.update([m, v])
             try:
-                gm, gv = float(row['Gols_Mandante_FT']), float(row['Gols_Visitante_FT'])
+                gm, gv = float(str(row['Gols_Mandante_FT']).replace(',','.')), float(str(row['Gols_Visitante_FT']).replace(',','.'))
             except: continue
             if liga not in stats: stats[liga] = {}
             for t in [m, v]:
@@ -139,7 +147,6 @@ def mostrar_jogos(df_hist):
                             icones += " 🔥⚽"
                             sugestoes_gols.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_gols})
                         
-                        # USANDO AS COLUNAS CORRETAS DE CANTOS
                         if 'Total_Corners' in df_hist.columns:
                             m_cantos = (h_m['Total_Corners'].mean() + h_v['Total_Corners'].mean()) / 2
                             if m_cantos > 9.5: 
@@ -180,13 +187,13 @@ def mostrar_jogos(df_hist):
             jogos_t = df_h[(df_h['M_T'] == t) | (df_h['V_T'] == t)]
             if jogos_t.empty: continue
             
-            # GOLS
+            # Cálculo de médias garantindo numérico
             gm_ft = jogos_t.apply(lambda r: r['Gols_Mandante_FT'] if r['M_T'] == t else r['Gols_Visitante_FT'], axis=1).mean()
             gs_ft = jogos_t.apply(lambda r: r['Gols_Visitante_FT'] if r['M_T'] == t else r['Gols_Mandante_FT'], axis=1).mean()
             gm_ht = jogos_t.apply(lambda r: r['Gols_Mandante_HT'] if r['M_T'] == t else r['Gols_Visitante_HT'], axis=1).mean()
             gs_ht = jogos_t.apply(lambda r: r['Gols_Visitante_HT'] if r['M_T'] == t else r['Gols_Mandante_HT'], axis=1).mean()
             
-            # CANTOS (Usando as colunas enviadas)
+            # Cantos (Corners_H, Corners_A, Total_Corners, Corners_H_HT, Corners_A_HT, Total_Corners_HT)
             cf_ft = jogos_t.apply(lambda r: r['Corners_H'] if r['M_T'] == t else r['Corners_A'], axis=1).mean()
             cs_ft = jogos_t.apply(lambda r: r['Corners_A'] if r['M_T'] == t else r['Corners_H'], axis=1).mean()
             cf_ht = jogos_t.apply(lambda r: r['Corners_H_HT'] if r['M_T'] == t else r['Corners_A_HT'], axis=1).mean()
@@ -200,7 +207,6 @@ def mostrar_jogos(df_hist):
         
         df_rank = pd.DataFrame(times_stats)
         if not df_rank.empty:
-            # GOLS FT
             r1, r2 = st.columns(2)
             with r1:
                 st.write("⚽ **Marcam + (FT)**")
@@ -209,7 +215,6 @@ def mostrar_jogos(df_hist):
                 st.write("🥅 **Sofrem + (FT)**")
                 st.table(df_rank.sort_values("GS FT", ascending=False)[["Time", "GS FT"]].head(5))
 
-            # GOLS HT
             r3, r4 = st.columns(2)
             with r3:
                 st.write("⏱️ **Marcam + HT**")
@@ -218,7 +223,6 @@ def mostrar_jogos(df_hist):
                 st.write("📉 **Sofrem + HT**")
                 st.table(df_rank.sort_values("GS HT", ascending=False)[["Time", "GS HT"]].head(5))
 
-            # CANTOS FT
             r5, r6 = st.columns(2)
             with r5:
                 st.write("🚩 **Cantos Feitos (FT)**")
@@ -227,7 +231,6 @@ def mostrar_jogos(df_hist):
                 st.write("🚩 **Cantos Sofridos (FT)**")
                 st.table(df_rank.sort_values("CS FT", ascending=False)[["Time", "CS FT"]].head(5))
 
-            # CANTOS HT
             r7, r8 = st.columns(2)
             with r7:
                 st.write("🚩 **Cantos Feitos (HT)**")
