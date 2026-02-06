@@ -28,45 +28,40 @@ def mostrar_jogos(df_hist):
     def carregar_agenda(url):
         try:
             df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8-sig')
-            # Limpeza profunda nos nomes das colunas da agenda
+            # Limpeza de nomes de colunas e remoção de duplicatas
             df.columns = [str(c).strip() for c in df.columns]
-            df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+            df = df.loc[:, ~df.columns.duplicated()]
             return df
         except: return pd.DataFrame()
 
-    # --- FUNÇÃO PARA CALCULAR CLASSIFICAÇÃO (VERSÃO BLINDADA) ---
+    # --- FUNÇÃO PARA CALCULAR CLASSIFICAÇÃO (TOTALMENTE PROTEGIDA) ---
     def obter_classificacao(df_input):
         if df_input is None or not isinstance(df_input, pd.DataFrame) or df_input.empty:
             return {}
         
-        # Criamos cópia e limpamos colunas (Resolve o AttributeError / KeyError)
+        # 1. Limpeza profunda: Remove espaços e colunas duplicadas (Causa do AttributeError)
         df_c = df_input.copy()
         df_c.columns = [str(c).strip() for c in df_c.columns]
+        df_c = df_c.loc[:, ~df_c.columns.duplicated()] 
         
-        # Tenta localizar a coluna Liga caso o nome esteja levemente diferente
-        target_col = None
-        for col in df_c.columns:
-            if 'LIGA' in col.upper():
-                target_col = col
-                break
-        
-        if not target_col:
-            return {}
+        # 2. Identificar a coluna de Liga (mesmo que mude o nome)
+        col_liga = next((c for c in df_c.columns if 'LIGA' in c.upper()), None)
+        if not col_liga: return {}
 
-        # Filtro de Temporada Atual (Focar apenas 2025/2026 e 2026)
-        temporadas_atuais = ['2025/2026', '2026']
+        # 3. Filtro de Temporada Atual (Focar apenas 2025/2026 e 2026)
         if 'Temporada' in df_c.columns:
-            df_c = df_c[df_c['Temporada'].astype(str).str.strip().isin(temporadas_atuais)]
+            df_c = df_c[df_c['Temporada'].astype(str).str.strip().isin(['2025/2026', '2026'])]
         
-        # Padronização para busca (Tudo maiúsculo e sem espaços)
-        df_c[target_col] = df_c[target_col].astype(str).str.strip().upper()
-        df_c['Mandante'] = df_c['Mandante'].astype(str).str.strip().upper()
-        df_c['Visitante'] = df_c['Visitante'].astype(str).str.strip().upper()
+        # 4. Padronização de nomes (Resolve o caso 'Enppi' vs 'ENPPI')
+        # Usamos .iloc[:, 0] se houver algum erro de duplicata residual
+        df_c['Liga_Clean'] = df_c[col_liga].astype(str).str.strip().upper()
+        df_c['M_Clean'] = df_c['Mandante'].astype(str).str.strip().upper()
+        df_c['V_Clean'] = df_c['Visitante'].astype(str).str.strip().upper()
 
         stats = {}
         for _, row in df_c.iterrows():
-            liga = row[target_col]
-            m, v = row['Mandante'], row['Visitante']
+            liga = row['Liga_Clean']
+            m, v = row['M_Clean'], row['V_Clean']
             try:
                 gm, gv = float(row['Gols_Mandante_FT']), float(row['Gols_Visitante_FT'])
             except: continue
@@ -80,7 +75,6 @@ def mostrar_jogos(df_hist):
             else:
                 stats[liga][m]['pts'] += 1
                 stats[liga][v]['pts'] += 1
-            
             stats[liga][m]['sg'] += (gm - gv)
             stats[liga][v]['sg'] += (gv - gm)
         
@@ -94,20 +88,21 @@ def mostrar_jogos(df_hist):
     df_agenda = carregar_agenda(URL_AGENDA)
     dict_posicoes = obter_classificacao(df_hist)
 
-    # Preparação para os cálculos de médias e ícones
+    # Preparação do histórico limpo para médias e ícones
     if not df_hist.empty:
-        df_hist_clean = df_hist.copy()
-        df_hist_clean.columns = [str(c).strip() for c in df_hist_clean.columns]
-        # Garantir que médias considerem temporadas atuais
-        if 'Temporada' in df_hist_clean.columns:
-            df_hist_clean = df_hist_clean[df_hist_clean['Temporada'].astype(str).isin(['2025/2026', '2026'])]
+        df_h_clean = df_hist.copy()
+        df_h_clean.columns = [str(c).strip() for c in df_h_clean.columns]
+        df_h_clean = df_h_clean.loc[:, ~df_h_clean.columns.duplicated()]
+        if 'Temporada' in df_h_clean.columns:
+            df_h_clean = df_h_clean[df_h_clean['Temporada'].astype(str).str.strip().isin(['2025/2026', '2026'])]
     else:
-        df_hist_clean = pd.DataFrame()
+        df_h_clean = pd.DataFrame()
 
     if df_agenda.empty or 'Data' not in df_agenda.columns:
         st.error("Erro ao carregar a agenda de jogos.")
         return
 
+    # Lógica de Datas
     def formatar_data_busca(dt):
         return [dt.strftime('%d/%m/%Y'), dt.strftime('%d/%m/%y')]
 
@@ -127,11 +122,10 @@ def mostrar_jogos(df_hist):
 
     st.info(f"Mostrando jogos de: **{st.session_state.data_exibicao}**")
 
-    # --- FILTRO DO DIA ---
+    # Filtro do dia
     df_dia = df_agenda[df_agenda['Data'].isin(st.session_state.data_sel_formatos)]
-    times_no_dia = [] 
+    times_no_dia = []
 
-    # --- LISTAGEM DE JOGOS ---
     if df_dia.empty:
         st.warning(f"Nenhum jogo encontrado para {st.session_state.data_exibicao}.")
     else:
@@ -145,48 +139,33 @@ def mostrar_jogos(df_hist):
                 times_no_dia.extend([mandante, visitante])
                 
                 m_up, v_up = mandante.upper(), visitante.upper()
-                
-                # Busca posição no ranking (Garante Enppi vs ENPPI)
                 pos_m = dict_posicoes.get(f"{liga_upper}_{m_up}", "?")
                 pos_v = dict_posicoes.get(f"{liga_upper}_{v_up}", "?")
                 
-                # --- LOGICA DE ÍCONES ---
-                tem_gol = False; tem_canto = False; tem_ambas = False
-                if not df_hist_clean.empty:
-                    df_m_h = df_hist_clean[(df_hist_clean['Mandante'].astype(str).str.upper() == m_up) | (df_hist_clean['Visitante'].astype(str).str.upper() == m_up)]
-                    df_v_h = df_hist_clean[(df_hist_clean['Mandante'].astype(str).str.upper() == v_up) | (df_hist_clean['Visitante'].astype(str).str.upper() == v_up)]
+                # --- SINAIS DE ALERTA ---
+                icones = ""
+                if not df_h_clean.empty:
+                    df_m_h = df_h_clean[(df_h_clean['Mandante'].astype(str).str.upper() == m_up) | (df_h_clean['Visitante'].astype(str).str.upper() == m_up)]
+                    df_v_h = df_h_clean[(df_h_clean['Mandante'].astype(str).str.upper() == v_up) | (df_h_clean['Visitante'].astype(str).str.upper() == v_up)]
                     
                     if not df_m_h.empty and not df_v_h.empty:
                         try:
                             # Gols
-                            m_gols = (df_m_h[df_m_h['Mandante'].astype(str).str.upper()==m_up]['Total_Gols_FT'].mean() + df_v_h[df_v_h['Visitante'].astype(str).str.upper()==v_up]['Total_Gols_FT'].mean()) / 2
-                            if m_gols > 2.5: tem_gol = True
-                            # Cantos
-                            col_c_h = 'Corners_H' if 'Corners_H' in df_hist_clean.columns else 'Cantos_Mandante'
-                            col_c_a = 'Corners_A' if 'Corners_A' in df_hist_clean.columns else 'Cantos_Visitante'
-                            if col_c_h in df_hist_clean.columns:
-                                m_c = (df_m_h[df_m_h['Mandante'].astype(str).str.upper()==m_up][col_c_h].mean() + df_v_h[df_v_h['Visitante'].astype(str).str.upper()==v_up][col_c_a].mean())
-                                if m_c > 9.5: tem_canto = True
-                            # Ambas
+                            m_g = (df_m_h['Total_Gols_FT'].mean() + df_v_h['Total_Gols_FT'].mean()) / 2
+                            if m_g > 2.5: icones += " 🔥⚽"
+                            # Ambas Marcam
                             b_m = (len(df_m_h[(df_m_h['Gols_Mandante_FT']>0) & (df_m_h['Gols_Visitante_FT']>0)]) / len(df_m_h))
                             b_v = (len(df_v_h[(df_v_h['Gols_Mandante_FT']>0) & (df_v_h['Gols_Visitante_FT']>0)]) / len(df_v_h))
-                            if (b_m + b_v) / 2 >= 0.60: tem_ambas = True
+                            if (b_m + b_v) / 2 >= 0.60: icones += " 🤝"
                         except: pass
-
-                icones = ""
-                if tem_gol: icones += " 🔥⚽"
-                if tem_canto: icones += " 🔥🚩"
-                if tem_ambas: icones += " 🤝"
 
                 odd_m = row.get('Odd Mandante', 0)
                 odd_v = row.get('Odd Visitante', 0)
                 selo = ""
                 try:
-                    v_m = float(str(odd_m).replace(',', '.'))
-                    v_v = float(str(odd_v).replace(',', '.'))
-                    if v_m < 1.4 or v_v < 1.4: selo = " 🌟"
-                    elif v_m <= 1.8 or v_v <= 1.8: selo = " ⭐"
-                    elif abs(v_m - v_v) <= 1.0: selo = " ⚖️"
+                    vm, vv = float(str(odd_m).replace(',','.')), float(str(odd_v).replace(',','.'))
+                    if vm < 1.4 or vv < 1.4: selo = " 🌟"
+                    elif vm <= 1.8 or vv <= 1.8: selo = " ⭐"
                 except: pass
 
                 c1, c2, c3 = st.columns([4.2, 3.0, 1.3])
@@ -195,24 +174,25 @@ def mostrar_jogos(df_hist):
                 with c2:
                     st.write(f"Odds: **{odd_m}** | **{row.get('Odd Empate',0)}** | **{odd_v}**")
                 with c3:
-                    if st.button("Analisar 🔍", key=f"btn_ag_{idx}_{m_up[:3]}", use_container_width=True):
+                    if st.button("Analisar 🔍", key=f"ag_{idx}_{m_up[:3]}", use_container_width=True):
                         st.session_state.liga_scout = liga_upper
                         st.session_state.time_casa_scout = mandante
                         st.session_state.time_fora_scout = visitante
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-    # --- RANKINGS DE PERFORMANCE (Temporada Atual) ---
-    if not df_hist_clean.empty and times_no_dia:
+    # --- RANKINGS ---
+    if not df_h_clean.empty and times_no_dia:
         st.divider()
-        st.subheader(f"📊 Rankings de Performance (25/26)")
-        times_u = list(set([str(t).strip().upper() for t in times_no_dia]))
-        r_data = []
+        st.subheader("📊 Destaques da Rodada (25/26)")
+        times_u = list(set([t.upper() for t in times_no_dia]))
+        r_list = []
         for t in times_u:
-            df_t = df_hist_clean[(df_hist_clean['Mandante'].astype(str).str.upper() == t) | (df_hist_clean['Visitante'].astype(str).str.upper() == t)]
+            df_t = df_h_clean[(df_h_clean['Mandante'].astype(str).str.upper() == t) | (df_h_clean['Visitante'].astype(str).str.upper() == t)]
             if not df_t.empty:
-                r_data.append({"Time": t, "Média Gols": df_t['Total_Gols_FT'].mean()})
-        if r_data:
-            df_rank = pd.DataFrame(r_data).sort_values('Média Gols', ascending=False).head(5)
-            st.write("🔥 **Top Ataques do Dia (Médias):**")
+                r_list.append({"Time": t, "Média Gols": df_t['Total_Gols_FT'].mean()})
+        
+        if r_list:
+            df_rank = pd.DataFrame(r_list).sort_values('Média Gols', ascending=False).head(5)
+            st.write("🔥 **Ataques mais perigosos em campo hoje:**")
             st.dataframe(df_rank, hide_index=True, use_container_width=True)
