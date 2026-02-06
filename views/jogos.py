@@ -28,27 +28,28 @@ def mostrar_jogos(df_hist):
     def carregar_agenda(url):
         try:
             df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8-sig')
+            # Limpa espaços nos nomes das colunas da agenda
             df.columns = [c.strip() for c in df.columns]
             df = df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
             return df
         except: return pd.DataFrame()
 
-    # --- FUNÇÃO PARA CALCULAR CLASSIFICAÇÃO (PADRONIZADA) ---
+    # --- FUNÇÃO PARA CALCULAR CLASSIFICAÇÃO (COM LIMPEZA DE COLUNAS) ---
     def obter_classificacao(df):
-        if df.empty: return {}
+        if df is None or df.empty: return {}
         
-        # LIMPEZA CRÍTICA: Remove espaços de nomes de colunas ocultas
-        df.columns = [str(c).strip() for c in df.columns]
+        # Cria uma cópia para não afetar o DataFrame original
+        df_c = df.copy()
         
-        # Verifica se as colunas necessárias existem após a limpeza
-        colunas_necessarias = ['Liga', 'Mandante', 'Visitante', 'Gols_Mandante_FT', 'Gols_Visitante_FT']
-        if not all(col in df.columns for col in colunas_necessarias):
+        # LIMPEZA DOS NOMES DAS COLUNAS (Cura o AttributeError)
+        df_c.columns = [str(c).strip() for c in df_c.columns]
+        
+        # Verifica se a coluna 'Liga' existe após a limpeza
+        if 'Liga' not in df_c.columns:
             return {}
 
         stats = {}
-        df_c = df.copy()
-        
-        # Padronização de valores
+        # Padronização de valores para busca
         df_c['Liga'] = df_c['Liga'].astype(str).str.strip().upper()
         df_c['Mandante'] = df_c['Mandante'].astype(str).str.strip().upper()
         df_c['Visitante'] = df_c['Visitante'].astype(str).str.strip().upper()
@@ -64,12 +65,14 @@ def mostrar_jogos(df_hist):
             for t in [m, v]:
                 if t not in stats[liga]: stats[liga][t] = {'pts': 0, 'sg': 0}
             
+            # Cálculo de Pontos
             if gm > gv: stats[liga][m]['pts'] += 3
             elif gv > gm: stats[liga][v]['pts'] += 3
             else:
                 stats[liga][m]['pts'] += 1
                 stats[liga][v]['pts'] += 1
             
+            # Saldo de Gols
             stats[liga][m]['sg'] += (gm - gv)
             stats[liga][v]['sg'] += (gv - gm)
         
@@ -82,7 +85,7 @@ def mostrar_jogos(df_hist):
 
     df_agenda = carregar_agenda(URL_AGENDA)
     
-    # Garantimos que df_hist (dados_25_26) esteja limpo antes de processar
+    # Processa a classificação com o df_hist (dados_25_26.csv)
     dict_posicoes = obter_classificacao(df_hist)
 
     if df_agenda.empty or 'Data' not in df_agenda.columns:
@@ -131,16 +134,17 @@ def mostrar_jogos(df_hist):
                 pos_m = dict_posicoes.get(f"{liga_upper}_{m_upper}", "?")
                 pos_v = dict_posicoes.get(f"{liga_upper}_{v_upper}", "?")
                 
-                # --- Lógica de ícones (mantida) ---
-                tem_gol = False; tem_canto = False
+                # --- Lógica de ícones simplificada ---
+                tem_gol = False
                 if not df_hist.empty:
-                    # Aplicamos upper na busca do histórico também
                     df_m_h = df_hist[(df_hist['Mandante'].astype(str).str.upper() == m_upper) | (df_hist['Visitante'].astype(str).str.upper() == m_upper)]
                     df_v_h = df_hist[(df_hist['Mandante'].astype(str).str.upper() == v_upper) | (df_hist['Visitante'].astype(str).str.upper() == v_upper)]
                     
                     if not df_m_h.empty and not df_v_h.empty:
-                        m_gols = (df_m_h[df_m_h['Mandante'].astype(str).str.upper()==m_upper]['Total_Gols_FT'].mean() + df_v_h[df_v_h['Visitante'].astype(str).str.upper()==v_upper]['Total_Gols_FT'].mean()) / 2
-                        if m_gols > 2.5: tem_gol = True
+                        try:
+                            m_gols = (df_m_h[df_m_h['Mandante'].astype(str).str.upper()==m_upper]['Total_Gols_FT'].mean() + df_v_h[df_v_h['Visitante'].astype(str).str.upper()==v_upper]['Total_Gols_FT'].mean()) / 2
+                            if m_gols > 2.5: tem_gol = True
+                        except: pass
 
                 icones = ""
                 if tem_gol: icones += " 🔥⚽"
@@ -161,8 +165,23 @@ def mostrar_jogos(df_hist):
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-    # --- RANKINGS DE PERFORMANCE (Resumo mantido) ---
+    # --- RANKINGS DE PERFORMANCE ---
     if not df_hist.empty and times_no_dia:
         st.divider()
         st.subheader(f"📊 Rankings de Performance")
-        # Mantém a lógica de rankings original aqui...
+        
+        times_dia_unicos = list(set([str(t).strip().upper() for t in times_no_dia]))
+        rank_data = []
+
+        for t in times_dia_unicos:
+            df_t = df_hist[(df_hist['Mandante'].astype(str).str.upper() == t) | (df_hist['Visitante'].astype(str).str.upper() == t)]
+            if not df_t.empty:
+                try:
+                    # Cálculo simplificado para evitar novos AttributeErrors
+                    gm_f = df_t[df_t['Mandante'].astype(str).str.upper()==t]['Gols_Mandante_FT'].mean()
+                    gm_s = df_t[df_t['Visitante'].astype(str).str.upper()==t]['Gols_Visitante_FT'].mean()
+                    rank_data.append({"Time": t, "Gols FT Marcados": gm_f, "Gols FT Sofridos": gm_s})
+                except: continue
+        
+        if rank_data:
+            st.dataframe(pd.DataFrame(rank_data).head(10), hide_index=True, use_container_width=True)
