@@ -138,10 +138,10 @@ def mostrar_jogos(df_hist):
                     if not h_m.empty and not h_v.empty:
                         try:
                             avg_g = (h_m['Total_Gols_FT'].mean() + h_v['Total_Gols_FT'].mean()) / 2
-                            if avg_g > 4.0: icones += " 🔥⚽"
+                            if avg_g > 3.5: icones += " 🔥⚽"
                             if 'Total_Cantos_FT' in df_hist.columns:
                                 avg_c = (h_m['Total_Cantos_FT'].mean() + h_v['Total_Cantos_FT'].mean()) / 2
-                                if avg_c > 13.0: icones += " 🔥🚩"
+                                if avg_c > 12.0: icones += " 🔥🚩"
                             b_m = (len(h_m[(h_m['Gols_Mandante_FT']>0) & (h_m['Gols_Visitante_FT']>0)]) / len(h_m))
                             b_v = (len(h_v[(h_v['Gols_Mandante_FT']>0) & (h_v['Gols_Visitante_FT']>0)]) / len(h_v))
                             if (b_m + b_v) / 2 >= 0.60: icones += " 🤝"
