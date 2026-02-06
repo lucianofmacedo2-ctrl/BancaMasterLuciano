@@ -33,7 +33,37 @@ def mostrar_jogos(df_hist):
             return df
         except: return pd.DataFrame()
 
+    # --- FUNÇÃO PARA CALCULAR CLASSIFICAÇÃO ---
+    def obter_classificacao(df):
+        if df.empty: return {}
+        stats = {}
+        for _, row in df.iterrows():
+            liga = row['Liga']
+            m, v = row['Mandante'], row['Visitante']
+            gm, gv = row['Gols_Mandante_FT'], row['Gols_Visitante_FT']
+            
+            if liga not in stats: stats[liga] = {}
+            for t in [m, v]:
+                if t not in stats[liga]: stats[liga][t] = {'pts': 0, 'sg': 0}
+            
+            if gm > gv: stats[liga][m]['pts'] += 3
+            elif gv > gm: stats[liga][v]['pts'] += 3
+            else:
+                stats[liga][m]['pts'] += 1
+                stats[liga][v]['pts'] += 1
+            
+            stats[liga][m]['sg'] += (gm - gv)
+            stats[liga][v]['sg'] += (gv - gm)
+        
+        posicoes_finais = {}
+        for liga in stats:
+            ranking = sorted(stats[liga].items(), key=lambda x: (x[1]['pts'], x[1]['sg']), reverse=True)
+            for i, (time, _) in enumerate(ranking):
+                posicoes_finais[f"{liga}_{time}"] = i + 1
+        return posicoes_finais
+
     df_agenda = carregar_agenda(URL_AGENDA)
+    dict_posicoes = obter_classificacao(df_hist)
 
     if df_agenda.empty or 'Data' not in df_agenda.columns:
         st.error("Erro ao carregar a agenda de jogos.")
@@ -62,7 +92,7 @@ def mostrar_jogos(df_hist):
     df_dia = df_agenda[df_agenda['Data'].isin(st.session_state.data_sel_formatos)]
     times_no_dia = [] 
 
-    # --- NOVO: LÓGICA DE SUGESTÕES (OVER GOLS E CANTOS) ---
+    # --- LÓGICA DE SUGESTÕES ---
     if not df_dia.empty and not df_hist.empty:
         sugestoes_gols = []
         sugestoes_cantos = []
@@ -76,12 +106,10 @@ def mostrar_jogos(df_hist):
             df_v = df_hist[(df_hist['Mandante'] == v) | (df_hist['Visitante'] == v)]
             
             if not df_m.empty and not df_v.empty:
-                # Média de Gols Combinada
                 m_gols = (df_hist[df_hist['Mandante']==m]['Total_Gols_FT'].mean() + df_hist[df_hist['Visitante']==v]['Total_Gols_FT'].mean()) / 2
                 if m_gols > 2.0:
                     sugestoes_gols.append({'Jogo': f"{m} x {v}", 'Média': m_gols})
                 
-                # Média de Cantos Combinada
                 if col_c_h in df_hist.columns:
                     m_cantos = (df_hist[df_hist['Mandante']==m][col_c_h].mean() + df_hist[df_hist['Visitante']==v][col_c_a].mean())
                     if m_cantos > 8.5:
@@ -112,6 +140,10 @@ def mostrar_jogos(df_hist):
             for idx, row in df_l.iterrows():
                 mandante, visitante = row['Mandante'], row['Visitante']
                 times_no_dia.extend([mandante, visitante])
+                
+                # Resgate das posições
+                pos_m = dict_posicoes.get(f"{liga}_{mandante}", "?")
+                pos_v = dict_posicoes.get(f"{liga}_{visitante}", "?")
                 
                 tem_gol = False
                 tem_canto = False
@@ -160,7 +192,8 @@ def mostrar_jogos(df_hist):
 
                 c1, c2, c3 = st.columns([4.2, 3.0, 1.3])
                 with c1:
-                    st.write(f"**{row['Hora']}** | {mandante} vs {visitante}{icones}{selo_favorito}")
+                    # Exibição com a posição incluída entre parênteses
+                    st.write(f"**{row['Hora']}** | ({pos_m}º) {mandante} vs {visitante} ({pos_v}º){icones}{selo_favorito}")
                 with c2:
                     st.write(f"Odds: **{odd_m}** | **{row.get('Odd Empate',0)}** | **{odd_v}**")
                 with c3:
@@ -171,7 +204,7 @@ def mostrar_jogos(df_hist):
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-    # --- RANKINGS DE PERFORMANCE ---
+    # --- RANKINGS DE PERFORMANCE (Mantido Original) ---
     if not df_hist.empty and times_no_dia:
         st.divider()
         st.subheader(f"📊 Rankings de Performance - {st.session_state.data_exibicao}")
