@@ -19,7 +19,7 @@ def mostrar_jogos(df_hist):
     with st.expander("💡 Legenda do Radar de Valor", expanded=False):
         st.markdown("""
         * 🔥⚽ **Fogo + Gol**: Média combinada > 2.5 gols.
-        * 🔥🚩 **Fogo + Canto**: Média combinada > 9.5 cantos.
+        * 🔥🚩 **Fogo + Canto**: Média combinada > 9.5 escanteios.
         * 🤝 **Ambas Sim**: Incidência de BTTS > 60%.
         * ⭐ **Favorito**: Odd 1.40 - 1.80 | 🌟 **Super Fav**: Odd < 1.40.
         * ⚖️ **Equilibrado**: Diferença de Odds ≤ 1.0.
@@ -81,7 +81,6 @@ def mostrar_jogos(df_hist):
         matches = get_close_matches(nome_agenda, lista_referencia, n=1, cutoff=0.6)
         return matches[0] if matches else None
 
-    # --- NAVEGAÇÃO ---
     if 'data_exibicao' not in st.session_state: st.session_state.data_exibicao = hoje_dt.strftime('%d/%m/%Y')
     cols_btn = st.columns(3)
     datas_ops = [hoje_dt, hoje_dt + timedelta(days=1), hoje_dt + timedelta(days=2)]
@@ -90,7 +89,6 @@ def mostrar_jogos(df_hist):
             st.session_state.data_exibicao = datas_ops[i].strftime('%d/%m/%Y')
             st.rerun()
 
-    # --- FILTRO DA AGENDA ---
     data_alvo = st.session_state.data_exibicao[0:5] 
     df_dia = df_agenda[df_agenda['Data'].str.contains(data_alvo, na=False)] if not df_agenda.empty else pd.DataFrame()
 
@@ -137,14 +135,14 @@ def mostrar_jogos(df_hist):
                     h_v = df_hist[(df_hist['Mandante'].apply(tratar_string) == v_match) | (df_hist['Visitante'].apply(tratar_string) == v_match)]
                     if not h_m.empty and not h_v.empty:
                         m_gols = (h_m['Total_Gols_FT'].mean() + h_v['Total_Gols_FT'].mean()) / 2
-                        if m_gols > 3.0: 
+                        if m_gols > 2.5: 
                             icones += " 🔥⚽"
                             sugestoes_gols.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_gols})
                         
-                        col_canto = 'Total_Cantos_FT' if 'Total_Cantos_FT' in df_hist.columns else 'Total_Cantos'
-                        if col_canto in df_hist.columns:
-                            m_cantos = (h_m[col_canto].mean() + h_v[col_canto].mean()) / 2
-                            if m_cantos > 11.0: 
+                        # USANDO AS COLUNAS CORRETAS DE CANTOS
+                        if 'Total_Corners' in df_hist.columns:
+                            m_cantos = (h_m['Total_Corners'].mean() + h_v['Total_Corners'].mean()) / 2
+                            if m_cantos > 9.5: 
                                 icones += " 🔥🚩"
                                 sugestoes_cantos.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_cantos})
 
@@ -157,7 +155,6 @@ def mostrar_jogos(df_hist):
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
 
-    # --- SEÇÃO DE SUGESTÕES ---
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top 5)")
     col_s1, col_s2 = st.columns(2)
@@ -170,7 +167,6 @@ def mostrar_jogos(df_hist):
         s_cantos = sorted(sugestoes_cantos, key=lambda x: x['valor'], reverse=True)[:5]
         for s in s_cantos: st.warning(f"{s['jogo']} ({s['valor']:.2f})")
 
-    # --- RANKINGS TOP 5 (APENAS TIMES QUE JOGAM NO DIA) ---
     if not df_hist.empty and times_do_dia_tratados:
         st.divider()
         st.subheader(f"📊 Top 5 Performance (Times que jogam em {st.session_state.data_exibicao})")
@@ -180,46 +176,62 @@ def mostrar_jogos(df_hist):
         df_h['M_T'] = df_h['Mandante'].apply(tratar_string)
         df_h['V_T'] = df_h['Visitante'].apply(tratar_string)
         
-        # Filtramos apenas os times que estão na agenda do dia
         for t in list(set(times_do_dia_tratados)):
             jogos_t = df_h[(df_h['M_T'] == t) | (df_h['V_T'] == t)]
             if jogos_t.empty: continue
             
+            # GOLS
             gm_ft = jogos_t.apply(lambda r: r['Gols_Mandante_FT'] if r['M_T'] == t else r['Gols_Visitante_FT'], axis=1).mean()
             gs_ft = jogos_t.apply(lambda r: r['Gols_Visitante_FT'] if r['M_T'] == t else r['Gols_Mandante_FT'], axis=1).mean()
             gm_ht = jogos_t.apply(lambda r: r['Gols_Mandante_HT'] if r['M_T'] == t else r['Gols_Visitante_HT'], axis=1).mean()
             gs_ht = jogos_t.apply(lambda r: r['Gols_Visitante_HT'] if r['M_T'] == t else r['Gols_Mandante_HT'], axis=1).mean()
             
-            c_ft = jogos_t['Total_Cantos_FT'].mean() if 'Total_Cantos_FT' in jogos_t.columns else 0
-            c_ht = jogos_t['Total_Cantos_HT'].mean() if 'Total_Cantos_HT' in jogos_t.columns else 0
+            # CANTOS (Usando as colunas enviadas)
+            cf_ft = jogos_t.apply(lambda r: r['Corners_H'] if r['M_T'] == t else r['Corners_A'], axis=1).mean()
+            cs_ft = jogos_t.apply(lambda r: r['Corners_A'] if r['M_T'] == t else r['Corners_H'], axis=1).mean()
+            cf_ht = jogos_t.apply(lambda r: r['Corners_H_HT'] if r['M_T'] == t else r['Corners_A_HT'], axis=1).mean()
+            cs_ht = jogos_t.apply(lambda r: r['Corners_A_HT'] if r['M_T'] == t else r['Corners_H_HT'], axis=1).mean()
             
             times_stats.append({
-                "Time": t, "Média GM FT": gm_ft, "Média GS FT": gs_ft,
-                "Média GM HT": gm_ht, "Média GS HT": gs_ht, "Média Cantos FT": c_ft, "Média Cantos HT": c_ht
+                "Time": t, 
+                "GM FT": gm_ft, "GS FT": gs_ft, "GM HT": gm_ht, "GS HT": gs_ht,
+                "CF FT": cf_ft, "CS FT": cs_ft, "CF HT": cf_ht, "CS HT": cs_ht
             })
         
         df_rank = pd.DataFrame(times_stats)
         if not df_rank.empty:
+            # GOLS FT
             r1, r2 = st.columns(2)
             with r1:
                 st.write("⚽ **Marcam + (FT)**")
-                st.table(df_rank.sort_values("Média GM FT", ascending=False)[["Time", "Média GM FT"]].head(5))
+                st.table(df_rank.sort_values("GM FT", ascending=False)[["Time", "GM FT"]].head(5))
             with r2:
                 st.write("🥅 **Sofrem + (FT)**")
-                st.table(df_rank.sort_values("Média GS FT", ascending=False)[["Time", "Média GS FT"]].head(5))
+                st.table(df_rank.sort_values("GS FT", ascending=False)[["Time", "GS FT"]].head(5))
 
+            # GOLS HT
             r3, r4 = st.columns(2)
             with r3:
                 st.write("⏱️ **Marcam + HT**")
-                st.table(df_rank.sort_values("Média GM HT", ascending=False)[["Time", "Média GM HT"]].head(5))
+                st.table(df_rank.sort_values("GM HT", ascending=False)[["Time", "GM HT"]].head(5))
             with r4:
                 st.write("📉 **Sofrem + HT**")
-                st.table(df_rank.sort_values("Média GS HT", ascending=False)[["Time", "Média GS HT"]].head(5))
+                st.table(df_rank.sort_values("GS HT", ascending=False)[["Time", "GS HT"]].head(5))
 
+            # CANTOS FT
             r5, r6 = st.columns(2)
             with r5:
-                st.write("🚩 **Volume Cantos FT**")
-                st.table(df_rank.sort_values("Média Cantos FT", ascending=False)[["Time", "Média Cantos FT"]].head(5))
+                st.write("🚩 **Cantos Feitos (FT)**")
+                st.table(df_rank.sort_values("CF FT", ascending=False)[["Time", "CF FT"]].head(5))
             with r6:
-                st.write("🚩 **Volume Cantos HT**")
-                st.table(df_rank.sort_values("Média Cantos HT", ascending=False)[["Time", "Média Cantos HT"]].head(5))
+                st.write("🚩 **Cantos Sofridos (FT)**")
+                st.table(df_rank.sort_values("CS FT", ascending=False)[["Time", "CS FT"]].head(5))
+
+            # CANTOS HT
+            r7, r8 = st.columns(2)
+            with r7:
+                st.write("🚩 **Cantos Feitos (HT)**")
+                st.table(df_rank.sort_values("CF HT", ascending=False)[["Time", "CF HT"]].head(5))
+            with r8:
+                st.write("🚩 **Cantos Sofridos (HT)**")
+                st.table(df_rank.sort_values("CS HT", ascending=False)[["Time", "CS HT"]].head(5))
