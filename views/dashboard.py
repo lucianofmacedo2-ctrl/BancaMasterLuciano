@@ -101,15 +101,14 @@ def mostrar_dashboard():
     r3.metric("Reds ❌", len(reds_df))
     r4.metric("Odd Média (Greens)", f"{odd_media_greens:.2f}")
 
-    # --- RELATÓRIO POR OPERADOR ---
+    # --- RELATÓRIO POR OPERADOR (TABELA GERAL) ---
     st.divider()
     st.subheader("👤 Performance por Operador")
     
+    operadores_alvo = ["DOUGLAS", "FÁBIO", "FERNANDO", "LUCIANO"]
+    
     if not df_f.empty and 'operador' in df_f.columns:
-        # Padronizando para maiúsculas para evitar erro de digitação
         df_f['operador'] = df_f['operador'].astype(str).str.upper()
-        # Lista com a grafia correta (FÁBIO com acento)
-        operadores_alvo = ["DOUGLAS", "FÁBIO", "FERNANDO", "LUCIANO"]
         
         stats_op = []
         for op in operadores_alvo:
@@ -131,14 +130,56 @@ def mostrar_dashboard():
         
         if stats_op:
             st.dataframe(pd.DataFrame(stats_op), use_container_width=True, hide_index=True)
+        
+        # --- NOVO: ANÁLISE INDIVIDUAL DETALHADA ---
+        st.divider()
+        st.subheader("🔍 Análise Individual Detalhada")
+        op_individual = st.selectbox("Selecione o Operador para ver detalhes", operadores_alvo)
+        
+        df_ind = df_f[df_f['operador'] == op_individual]
+        
+        if not df_ind.empty:
+            i1, i2, i3, i4 = st.columns(4)
+            lucro_ind = df_ind['lucro'].sum()
+            g_ind = df_ind[df_ind['status'].str.contains('Green', na=False)]
+            wr_ind = (len(g_ind) / len(df_ind) * 100)
+            stake_ind = df_ind['stake'].sum()
+            roi_ind = (lucro_ind / stake_ind * 100) if stake_ind > 0 else 0
+            
+            i1.metric("Lucro do Operador", f"R$ {lucro_ind:.2f}")
+            i2.metric("Win Rate", f"{wr_ind:.1f}%")
+            i3.metric("ROI %", f"{roi_ind:.1f}%")
+            i4.metric("Stake Total", f"R$ {stake_ind:.2f}")
+            
+            # Gráficos Individuais
+            ci1, ci2 = st.columns(2)
+            with ci1:
+                # Lucro por Método do Operador Selecionado
+                df_met_ind = df_ind.groupby('metodo')['lucro'].sum().reset_index()
+                fig_met_ind = px.bar(df_met_ind, x='metodo', y='lucro', title=f"Lucro por Método: {op_individual}", color='lucro', color_continuous_scale="RdYlGn")
+                st.plotly_chart(fig_met_ind, use_container_width=True)
+            
+            with ci2:
+                # Evolução do Operador
+                df_ev_ind = df_ind.sort_values('data').copy()
+                df_ev_ind['Evolução'] = df_ev_ind['lucro'].cumsum()
+                fig_ev_ind = px.line(df_ev_ind, x='data', y='Evolução', title=f"Curva de Lucro: {op_individual}", markers=True)
+                st.plotly_chart(fig_ev_ind, use_container_width=True)
+                
+            # Tabela de Histórico do Operador
+            with st.expander(f"📄 Ver últimas 10 entradas de {op_individual}"):
+                st.table(df_ind.sort_values('data', ascending=False)[['data', 'liga', 'mandante', 'visitante', 'metodo', 'odd', 'status', 'lucro']].head(10))
         else:
-            st.info("Nenhum dado encontrado para os operadores no período selecionado.")
+            st.info(f"O operador {op_individual} não possui entradas no período selecionado.")
+            
     else:
         st.warning("Coluna 'operador' não encontrada ou filtros retornaram vazio.")
 
-    # --- GRÁFICOS ---
+    # --- GRÁFICOS GERAIS ---
     if not df_f.empty:
         st.divider()
+        st.subheader("📈 Gráficos Gerais")
+        
         # Evolução Patrimonial
         df_ev = df_f.sort_values('data')
         df_ev['Evolução'] = s_ini + df_ev['lucro'].cumsum()
