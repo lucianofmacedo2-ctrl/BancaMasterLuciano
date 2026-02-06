@@ -143,13 +143,13 @@ def mostrar_jogos(df_hist):
                     h_v = df_hist[(df_hist['Mandante'].apply(tratar_string) == v_match) | (df_hist['Visitante'].apply(tratar_string) == v_match)]
                     if not h_m.empty and not h_v.empty:
                         m_gols = (h_m['Total_Gols_FT'].mean() + h_v['Total_Gols_FT'].mean()) / 2
-                        if m_gols > 2.5: 
+                        if m_gols > 3.0: 
                             icones += " 🔥⚽"
                             sugestoes_gols.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_gols})
                         
                         if 'Total_Corners' in df_hist.columns:
                             m_cantos = (h_m['Total_Corners'].mean() + h_v['Total_Corners'].mean()) / 2
-                            if m_cantos > 9.5: 
+                            if m_cantos > 11.0: 
                                 icones += " 🔥🚩"
                                 sugestoes_cantos.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_cantos})
 
