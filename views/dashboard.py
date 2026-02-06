@@ -101,7 +101,7 @@ def mostrar_dashboard():
     r3.metric("Reds ❌", len(reds_df))
     r4.metric("Odd Média (Greens)", f"{odd_media_greens:.2f}")
 
-    # --- RELATÓRIO POR OPERADOR (TABELA GERAL) ---
+    # --- RELATÓRIO POR OPERADOR ---
     st.divider()
     st.subheader("👤 Performance por Operador")
     
@@ -131,7 +131,7 @@ def mostrar_dashboard():
         if stats_op:
             st.dataframe(pd.DataFrame(stats_op), use_container_width=True, hide_index=True)
         
-        # --- NOVO: ANÁLISE INDIVIDUAL DETALHADA ---
+        # --- ANÁLISE INDIVIDUAL DETALHADA ---
         st.divider()
         st.subheader("🔍 Análise Individual Detalhada")
         op_individual = st.selectbox("Selecione o Operador para ver detalhes", operadores_alvo)
@@ -151,24 +151,38 @@ def mostrar_dashboard():
             i3.metric("ROI %", f"{roi_ind:.1f}%")
             i4.metric("Stake Total", f"R$ {stake_ind:.2f}")
             
-            # Gráficos Individuais
             ci1, ci2 = st.columns(2)
             with ci1:
-                # Lucro por Método do Operador Selecionado
                 df_met_ind = df_ind.groupby('metodo')['lucro'].sum().reset_index()
                 fig_met_ind = px.bar(df_met_ind, x='metodo', y='lucro', title=f"Lucro por Método: {op_individual}", color='lucro', color_continuous_scale="RdYlGn")
                 st.plotly_chart(fig_met_ind, use_container_width=True)
             
             with ci2:
-                # Evolução do Operador
                 df_ev_ind = df_ind.sort_values('data').copy()
                 df_ev_ind['Evolução'] = df_ev_ind['lucro'].cumsum()
                 fig_ev_ind = px.line(df_ev_ind, x='data', y='Evolução', title=f"Curva de Lucro: {op_individual}", markers=True)
                 st.plotly_chart(fig_ev_ind, use_container_width=True)
                 
-            # Tabela de Histórico do Operador
-            with st.expander(f"📄 Ver últimas 10 entradas de {op_individual}"):
-                st.table(df_ind.sort_values('data', ascending=False)[['data', 'liga', 'mandante', 'visitante', 'metodo', 'odd', 'status', 'lucro']].head(10))
+            # --- HISTÓRICO COLORIDO (Últimas 30 Entradas) ---
+            with st.expander(f"📄 Ver últimas 30 entradas de {op_individual}"):
+                df_hist = df_ind.sort_values('data', ascending=False).head(30).copy()
+                
+                # Função para colorir as linhas
+                def color_status(row):
+                    if 'Green' in str(row.status):
+                        return ['background-color: #d4edda; color: #155724'] * len(row)
+                    elif 'Red' in str(row.status):
+                        return ['background-color: #f8d7da; color: #721c24'] * len(row)
+                    return [''] * len(row)
+
+                # Formatando a data para exibição
+                df_hist['data'] = df_hist['data'].dt.strftime('%d/%m/%Y %H:%M')
+                
+                st.dataframe(
+                    df_hist[['data', 'liga', 'mandante', 'visitante', 'metodo', 'odd', 'status', 'lucro']].style.apply(color_status, axis=1),
+                    use_container_width=True,
+                    hide_index=True
+                )
         else:
             st.info(f"O operador {op_individual} não possui entradas no período selecionado.")
             
@@ -180,35 +194,20 @@ def mostrar_dashboard():
         st.divider()
         st.subheader("📈 Gráficos Gerais")
         
-        # Evolução Patrimonial
         df_ev = df_f.sort_values('data')
         df_ev['Evolução'] = s_ini + df_ev['lucro'].cumsum()
         st.plotly_chart(px.line(df_ev, x='data', y='Evolução', title="Curva de Património", markers=True), use_container_width=True)
 
-        # Cálculo de Lucro e ROI por Método
         st.subheader("🏆 Performance por Método (Top 5 Melhores vs Piores)")
-        df_met = df_f.groupby('metodo').agg({
-            'lucro': 'sum',
-            'stake': 'sum'
-        }).reset_index()
-        
+        df_met = df_f.groupby('metodo').agg({'lucro': 'sum', 'stake': 'sum'}).reset_index()
         df_met['ROI %'] = (df_met['lucro'] / df_met['stake']) * 100
         melhores = df_met.nlargest(5, 'lucro')
         piores = df_met.nsmallest(5, 'lucro')
         df_top10 = pd.concat([melhores, piores]).drop_duplicates().sort_values(by="lucro", ascending=False)
         
-        fig_met = px.bar(
-            df_top10, 
-            x='metodo', 
-            y='lucro', 
-            color='ROI %',
-            text=df_top10['ROI %'].apply(lambda x: f"ROI: {x:.1f}%"),
-            title="Lucro por Método (Barras) e ROI % (Cores)",
-            color_continuous_scale="RdYlGn"
-        )
+        fig_met = px.bar(df_top10, x='metodo', y='lucro', color='ROI %', text=df_top10['ROI %'].apply(lambda x: f"ROI: {x:.1f}%"), title="Lucro por Método e ROI %", color_continuous_scale="RdYlGn")
         st.plotly_chart(fig_met, use_container_width=True)
 
-        # Distribuição de Odds
         st.divider()
         st.subheader("🎯 Distribuição de Odds dos Greens")
         fig_odd = px.histogram(greens_df, x="odd", nbins=15, title="Onde estão seus acertos?", color_discrete_sequence=['#002b5c'])
