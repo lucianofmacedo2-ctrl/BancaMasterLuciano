@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 from supabase import create_client
 from datetime import datetime, date, timedelta
-import calendar
+import pytz
 
 # --- CONFIGURAÇÃO SUPABASE ---
 URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
@@ -101,6 +101,31 @@ def mostrar_dashboard():
     r3.metric("Reds ❌", len(reds_df))
     r4.metric("Odd Média (Greens)", f"{odd_media_greens:.2f}")
 
+    # --- NOVO: RELATÓRIO DE LUCRO DIÁRIO ---
+    st.divider()
+    st.subheader("📅 Relatório Diário de Lucro")
+    if not df_f.empty:
+        # Agrupar lucro por data
+        df_diario = df_f.copy()
+        df_diario['apenas_data'] = df_diario['data'].dt.date
+        resumo_diario = df_diario.groupby('apenas_data')['lucro'].sum().reset_index()
+        resumo_diario.columns = ['Data', 'Lucro/Prejuízo']
+        resumo_diario = resumo_diario.sort_values('Data', ascending=False)
+
+        def color_positivo_negativo(val):
+            color = '#d4edda' if val >= 0 else '#f8d7da'
+            text_color = '#155724' if val >= 0 else '#721c24'
+            return f'background-color: {color}; color: {text_color}'
+
+        st.dataframe(
+            resumo_diario.style.format({'Lucro/Prejuízo': 'R$ {:.2f}'})
+            .applymap(color_positivo_negativo, subset=['Lucro/Prejuízo']),
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("Sem dados para gerar o relatório diário.")
+
     # --- RELATÓRIO POR OPERADOR ---
     st.divider()
     st.subheader("👤 Performance por Operador")
@@ -163,11 +188,9 @@ def mostrar_dashboard():
                 fig_ev_ind = px.line(df_ev_ind, x='data', y='Evolução', title=f"Curva de Lucro: {op_individual}", markers=True)
                 st.plotly_chart(fig_ev_ind, use_container_width=True)
                 
-            # --- HISTÓRICO COLORIDO (Últimas 30 Entradas) ---
             with st.expander(f"📄 Ver últimas 30 entradas de {op_individual}"):
                 df_hist = df_ind.sort_values('data', ascending=False).head(30).copy()
                 
-                # Função para colorir as linhas
                 def color_status(row):
                     if 'Green' in str(row.status):
                         return ['background-color: #d4edda; color: #155724'] * len(row)
@@ -175,7 +198,6 @@ def mostrar_dashboard():
                         return ['background-color: #f8d7da; color: #721c24'] * len(row)
                     return [''] * len(row)
 
-                # Formatando a data para exibição
                 df_hist['data'] = df_hist['data'].dt.strftime('%d/%m/%Y %H:%M')
                 
                 st.dataframe(
