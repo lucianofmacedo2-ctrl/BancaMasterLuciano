@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from difflib import get_close_matches
 
 def mostrar_scout(df):
     st.markdown("## 🔎 Painel de Análise")
@@ -12,8 +13,10 @@ def mostrar_scout(df):
     lista_ligas = sorted(df['Liga'].unique())
     idx_liga = 0
     if 'liga_scout' in st.session_state:
-        if st.session_state.liga_scout in lista_ligas:
-            idx_liga = lista_ligas.index(st.session_state.liga_scout)
+        # Busca aproximada da liga para evitar erros de string
+        matches_l = get_close_matches(st.session_state.liga_scout, lista_ligas, n=1, cutoff=0.6)
+        if matches_l:
+            idx_liga = lista_ligas.index(matches_l[0])
 
     # 2. SELEÇÃO DA LIGA
     liga_sel = st.selectbox("🏆 Escolha a Liga", lista_ligas, index=idx_liga)
@@ -23,16 +26,20 @@ def mostrar_scout(df):
     lista_times = sorted(df_l['Mandante'].unique())
     
     idx_casa = 0
-    if 'time_casa_scout' in st.session_state and st.session_state.time_casa_scout in lista_times:
-        idx_casa = lista_times.index(st.session_state.time_casa_scout)
+    if 'time_casa_scout' in st.session_state:
+        matches_m = get_close_matches(st.session_state.time_casa_scout, lista_times, n=1, cutoff=0.6)
+        if matches_m:
+            idx_casa = lista_times.index(matches_m[0])
 
     # 3. SELEÇÃO DOS TIMES
     m_sel = st.selectbox("🏠 Time da Casa", lista_times, index=idx_casa)
     
     visitantes_disp = [t for t in lista_times if t != m_sel]
     idx_fora = 0
-    if 'time_fora_scout' in st.session_state and st.session_state.time_fora_scout in visitantes_disp:
-        idx_fora = visitantes_disp.index(st.session_state.time_fora_scout)
+    if 'time_fora_scout' in st.session_state:
+        matches_v = get_close_matches(st.session_state.time_fora_scout, visitantes_disp, n=1, cutoff=0.6)
+        if matches_v:
+            idx_fora = visitantes_disp.index(matches_v[0])
 
     v_sel = st.selectbox("🚌 Time de Fora", visitantes_disp, index=idx_fora)
 
@@ -125,14 +132,10 @@ def mostrar_scout(df):
         return [mean, median, mode, std, cv]
 
     def preparar_tabela_tecnica(df_hist, time):
-        # NOMES EXATOS DAS COLUNAS
         col_cn_h = 'Corners_H' if 'Corners_H' in df_hist.columns else 'Cantos_Mandante'
         col_cn_a = 'Corners_A' if 'Corners_A' in df_hist.columns else 'Cantos_Visitante'
-        
-        # Novas Colunas HT
         col_cn_h_ht = 'Corners_H_HT'
         col_cn_a_ht = 'Corners_A_HT'
-
         col_yc_h = 'Yellow_Cards_H'
         col_yc_a = 'Yellow_Cards_A'
         col_rc_h = 'Red_Cards_H'
@@ -140,23 +143,16 @@ def mostrar_scout(df):
         col_tc_h = 'Total_Cards_H'
         col_tc_a = 'Total_Cards_A'
 
-        # Gols FT
         g_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
         g_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_FT']])
-        
-        # Gols HT (Novidade)
         g_pro_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_HT']])
         g_con_ht = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_HT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_HT']])
 
-        # Cantos FT
         c_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_a, pd.Series(0))])
         c_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_h, pd.Series(0))])
-
-        # Cantos HT (Novidade)
         c_pro_ht = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_h_ht, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_a_ht, pd.Series(0))])
         c_con_ht = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_a_ht, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_h_ht, pd.Series(0))])
 
-        # Cartões
         y_cometidos = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_yc_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_yc_a, pd.Series(0))])
         y_causados = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_yc_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_yc_h, pd.Series(0))])
         r_cometidos = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_rc_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_rc_a, pd.Series(0))])
@@ -194,15 +190,10 @@ def mostrar_scout(df):
     st.markdown("### 💰 Incidência de Mercados (%)")
     def calcular_incidencia(df_hist):
         df_hist = df_hist.copy()
-        # Conversão de Gols
         df_hist['Total_HT'] = pd.to_numeric(df_hist['Gols_Mandante_HT'], errors='coerce').fillna(0) + pd.to_numeric(df_hist['Gols_Visitante_HT'], errors='coerce').fillna(0)
         df_hist['Total_FT'] = pd.to_numeric(df_hist['Gols_Mandante_FT'], errors='coerce').fillna(0) + pd.to_numeric(df_hist['Gols_Visitante_FT'], errors='coerce').fillna(0)
         df_hist['BTTS_FT'] = (pd.to_numeric(df_hist['Gols_Mandante_FT']) > 0) & (pd.to_numeric(df_hist['Gols_Visitante_FT']) > 0)
-        
-        # Conversão de Cantos HT
         df_hist['Total_C_HT'] = pd.to_numeric(df_hist['Total_Corners_HT'], errors='coerce').fillna(0)
-        
-        # SOMA TOTAL DE CARTÕES
         df_hist['Soma_Cartoes'] = pd.to_numeric(df_hist['Total_Cards_H'], errors='coerce').fillna(0) + pd.to_numeric(df_hist['Total_Cards_A'], errors='coerce').fillna(0)
 
         linhas = [
