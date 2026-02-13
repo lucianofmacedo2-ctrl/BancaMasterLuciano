@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from scipy.stats import poisson
+from difflib import get_close_matches
 
 def mostrar_simulador(df):
     st.markdown("## 🎲 Simulador de Confrontos")
@@ -14,7 +15,7 @@ def mostrar_simulador(df):
     col_cn_h = 'Corners_H' if 'Corners_H' in df.columns else 'Cantos_Mandante'
     col_cn_a = 'Corners_A' if 'Corners_A' in df.columns else 'Cantos_Visitante'
     
-    # Colunas HT (Conforme solicitado)
+    # Colunas HT
     col_cn_h_ht = 'Corners_H_HT'
     col_cn_a_ht = 'Corners_A_HT'
     
@@ -22,16 +23,39 @@ def mostrar_simulador(df):
     col_tc_h = 'Total_Cards_H'
     col_tc_a = 'Total_Cards_A'
 
-    # 2. SELEÇÃO DE TIMES
+    # --- LÓGICA DE INDEXAÇÃO AUTOMÁTICA (ADICIONADO) ---
     lista_ligas = sorted(df['Liga'].unique())
-    liga_sel = st.selectbox("🏆 Selecione a Liga", lista_ligas)
+    idx_liga = 0
+    if 'liga_simulador' in st.session_state:
+        matches_l = get_close_matches(st.session_state.liga_simulador, lista_ligas, n=1, cutoff=0.6)
+        if matches_l:
+            idx_liga = lista_ligas.index(matches_l[0])
+
+    # 2. SELEÇÃO DE TIMES
+    liga_sel = st.selectbox("🏆 Selecione a Liga", lista_ligas, index=idx_liga)
     df_l = df[df['Liga'] == liga_sel].copy()
+
+    lista_times = sorted(df_l['Mandante'].unique())
+    
+    idx_casa = 0
+    if 'time_casa_simulador' in st.session_state:
+        matches_m = get_close_matches(st.session_state.time_casa_simulador, lista_times, n=1, cutoff=0.6)
+        if matches_m:
+            idx_casa = lista_times.index(matches_m[0])
 
     col_s1, col_s2 = st.columns(2)
     with col_s1:
-        m_sel = st.selectbox("🏠 Mandante", sorted(df_l['Mandante'].unique()))
+        m_sel = st.selectbox("🏠 Mandante", lista_times, index=idx_casa)
+    
+    visitantes_disp = sorted([t for t in lista_times if t != m_sel])
+    idx_fora = 0
+    if 'time_fora_simulador' in st.session_state:
+        matches_v = get_close_matches(st.session_state.time_fora_simulador, visitantes_disp, n=1, cutoff=0.6)
+        if matches_v:
+            idx_fora = visitantes_disp.index(matches_v[0])
+
     with col_s2:
-        v_sel = st.selectbox("🚌 Visitante", sorted([t for t in df_l['Mandante'].unique() if t != m_sel]))
+        v_sel = st.selectbox("🚌 Visitante", visitantes_disp, index=idx_fora)
 
     # 3. CÁLCULO DAS MÉDIAS (Últimos 10 jogos)
     def get_team_stats(df_liga, time):
@@ -54,8 +78,8 @@ def mostrar_simulador(df):
         cc_ht = pd.concat([df_t[df_t['Mandante'] == time].get(col_cn_a_ht, pd.Series(0)), df_t[df_t['Visitante'] == time].get(col_cn_h_ht, pd.Series(0))]).mean()
         
         # Cartões
-        tcp = pd.concat([df_t[df_t['Mandante'] == time][col_tc_h], df_t[df_t['Visitante'] == time][col_tc_a]]).mean()
-        tcc = pd.concat([df_t[df_t['Mandante'] == time][col_tc_a], df_t[df_t['Visitante'] == time][col_tc_h]]).mean()
+        tcp = pd.concat([df_t[df_t['Mandante'] == time].get(col_tc_h, pd.Series(0)), df_t[df_t['Visitante'] == time].get(col_tc_a, pd.Series(0))]).mean()
+        tcc = pd.concat([df_t[df_t['Mandante'] == time].get(col_tc_a, pd.Series(0)), df_t[df_t['Visitante'] == time].get(col_tc_h, pd.Series(0))]).mean()
         
         return gp, gc, gp_ht, gc_ht, cp, cc, cp_ht, cc_ht, tcp, tcc
 
@@ -65,16 +89,12 @@ def mostrar_simulador(df):
     # 4. PROJEÇÕES (Ataque de um contra Defesa do outro)
     exp_gols_m = (gp_m + gc_v) / 2
     exp_gols_v = (gp_v + gc_m) / 2
-    
     exp_gols_h_m = (gph_m + gch_v) / 2
     exp_gols_h_v = (gph_v + gch_m) / 2
-
     exp_cantos_m = (cp_m + cc_v) / 2
     exp_cantos_v = (cp_v + cc_m) / 2
-
     exp_cantos_h_m = (cph_m + cch_v) / 2
     exp_cantos_h_v = (cph_v + cch_m) / 2
-    
     exp_cards_m = (tcp_m + tcc_v) / 2
     exp_cards_v = (tcp_v + tcc_m) / 2
 
@@ -95,7 +115,6 @@ def mostrar_simulador(df):
 
     st.divider()
 
-    # Função para cores das probabilidades
     def format_prob(val):
         color = "green" if val > 60 else "orange" if val > 40 else "red"
         return f"<h2 style='color:{color}; text-align:center;'>{val:.1f}%</h2>"
