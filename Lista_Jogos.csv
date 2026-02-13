@@ -1,450 +1,89 @@
-﻿Data;Hora;Rodada;Liga;Mandante;Visitante;Odd Mandante;Odd Empate;Odd Visitante
-13/02/2026;;1;BELGIUM 1;KV Mechelen;KRC Genk;3.40;3,44;2,16
-13/02/2026;;2;BELGIUM 2;Club Brugge II;Patro Eisden;--;3,57;3,38
-13/02/2026;;3;BELGIUM 2;Lierse Kempenzonen;RFC Seraing;1.96;3,36;3,43
-13/02/2026;;4;BULGARIA 1;Spartak Varna;Lokomotiv Sofia 1929;--;4,05;3,44
-13/02/2026;;5;CHILE 1;Everton;Huachipato;2.20;3,02;3,47
-13/02/2026;;6;CHILE 1;Palestino;Universidad Chile;3.18;3,32;2,19
-13/02/2026;;7;CROATIA 1;Slaven Koprivnica;Lokomotiva Zagreb;2.40;3,2;2,91
-13/02/2026;;8;CYPRUS 1;Anorthosis;Digenis Ypsonas;1.82;3,35;4,44
-13/02/2026;;9;DENMARK 1;Randers;Vejle;1.78;3,44;4,67
-13/02/2026;;10;FRANCE 1;Rennes;PSG;6.61;5,24;1,49
-13/02/2026;;11;FRANCE 1;Monaco;Nantes;1.51;4,98;6,66
-13/02/2026;;12;FRANCE 2;Amiens SC;Dunkerque;3.87;3,5;1,91
-13/02/2026;;13;FRANCE 2;Clermont;Rodez;2.44;3,28;2,8
-13/02/2026;;14;FRANCE 2;Laval;Annecy;3.10;2,93;2,48
-13/02/2026;;15;FRANCE 2;Pau;Boulogne;1.89;3,38;4,14
-13/02/2026;;16;FRANCE 2;Red Star;Nancy;2.01;3,3;3,74
-13/02/2026;;17;FRANCE 3;Aubagne;Bourg-en-Bresse;2.15;3,13;3,19
-13/02/2026;;18;FRANCE 3;Chateauroux;Rouen;3.42;3,02;2,1
-13/02/2026;;19;FRANCE 3;Dijon;Caen;1.76;3,25;4,49
-13/02/2026;;20;FRANCE 3;Fleury 91;Villefranche;1.74;3,14;4,85
-13/02/2026;;21;FRANCE 3;Le Puy F.43 Auvergne;Orleans;1.88;3,22;3,9
-13/02/2026;;22;FRANCE 3;Sochaux;Paris 13 Atletico;1.64;3,42;5,08
-13/02/2026;;23;FRANCE 3;Valenciennes;Stade Briochin;1.68;3,52;4,57
-13/02/2026;;24;AUSTRIA 1;Borussia Dortmund;Mainz 05;1.65;4,47;5,43
-13/02/2026;;25;GERMANY 2;Fortuna Dusseldorf;Preußen Munster;1.98;3,48;3,64
-13/02/2026;;26;GERMANY 2;Nurnberg;Karlsruher SC;1.73;4,05;4,12
-13/02/2026;;27;GERMANY 3;Viktoria Koln;Erzgebirge Aue;2.08;3,28;3,19
-13/02/2026;;28;HUNGARY 1;Ujpest;Debrecen;2.10;3,32;3,1
-13/02/2026;;29;IRELAND 1;Derry City;Dundalk;1.58;3,98;5,45
-13/02/2026;;30;IRELAND 1;Drogheda United;Waterford;2.01;3,38;3,65
-13/02/2026;;31;IRELAND 1;St Patrick's Athl.;Galway United;1.85;3,38;4,33
-13/02/2026;;32;IRELAND 1;Shelbourne;Shamrock Rovers;2.41;3,02;3,11
-13/02/2026;;33;HUNGARY 2;Pisa;AC Milan;6.40;3,91;1,66
-13/02/2026;;34;MOROCCO 1;Raja Casablanca;Yacoub El Mansour;1.37;3,98;8,45
-13/02/2026;;35;NETHERLANDS 1;Volendam;PSV;10.40;6,76;1,25
-13/02/2026;;36;NETHERLANDS 2;Almere City;Helmond Sport;1.43;4,8;6,03
-13/02/2026;;37;NETHERLANDS 2;ADO Den Haag;MVV;1.19;6,5;13
-13/02/2026;;38;NETHERLANDS 2;Dordrecht;Emmen;1.89;3,7;3,65
-13/02/2026;;39;NETHERLANDS 2;PSV II;De Graafschap;2.67;3,98;2,23
-13/02/2026;;40;NETHERLANDS 2;Oss;AZ II;2.43;3,55;2,59
-13/02/2026;;41;NETHERLANDS 2;RKC Waalwijk;Roda JC;2.22;3,58;2,91
-13/02/2026;;42;NORTHERN IRELAND 1;Dungannon Swifts;Cliftonville;2.55;3,13;2,51
-13/02/2026;;43;POLAND 1;Radomiak Radom;Korona Kielce;2.10;3,34;3,35
-13/02/2026;;44;POLAND 1;GKS Katowice;Legia Warszawa;3.22;3,2;2,22
-13/02/2026;;45;POLAND 2;Gornik Łeczna;Stal Mielec;1.93;3,52;3,36
-13/02/2026;;46;POLAND 2;Pogon Siedlce;Ruch Chorzow;2.88;3,1;2,33
-13/02/2026;;47;PORTUGAL 1;Santa Clara;Benfica;6.81;4,11;1,56
-13/02/2026;;48;PORTUGAL 1;CD Tondela;Alverca;2.55;3,12;3,14
-13/02/2026;;49;DENMARK 1;Petrolul 52;Arges;3.08;2,75;2,6
-13/02/2026;;50;SAUDI ARABIA 1;Al Shabab;Al Ahli;4.61;3,78;1,62
-13/02/2026;;51;SAUDI ARABIA 1;Al Hilal;Al Ittifaq;1.13;7,6;10,7
-13/02/2026;;52;SAUDI ARABIA 1;Al Ittihad;Al Feiha;1.31;4,65;8,2
-13/02/2026;;53;ENGLAND 2;Airdrieonians;St. Johnstone;6.08;3,66;1,51
-13/02/2026;;54;SERBIA 2;Loznica;Trajal Krusevac;1.93;3;4,12
-13/02/2026;;55;SOUTH AFRICA 1;Durban City;TS Galaxy;2.18;2,85;3,46
-13/02/2026;;56;SOUTH AFRICA 1;Magesi;Golden Arrows;2.13;2,71;3,83
-13/02/2026;;57;SPAIN 1;Elche CF;CA Osasuna;2.99;3,26;2,68
-13/02/2026;;58;SPAIN 2;Almeria;FC Andorra;1.74;3,99;4,63
-13/02/2026;;59;SPAIN 3;Real Madrid B;Athletic Club II;1.95;3,2;3,65
-13/02/2026;;60;SPAIN 3;Sanluqueno;Atl. Madrid B;4.65;3,1;1,78
-13/02/2026;;61;SWITZERLAND 2;Bellinzona;Vaduz;4.40;3,84;1,64
-13/02/2026;;62;SWITZERLAND 2;Wil;Rapperswil-Jona;2.10;3,2;3,22
-13/02/2026;;63;SWITZERLAND 2;Etoile Carouge;Neuchatel Xamax;2.53;3,35;2,4
-13/02/2026;;64;SWITZERLAND 2;Stade Lausanne-Ouchy;Aarau;2.13;3,52;2,89
-13/02/2026;;65;SWITZERLAND 2;Yverdon Sport;Stade Nyonnais;1.60;3,75;4,82
-13/02/2026;;66;TUNISIA 1;Gabes;CA Bizertin;2.60;2,55;3,1
-13/02/2026;;67;TUNISIA 1;Kairouan;Etoile du Sahel;4.14;2,8;2,13
-13/02/2026;;68;TUNISIA 1;Stade Tunisien;Olympique Beja;1.20;5,41;19,4
-13/02/2026;;69;TURKEY 1;Antalyaspor;Samsunspor;3.95;3,31;2,1
-13/02/2026;;70;TURKEY 1;Galatasaray;Eyupspor;1.14;10;18,5
-13/02/2026;;71;TURKEY 2;Boluspor;Hatayspor;1.05;9,3;18
-13/02/2026;;72;TURKEY 2;Corum Belediyespor;Istanbulspor;1.53;3,92;5,26
-13/02/2026;;73;TURKEY 2;Erokspor;Manisa BBSK;1.42;4,25;6,27
-14/02/2026;;74;AUSTRALIA 1;Melbourne Victory FC;Brisbane Roar;1.74;3,87;4,96
-14/02/2026;;75;AUSTRALIA 1;Sydney FC;Adelaide United;1.79;4,24;4,14
-14/02/2026;;76;AUSTRIA 1;Hartberg;Rheindorf Altach;2.45;3,15;2,92
-14/02/2026;;77;AUSTRIA 1;Ried;LASK Linz;2.51;3,28;2,71
-14/02/2026;;78;AUSTRIA 1;Wattens;Sturm Graz;3.27;3,28;2,19
-14/02/2026;;79;BELGIUM 1;OH Leuven;FCV Dender EH;2.00;3,38;3,99
-14/02/2026;;80;BELGIUM 1;Sporting Charleroi;KAA Gent;2.20;3,38;3,38
-14/02/2026;;81;BELGIUM 1;Standard Liege;Union Saint-Gilloise;5.37;3,71;1,69
-14/02/2026;;82;BELGIUM 2;Lommel United;RSC Anderlecht II;1.55;4,1;4,75
-14/02/2026;;83;BELGIUM 2;KRC Genk II;RFC Liege;3.46;3,66;1,86
-14/02/2026;;84;BELGIUM 2;KV Kortrijk;Beerschot-Wilrijk;2.03;3,24;3,35
-14/02/2026;;85;BELGIUM 2;RWDM;Lokeren-Temse;2.49;3,2;2,52
-14/02/2026;;86;BOSNIA 1;Borac Banja Luka;Zrinjski;1.93;3,15;3,8
-14/02/2026;;87;BULGARIA 1;CSKA 1948 Sofia;CSKA Sofia;3.12;3,1;2,34
-14/02/2026;;88;BULGARIA 1;Arda;Slavia Sofia;1.85;3,18;4,6
-14/02/2026;;89;CHILE 1;La Serena;Coquimbo Unido;3.53;3,26;2,07
-14/02/2026;;90;CHILE 1;Deportes Limache;O'Higgins;2.62;3,24;2,57
-14/02/2026;;91;CHILE 1;Cobresal;Universidad Catolica;2.85;3,06;2,49
-14/02/2026;;92;CROATIA 1;Dinamo Zagreb;Istra 1961;1.33;4,9;8,5
-14/02/2026;;93;CROATIA 1;Rijeka;Varazdin;1.73;3,42;4,93
-14/02/2026;;94;CROATIA 2;Dugopolje;Rudes;2.51;2,7;3
-14/02/2026;;95;CROATIA 2;Dubrava Zagreb;Opatija;1.78;3,06;4,71
-14/02/2026;;96;CROATIA 2;Jarun;Sesvete;2.68;2,77;2,64
-14/02/2026;;97;CYPRUS 1;Akritas;Aris;8.50;5,05;1,32
-14/02/2026;;98;CYPRUS 1;Omonia Nicosia;Enosis;1.02;14;46
-14/02/2026;;99;CYPRUS 1;AEK Larnaca;Apollon;1.86;3,34;4,25
-14/02/2026;;100;CZECH 1;Dukla Praha;Zlin;2.57;2,88;2,92
-14/02/2026;;101;CZECH 1;Karvina;Slavia Praha;5.94;4,2;1,5
-14/02/2026;;102;CZECH 1;Slovacko;Bohemians;2.30;3,22;3,06
-14/02/2026;;103;CZECH 1;Sigma Olomouc;Viktoria Plzen;3.32;3,14;2,21
-14/02/2026;;104;DENMARK 1;København;Nordsjælland;1.76;3,95;4,07
-14/02/2026;;105;ENGLAND 2;Derby County;Swansea City;2.27;3,13;3,26
-14/02/2026;;106;ENGLAND 2;Portsmouth;Sheffield United;3.00;3,36;2,29
-14/02/2026;;107;ENGLAND 2;Preston North End;Watford;3.07;3,13;2,37
-14/02/2026;;108;ENGLAND 2;Queens Park Rangers;Blackburn Rovers;2.12;3,28;3,44
-14/02/2026;;109;ENGLAND 2;Sheffield Wednesday;Millwall;9.00;4,75;1,34
-14/02/2026;;110;ENGLAND 3;Reading;Wycombe Wanderers;2.95;3,26;2,37
-14/02/2026;;111;ENGLAND 3;Stevenage;Huddersfield Town;2.64;3,04;2,75
-14/02/2026;;112;ENGLAND 3;Barnsley;AFC Wimbledon;2.06;3,42;3,45
-14/02/2026;;113;ENGLAND 3;Blackpool;Plymouth Argyle;2.62;3,42;2,51
-14/02/2026;;114;ENGLAND 3;Bradford City;Peterborough United;2.12;3,48;3,24
-14/02/2026;;115;ENGLAND 3;Cardiff City;Luton Town;1.83;3,55;4,18
-14/02/2026;;116;ENGLAND 3;Exeter City;Northampton Town;1.91;3,42;3,97
-14/02/2026;;117;ENGLAND 3;Lincoln City;Bolton Wanderers;2.38;3,3;2,9
-14/02/2026;;118;ENGLAND 4;Barnet;Cheltenham Town;1.40;4,5;7,33
-14/02/2026;;119;ENGLAND 4;Barrow;Colchester United;3.49;3,32;2,06
-14/02/2026;;120;ENGLAND 4;Bromley;Notts County;2.33;3,22;3
-14/02/2026;;121;ENGLAND 4;Cambridge United;Bristol Rovers;1.70;3,54;4,92
-14/02/2026;;122;ENGLAND 4;Chesterfield;Harrogate Town;1.40;4,65;6,93
-14/02/2026;;123;ENGLAND 4;Crewe Alexandra;Gillingham;2.38;3,3;2,86
-14/02/2026;;124;ENGLAND 4;Milton Keynes Dons;Newport County;1.35;4,85;7,9
-14/02/2026;;125;ENGLAND 4;Oldham Athletic;Fleetwood Town;1.92;3,38;3,96
-14/02/2026;;126;ENGLAND 4;Shrewsbury Town;Swindon Town;2.89;3,35;2,33
-14/02/2026;;127;ENGLAND 4;Tranmere Rovers;Crawley Town;2.26;3,36;3
-14/02/2026;;128;FRANCE 1;Olympique Marseille;Strasbourg;1.76;4,27;4,72
-14/02/2026;;129;FRANCE 1;Lille;Brest;1.80;4,04;4,72
-14/02/2026;;130;FRANCE 1;Paris;Lens;4.21;3,78;1,95
-14/02/2026;;131;FRANCE 2;Grenoble Foot 38;Reims;4.32;3,15;1,93
-14/02/2026;;132;FRANCE 2;Montpellier;Le Mans;2.27;3,13;3,26
-14/02/2026;;133;FRANCE 2;Guingamp;Saint-Etienne;2.55;3,3;2,65
-14/02/2026;;134;AUSTRIA 1;Bayer Leverkusen;St. Pauli;1.54;4,47;7,11
-14/02/2026;;135;AUSTRIA 1;Eintracht Frankfurt;Borussia M'gladbach;2.01;3,82;3,9
-14/02/2026;;136;AUSTRIA 1;Hamburger SV;Union Berlin;2.65;3,29;3
-14/02/2026;;137;AUSTRIA 1;Hoffenheim;Freiburg;1.77;4,17;4,78
-14/02/2026;;138;AUSTRIA 1;Werder Bremen;Bayern Munchen;9.55;6,25;1,33
-14/02/2026;;139;AUSTRIA 1;Stuttgart;Koln;1.49;5,08;6,7
-14/02/2026;;140;GERMANY 2;Eintracht Braunschweig;Darmstadt 98;3.07;3,4;2,24
-14/02/2026;;141;GERMANY 2;Hertha BSC;Hannover 96;2.74;3,46;2,39
-14/02/2026;;142;GERMANY 2;Kaiserslautern;Greuther Furth;1.63;4,1;4,78
-14/02/2026;;143;GERMANY 2;Dynamo Dresden;Elversberg;3.11;3,42;2,21
-14/02/2026;;144;GERMANY 3;Hansa Rostock;Osnabruck;1.84;3,38;3,85
-14/02/2026;;145;GERMANY 3;Saarbrucken;Stuttgart II;1.89;3,6;3,42
-14/02/2026;;146;GERMANY 3;Havelse;1860 Munchen;2.80;3,6;2,15
-14/02/2026;;147;GERMANY 3;Verl;Hoffenheim II;1.53;4,4;4,59
-14/02/2026;;148;GERMANY 3;Wehen Wiesbaden;MSV Duisburg;2.48;3,14;2,57
-14/02/2026;;149;GERMANY 3;Rot-Weiss Essen;Jahn Regensburg;1.73;3,72;3,96
-14/02/2026;;150;GREECE 1;Panathinaikos;Asteras Tripolis;3.43;3,02;2,25
-14/02/2026;;151;GREECE 1;Levadiakos;Olympiakos Piraeus;7.38;4,4;1,42
-14/02/2026;;152;GREECE 1;Volos NFC;Aris;4.10;3,14;1,98
-14/02/2026;;153;HUNGARY 1;MTK;Puskas;2.86;3,48;2,16
-14/02/2026;;154;HUNGARY 1;Zalaegerszegi TE;Ferencvaros;4.56;4;1,59
-14/02/2026;;155;HUNGARY 1;Paksi SE;Diosgyor;1.49;4,33;5,06
-14/02/2026;;156;IRELAND 1;Sligo Rovers;Bohemians;3.55;3,38;2,04
-14/02/2026;;157;ISRAEL 1;Hapoel Petah Tikva;Hapoel Haifa;1.88;3,7;3,68
-14/02/2026;;158;ISRAEL 1;Ironi Kiryat Shmona;Ironi Tiberias;2.01;3,48;3,49
-14/02/2026;;159;ISRAEL 1;Maccabi Bnei Raina;Maccabi Netanya;3.68;3,7;1,88
-14/02/2026;;160;ISRAEL 1;Ashdod;Hapoel Be'er Sheva;7.70;5,2;1,33
-14/02/2026;;161;HUNGARY 2;Como;Fiorentina;1.79;3,97;4,91
-14/02/2026;;162;HUNGARY 2;Lazio;Atalanta;3.60;3,44;2,24
-14/02/2026;;163;HUNGARY 2;Inter Milan;Juventus;2.01;3,56;4,22
-14/02/2026;;164;ITALY 2;Modena;Carrarese;1.70;3,32;5,63
-14/02/2026;;165;ITALY 2;Palermo;Virtus Entella;1.62;3,82;5,31
-14/02/2026;;166;ITALY 2;Sampdoria;Calcio Padova;1.86;3,05;4,97
-14/02/2026;;167;ITALY 2;Catanzaro;Mantova;1.94;3,2;4,19
-14/02/2026;;168;ITALY 2;Cesena;Venezia;4.00;3,13;2,01
-14/02/2026;;169;ITALY 3;Benevento;Latina;1.27;4,55;10,5
-14/02/2026;;170;ITALY 3;Virtus Casarano;Casertana;2.73;2,94;2,46
-14/02/2026;;171;ITALY 3;Cavese;Salernitana;3.71;2,91;2,05
-14/02/2026;;172;ITALY 3;Cosenza;Audace Cerignola;2.01;2,78;4,09
-14/02/2026;;173;ITALY 3;SSC Giugliano;Trapani 1905;2.30;3,02;2,99
-14/02/2026;;174;ITALY 3;Monopoli;Sorrento Calcio;1.97;2,86;4,1
-14/02/2026;;175;ITALY 3;Foggia;Atalanta II;3.05;3,13;2,21
-14/02/2026;;176;ITALY 3;Picerno;Crotone;4.03;3,06;1,9
-14/02/2026;;177;ITALY 3;Siracusa;Catania;5.29;3,58;1,58
-14/02/2026;;178;J1 League;Machida;Mito;1.51;3,95;6,57
-14/02/2026;;179;J1 League;Sanfrecce Hiroshima;Okayama;1.46;4,2;6,91
-14/02/2026;;180;J1 League;Shimizu S-Pulse;Kyoto;3.19;3,44;2,16
-14/02/2026;;181;J1 League;FC Tokyo;Urawa Reds;2.49;3,24;2,77
-14/02/2026;;182;J1 League;Kashima Antlers;Yokohama F. Marinos;1.63;3,88;5,12
-14/02/2026;;183;MOROCCO 1;Ittihad Tanger;Olympique Dcheira;2.23;2,88;3,29
-14/02/2026;;184;MOROCCO 1;Difaa El Jadida;UTS Rabat;2.42;2,74;3,11
-14/02/2026;;185;NETHERLANDS 1;Heracles;NAC Breda;2.72;3,44;2,61
-14/02/2026;;186;NETHERLANDS 1;Excelsior;Ajax;3.44;3,85;2,04
-14/02/2026;;187;NETHERLANDS 1;AZ;Fortuna Sithard;1.39;5,23;7,75
-14/02/2026;;188;NETHERLANDS 1;Groningen;Utrecht;2.04;3,45;3,83
-14/02/2026;;189;NETHERLANDS 2;Vitesse;VVV;1.88;3,68;3,7
-14/02/2026;;190;NORTHERN IRELAND 1;Carrick Rangers;Coleraine;4.42;3,64;1,67
-14/02/2026;;191;NORTHERN IRELAND 1;Crusaders;Bangor;2.24;3,5;2,72
-14/02/2026;;192;NORTHERN IRELAND 1;Glenavon;Linfield;6.27;4,25;1,42
-14/02/2026;;193;NORTHERN IRELAND 1;Glentoran;Ballymena United;1.44;4,05;6,33
-14/02/2026;;194;NORTHERN IRELAND 1;Portadown;Larne;5.12;3,68;1,58
-14/02/2026;;195;POLAND 1;Cracovia Krakow;Jagiellonia Białystok;2.44;3,28;2,74
-14/02/2026;;196;POLAND 1;Zagłebie Lubin;Rakow Czestochowa;3.49;3,48;2
-14/02/2026;;197;POLAND 1;Wisła Płock;Widzew Łodz;2.69;3,1;2,6
-14/02/2026;;198;POLAND 2;Miedz Legnica;Slask Wrocław;2.19;3,44;2,84
-14/02/2026;;199;POLAND 2;ŁKS Łodz;Chrobry Głogow;1.79;3,35;4,13
-14/02/2026;;200;POLAND 2;Polonia Warszawa;Znicz Pruszkow;1.64;3,8;4,42
-14/02/2026;;201;PORTUGAL 1;Casa Pia;FC Arouca;2.88;3,22;2,68
-14/02/2026;;202;PORTUGAL 1;Vitoria Guimaraes;Estrela Amadora;1.71;3,73;5,67
-14/02/2026;;203;PORTUGAL 1;Gil Vicente;Sporting Braga;3.58;3,31;2,23
-14/02/2026;;204;PORTUGAL 2;CD Feirense;GD Chaves;2.67;2,94;2,74
-14/02/2026;;205;PORTUGAL 2;Academico Viseu;UD Oliveirense;1.47;4,1;6,7
-14/02/2026;;206;PORTUGAL 2;Farense;Leixoes;1.95;3,25;3,95
-14/02/2026;;207;PORTUGAL 2;Benfica II;Felgueiras 1932;2.33;3,32;2,92
-14/02/2026;;208;Liga 3 - Promotion Group;CD Trofense;Uniao Santarem;1.93;2,9;4,2
-14/02/2026;;209;Liga 3 - Relegation Group;AD Marco 09;Paredes;3.20;2,77;2,34
-14/02/2026;;210;Liga 3 - Relegation Group;Sanjoanense;Sao Joao Ver;2.17;3,3;2,96
-14/02/2026;;211;DENMARK 1;Metaloglobus;Otelul Galati;6.94;4,25;1,44
-14/02/2026;;212;DENMARK 1;Universitatea Cluj;Csikszereda;1.44;4,1;7,44
-14/02/2026;;213;SAUDI ARABIA 1;Al Riyadh;Al Khaleej;3.21;3,3;2,06
-14/02/2026;;214;SAUDI ARABIA 1;Al Najma;Al Kholood;2.89;3,28;2,23
-14/02/2026;;215;SAUDI ARABIA 1;Al Fateh;Al Nassr;7.44;5,65;1,27
-14/02/2026;;216;SCOTLAND 1;Dundee;Livingston;2.04;3,38;3,55
-14/02/2026;;217;SCOTLAND 1;Falkirk;Dundee United;1.84;3,62;4,03
-14/02/2026;;218;SCOTLAND 1;Hibernian;St. Mirren;1.86;3,5;4,13
-14/02/2026;;219;ENGLAND 2;Arbroath;Ayr United;2.41;3,25;2,58
-14/02/2026;;220;ENGLAND 2;Dunfermline Athletic;Partick Thistle;3.04;3,02;2,28
-14/02/2026;;221;ENGLAND 2;Greenock Morton;Raith Rovers;2.95;2,98;2,35
-14/02/2026;;222;ENGLAND 2;Ross County;Queen's Park;1.69;3,44;4,63
-14/02/2026;;223;SERBIA 1;Napredak;Radnicki Nis;3.32;3,1;2,1
-14/02/2026;;224;SERBIA 1;Partizan;Spartak Subotica;1.13;7,2;11,5
-14/02/2026;;225;SERBIA 1;Cukaricki;Vojvodina;3.23;3,1;2,14
-14/02/2026;;226;SERBIA 1;Zeleznicar Pancevo;Red Star Belgrade;8.30;4,75;1,3
-14/02/2026;;227;SLOVENIA 1;Celje;Mura;1.30;4,45;9,75
-14/02/2026;;228;SOUTH AFRICA 1;Orlando Pirates;Marumo Gallants;1.30;4,55;9,3
-14/02/2026;;229;SOUTH AFRICA 1;Polokwane City;Siwelele;2.50;2,51;3,32
-14/02/2026;;230;SOUTH AFRICA 1;Chippa United;Richards Bay;2.78;2,47;2,9
-14/02/2026;;231;SPAIN 1;RCD Espanyol;Celta de Vigo;2.57;3,3;3,09
-14/02/2026;;232;SPAIN 1;Getafe CF;Villarreal;3.46;3,21;2,41
-14/02/2026;;233;SPAIN 1;Sevilla FC;Deportivo Alaves;2.21;3,21;3,99
-14/02/2026;;234;SPAIN 1;Real Madrid;Real Sociedad;1.40;5,59;8
-14/02/2026;;235;SPAIN 2;Cordoba;Leganes;2.08;3,32;3,86
-14/02/2026;;236;SPAIN 2;Burgos CF;Cadiz;2.18;3,08;3,86
-14/02/2026;;237;SPAIN 2;Cultural y Deportiva Leonesa;Real Zaragoza;2.54;3,08;3,09
-14/02/2026;;238;SPAIN 2;Granada CF;Real Valladolid;2.24;3,24;3,48
-14/02/2026;;239;SPAIN 3;Cacereno;Pontevedra;2.46;3,02;2,68
-14/02/2026;;240;SPAIN 3;Arenas Getxo;SD Ponferradina;2.62;2,86;2,64
-14/02/2026;;241;SPAIN 3;Ourense CF;AD Merida;2.19;2,84;3,44
-14/02/2026;;242;SPAIN 3;Tenerife;Racing Club Ferrol;1.62;3,4;5,33
-14/02/2026;;243;SPAIN 3;Villarreal B;Eldense;2.44;2,8;3,01
-14/02/2026;;244;SPAIN 3;Algeciras;Torremolinos;1.91;2,88;4,4
-14/02/2026;;245;SPAIN 3;CE Europa;SD Tarazona;1.89;3,05;4,14
-14/02/2026;;246;SPAIN 3;Gimnàstic de Tarragona;Betis B;1.83;3,08;4,39
-14/02/2026;;247;SPAIN 3;Real Oviedo II;Atletico Astorga FC;1.77;3,13;4,69
-14/02/2026;;248;SPAIN 3;Langreo;Burgos Promesas;1.87;3,05;4,24
-14/02/2026;;249;SPAIN 3;CD Ebro;SD Logrones;2.06;2,91;3,7
-14/02/2026;;250;SPAIN 3;Beasain;Deportivo Alaves II;2.68;2,72;2,72
-14/02/2026;;251;SPAIN 3;UD Mutilvera;Gernika Club;2.83;2,76;2,53
-14/02/2026;;252;SPAIN 3;Castellon II;Barcelona II;4.14;4,1;1,64
-14/02/2026;;253;SPAIN 4;Malaga II;CF Lorca Deportiva;3.27;2,95;2,2
-14/02/2026;;254;SPAIN 4;Ilicitano;Getafe II;3.50;2,96;2,1
-14/02/2026;;255;SPAIN 3;Santa Marta Tormes;Colegios Diocesanos;1.46;3,84;6,41
-14/02/2026;;256;GREECE 1;St. Gallen;Grasshopper;1.71;4,1;4,21
-14/02/2026;;257;GREECE 1;Zurich;Luzern;2.80;3,2;2,49
-14/02/2026;;258;GREECE 1;Young Boys;Winterthur;1.37;5,65;6,18
-14/02/2026;;259;TUNISIA 1;AS Slimane;Marsa;2.51;2,8;2,8
-14/02/2026;;260;TURKEY 1;Genclerbirligi;Rizespor;2.65;3,06;3,06
-14/02/2026;;261;TURKEY 1;Alanyaspor;Konyaspor;2.18;3,47;3,51
-14/02/2026;;262;TURKEY 1;Trabzonspor;Fenerbahce;3.39;3,78;2,12
-14/02/2026;;263;TURKEY 2;Bandırmaspor;Serik Belediyespor;1.14;6,1;13,7
-14/02/2026;;264;TURKEY 2;Sivasspor;Van BB;2.27;2,84;3,25
-14/02/2026;;265;TURKEY 2;BB Bodrumspor;Keciorengucu;1.91;3,58;3,38
-15/02/2026;;266;AUSTRIA 1;Blau-Weiß Linz;Wolfsberger AC;2.82;3,35;2,41
-15/02/2026;;267;AUSTRIA 1;Grazer AK;Salzburg;4.42;3,68;1,76
-15/02/2026;;268;AUSTRIA 1;Austria Wien;Rapid Wien;2.43;3,22;2,9
-15/02/2026;;269;BELGIUM 1;Cercle Brugge;Club Brugge;4.07;3,91;1,83
-15/02/2026;;270;BELGIUM 1;Royal Antwerp FC;KVC Westerlo;2.12;3,52;3,44
-15/02/2026;;271;BELGIUM 1;RSC Anderlecht;RAAL La Louviere;1.76;3,71;4,76
-15/02/2026;;272;BELGIUM 1;Sint-Truiden;Zulte-Waregem;1.73;3,91;4,7
-15/02/2026;;273;BELGIUM 2;Francs Borains;Waasland-Beveren;5.49;3,98;1,5
-15/02/2026;;274;BELGIUM 2;KAA Gent II;Olympic Charleroi;1.84;3,48;3,72
-15/02/2026;;275;BULGARIA 1;Lokomotiv Plovdiv;Cherno More;3.00;2,86;2,56
-15/02/2026;;276;BULGARIA 1;Ludogorets;Beroe;1.10;8;20
-15/02/2026;;277;BULGARIA 1;Levski Sofia;Botev Plovdiv;1.31;5,05;8,9
-15/02/2026;;278;CHILE 1;Univ. Concepcion;Concepcion;2.20;3,18;3,3
-15/02/2026;;279;CHILE 1;Nublense;Audax Italiano;2.09;3,28;3,45
-15/02/2026;;280;CHILE 1;Colo-Colo;Union La Calera;1.45;4,25;6,74
-15/02/2026;;281;CROATIA 1;Gorica;HNK Vukovar 1991;1.75;3,6;4,48
-15/02/2026;;282;CROATIA 1;Osijek;Hajduk Split;3.75;3,34;1,97
-15/02/2026;;283;CYPRUS 1;Olympiakos;Omonia Aradippou;2.48;2,95;3,02
-15/02/2026;;284;CYPRUS 1;Ethnikos Achna;APOEL;4.14;3,48;1,84
-15/02/2026;;285;CYPRUS 1;AEL;Paphos;4.34;3,48;1,8
-15/02/2026;;286;CZECH 1;Pardubice;Jablonec;2.53;3,28;2,64
-15/02/2026;;287;CZECH 1;Slovan Liberec;Banik Ostrava;1.90;3,46;3,88
-15/02/2026;;288;CZECH 1;Mlada Boleslav;Teplice;2.14;3,18;3,44
-15/02/2026;;289;CZECH 1;Sparta Praha;Hradec Kralove;1.38;4,45;8
-15/02/2026;;290;DENMARK 1;Fredericia;AGF;6.79;4,85;1,4
-15/02/2026;;291;DENMARK 1;OB;Midtjylland;4.26;4,05;1,71
-15/02/2026;;292;DENMARK 1;Viborg;Brøndby;2.43;3,58;2,63
-15/02/2026;;293;FRANCE 1;Le Havre;Toulouse;3.39;3,27;2,41
-15/02/2026;;294;FRANCE 1;Lorient;Angers SCO;2.06;3,13;4,73
-15/02/2026;;295;FRANCE 1;Metz;Auxerre;3.04;3;2,84
-15/02/2026;;296;FRANCE 1;Olympique Lyonnais;Nice;1.68;4,22;5,49
-15/02/2026;;297;AUSTRIA 1;Augsburg;Heidenheim;1.90;3,92;4,27
-15/02/2026;;298;AUSTRIA 1;RB Leipzig;Wolfsburg;1.53;5,08;6,15
-15/02/2026;;299;GERMANY 2;Bochum;Paderborn;2.51;3,58;2,54
-15/02/2026;;300;GERMANY 2;Holstein Kiel;Schalke 04;2.78;3,22;2,49
-15/02/2026;;301;GERMANY 2;Magdeburg;Arminia Bielefeld;2.12;3,58;3,16
-15/02/2026;;302;GERMANY 3;Energie Cottbus;Waldhof Mannheim;1.80;3,66;3,71
-15/02/2026;;303;GERMANY 3;Ulm;Alemannia Aachen;2.29;3,32;2,76
-15/02/2026;;304;GERMANY 3;Schweinfurt;Ingolstadt;3.80;3,92;1,72
-15/02/2026;;305;GREECE 1;Kifisia;OFI;2.25;3,05;3,39
-15/02/2026;;306;GREECE 1;PAOK;AEK Athens;2.17;3,3;3,31
-15/02/2026;;307;GREECE 1;Panaitolikos;Larissa;1.34;4,6;9,6
-15/02/2026;;308;HUNGARY 1;Kazincbarcika;Nyiregyhaza Spartacus;3.51;3,1;2,03
-15/02/2026;;309;HUNGARY 1;Gyori ETO;Varda SE;1.46;4,25;5,58
-15/02/2026;;310;NB II.;Bekescsaba;Vasas;5.38;3,68;1,55
-15/02/2026;;311;NB II.;Karcag SE;Szeged 2011;2.39;3,18;2,64
-15/02/2026;;312;NB II.;Kozarmisleny;Mezokovesd-Zsory;3.05;3,24;2,15
-15/02/2026;;313;NB II.;Tiszakecske;Soroksar SC;1.83;3,58;3,62
-15/02/2026;;314;NB II.;Ajka;Budafoki MTE;2.17;3,14;3,11
-15/02/2026;;315;NB II.;Csakvari TK;Videoton;2.18;3,26;2,97
-15/02/2026;;316;NB II.;Kecskemeti TE;BVSC;1.51;3,64;6,09
-15/02/2026;;317;NB II.;Honved W;Szentlorinc SE;1.37;4,25;7,31
-15/02/2026;;318;ISRAEL 1;Maccabi Haifa;Bnei Sakhnin;1.33;4,9;8,5
-15/02/2026;;319;HUNGARY 2;Udinese;Sassuolo;2.52;3,04;3,46
-15/02/2026;;320;HUNGARY 2;Cremonese;Genoa;3.35;3,06;2,57
-15/02/2026;;321;HUNGARY 2;Parma;Hellas Verona;2.47;2,97;3,66
-15/02/2026;;322;HUNGARY 2;Torino;Bologna;3.27;3,36;2,43
-15/02/2026;;323;HUNGARY 2;Napoli;Roma;2.43;3,07;3,6
-15/02/2026;;324;ITALY 2;Bari 1908;Sudtirol;3.01;2,99;2,5
-15/02/2026;;325;ITALY 2;Monza;Juve Stabia;1.69;3,55;5,2
-15/02/2026;;326;ITALY 2;Spezia;Frosinone;2.69;3,26;2,54
-15/02/2026;;327;ITALY 2;Empoli;Reggiana;2.00;3,18;3,95
-15/02/2026;;328;ITALY 2;Avellino;Pescara;2.31;3,28;3,03
-15/02/2026;;329;ITALY 3;Vicenza;Alcione;1.32;4,15;9,7
-15/02/2026;;330;ITALY 3;Triestina;Novara;2.66;2,66;2,83
-15/02/2026;;331;ITALY 3;Dolomiti Bellunesi;Pro Vercelli;3.17;3,08;2,17
-15/02/2026;;332;ITALY 3;AlbinoLeffe;Arzignano Valchiampo;2.34;2,99;2,94
-15/02/2026;;333;ITALY 3;Lumezzane;Giana Erminio;2.57;2,92;2,63
-15/02/2026;;334;ITALY 3;Trento;Pro Patria;1.47;3,74;6,52
-15/02/2026;;335;ITALY 3;Lecco;Virtus Verona;1.63;3,4;5,15
-15/02/2026;;336;ITALY 3;Bra;Ascoli;4.39;3,28;1,76
-15/02/2026;;337;ITALY 3;Nuova Monterosi;Forli;2.19;3,14;3,07
-15/02/2026;;338;ITALY 3;Ravenna;Juventus II;1.73;3,44;4,33
-15/02/2026;;339;ITALY 3;Sambenedettese;Sassari Torres;2.38;3,02;2,77
-15/02/2026;;340;ITALY 3;Perugia;Athletic Carpi;1.80;3,4;3,98
-15/02/2026;;341;ITALY 3;Pontedera;Gubbio;2.69;2,99;2,46
-15/02/2026;;342;ITALY 3;Potenza Calcio;Team Altamura;2.03;3,04;3,58
-15/02/2026;;343;J1 League;Chiba;Kawasaki Frontale;3.09;3,52;2,18
-15/02/2026;;344;J1 League;Kashiwa Reysol;Verdy;1.48;4,05;6,91
-15/02/2026;;345;J1 League;Avispa Fukuoka;Cerezo Osaka;2.59;3,32;2,6
-15/02/2026;;346;J1 League;Gamba Osaka;Nagoya Grampus;2.22;3,28;3,21
-15/02/2026;;347;NETHERLANDS 1;Feyenoord;Go Ahead Eagles;1.42;5,15;6,96
-15/02/2026;;348;NETHERLANDS 1;Heerenveen;PEC Zwolle;1.57;4,43;5,66
-15/02/2026;;349;NETHERLANDS 1;Telstar;Twente;5.14;4,32;1,62
-15/02/2026;;350;NETHERLANDS 1;Sparta Rotterdam;NEC;2.73;3,64;2,5
-15/02/2026;;351;POLAND 1;Motor Lublin;Lechia Gdansk;2.45;3,48;2,61
-15/02/2026;;352;POLAND 1;Pogon Szczecin;Arka Gdynia;1.67;3,9;4,57
-15/02/2026;;353;POLAND 1;Lech Poznan;Piast Gliwice;1.73;3,8;4,31
-15/02/2026;;354;POLAND 2;Stal Rzeszow;Polonia Bytom;2.41;3,46;2,46
-15/02/2026;;355;POLAND 2;Pogon Grod. Mazowiecki;Wisła Krakow;3.92;3,85;1,71
-15/02/2026;;356;POLAND 2;Wieczysta Krakow;Puszcza Niepołomice;1.47;3,98;5,96
-15/02/2026;;357;PORTUGAL 1;CD Nacional;Porto;8.70;5,15;1,39
-15/02/2026;;358;PORTUGAL 1;AVS;GD Estoril Praia;4.32;3,91;1,84
-15/02/2026;;359;PORTUGAL 1;Sporting CP;Famalicao;1.31;5,67;10,6
-15/02/2026;;360;PORTUGAL 2;Pacos de Ferreira;Torreense;3.68;3,16;2,06
-15/02/2026;;361;PORTUGAL 2;Sporting CP II;Portimonense;1.90;3,55;3,76
-15/02/2026;;362;PORTUGAL 2;FC Vizela;CS Maritimo;2.90;2,76;2,69
-15/02/2026;;363;PORTUGAL 2;Uniao de Leiria;Porto II;1.91;3,4;3,91
-15/02/2026;;364;Liga 3 - Promotion Group;Vitoria Guimaraes II;CF Os Belenenses;3.23;2,95;2,21
-15/02/2026;;365;Liga 3 - Promotion Group;Amarante;Associacao Academica de Coimbra OAF;2.74;3;2,41
-15/02/2026;;366;Liga 3 - Promotion Group;CD Mafra;Varzim;2.28;3,02;3,02
-15/02/2026;;367;Liga 3 - Relegation Group;Amora;Sporting Covilha;1.87;3,13;4,05
-15/02/2026;;368;Liga 3 - Relegation Group;Atletico CP;Lusitano Evora 1911;2.23;2,98;3,15
-15/02/2026;;369;Liga 3 - Relegation Group;Caldas;1 Dezembro;2.00;2,94;3,83
-15/02/2026;;370;Liga 3 - Relegation Group;Fafe;Sporting Braga II;1.59;3,58;5,18
-15/02/2026;;371;DENMARK 1;UTA Arad;Botosani;2.68;3,1;2,61
-15/02/2026;;372;DENMARK 1;SSC Farul;Rapid Bucuresti;3.24;3,3;2,17
-15/02/2026;;373;DENMARK 1;CS U Craiova;FCSB;2.08;3,28;3,47
-15/02/2026;;374;SCOTLAND 1;Kilmarnock;Celtic;7.17;4,7;1,4
-15/02/2026;;375;SCOTLAND 1;Motherwell;Aberdeen;1.68;3,86;4,7
-15/02/2026;;376;SCOTLAND 1;Rangers;Hearts;1.93;3,48;3,83
-15/02/2026;;377;SERBIA 1;Novi Pazar;OFK Beograd;1.83;3,52;3,72
-15/02/2026;;378;SERBIA 1;Radnicki Kragujevac;Radnik Surdulica;1.81;3,58;3,74
-15/02/2026;;379;SERBIA 1;LFK Mladost Lucani;Backa Topola;2.98;3;2,32
-15/02/2026;;380;SLOVENIA 1;NK Primorje;Maribor;4.27;3,75;1,67
-15/02/2026;;381;SLOVENIA 1;Koper;Radomlje;1.53;4,05;5,05
-15/02/2026;;382;SOUTH AFRICA 1;Sekhukhune United;Orbit College;1.60;3,2;6,16
-15/02/2026;;383;SPAIN 1;Real Oviedo;Athletic Club Bilbao;3.80;3,2;2,28
-15/02/2026;;384;SPAIN 1;Rayo Vallecano;Atletico Madrid;4.67;3,76;1,87
-15/02/2026;;385;SPAIN 1;Levante UD;Valencia CF;2.81;3,45;2,7
-15/02/2026;;386;SPAIN 1;RCD Mallorca;Real Betis;3.15;3,27;2,55
-15/02/2026;;387;SPAIN 2;Mirandes;UD Las Palmas;3.19;3,17;2,43
-15/02/2026;;388;SPAIN 2;SD Eibar;Racing Santander;2.34;3,21;3,29
-15/02/2026;;389;SPAIN 2;SD Huesca;Ceuta;2.26;3,22;3,48
-15/02/2026;;390;SPAIN 2;Albacete Balompie;Sporting Gijon;2.38;3,22;3,22
-15/02/2026;;391;SPAIN 2;CD Castellon;Deportivo La Coruna;1.88;3,6;4,32
-15/02/2026;;392;SPAIN 3;Celta de Vigo II;Real Aviles;1.68;3,54;4,52
-15/02/2026;;393;SPAIN 3;Osasuna II;Unionistas de Salamanca CF;2.29;2,98;3,06
-15/02/2026;;394;SPAIN 3;Zamora CF;Barakaldo CF;2.22;2,99;3,19
-15/02/2026;;395;SPAIN 3;CF Talavera;Arenteiro;1.87;3,13;4,09
-15/02/2026;;396;SPAIN 3;CD Lugo;Guadalajara;1.68;3,4;4,78
-15/02/2026;;397;SPAIN 3;Sevilla FC B;Teruel;2.18;2,81;3,52
-15/02/2026;;398;SPAIN 3;Ibiza Islas Pitiusas;Sabadell;2.23;2,85;3,33
-15/02/2026;;399;SPAIN 3;FC Cartagena SAD;Marbella;1.93;2,9;4,25
-15/02/2026;;400;SPAIN 3;Hercules;Antequera;1.75;3,24;4,58
-15/02/2026;;401;SPAIN 3;Alcorcon;Murcia;2.43;2,6;3,3
-15/02/2026;;402;SPAIN 3;CD Numancia;UD Ourense;1.98;3,02;3,8
-15/02/2026;;403;SPAIN 3;Sarriana;Gimnastica Segoviana CF;3.04;3,06;2,25
-15/02/2026;;404;SPAIN 3;Bergantinos;Rayo Cantabria;2.06;3,15;3,37
-15/02/2026;;405;SPAIN 3;Coruxo;Real Valladolid II;1.79;3,32;4,18
-15/02/2026;;406;SPAIN 3;Club Marino de Luanco;Dep. Fabril;3.15;3,08;2,19
-15/02/2026;;407;SPAIN 3;Real Avila;Salamanca CF UDS;2.49;2,98;2,68
-15/02/2026;;408;SPAIN 3;Samano;CD Lealtad;3.22;3,05;2,17
-15/02/2026;;409;SPAIN 3;SD Amorebieta;SD Ejea;1.84;2,94;4,65
-15/02/2026;;410;SPAIN 3;Eibar II;Basconia;2.01;3,05;3,66
-15/02/2026;;411;SPAIN 3;Naxara CD;CD Tudelano;3.45;3,32;1,97
-15/02/2026;;412;SPAIN 3;UD Logrones;Real Zaragoza II;1.31;4,5;8,75
-15/02/2026;;413;SPAIN 3;Utebo;CD Alfaro;1.28;4,55;10,1
-15/02/2026;;414;SPAIN 3;Sestao River Club;Real Union;2.04;3,1;3,49
-15/02/2026;;415;SPAIN 3;Valencia II;UD Poblense;2.46;2,71;3,09
-15/02/2026;;416;SPAIN 3;CD Alcoyano;CD Atletico Baleares;2.47;3,05;2,65
-15/02/2026;;417;SPAIN 3;UD Barbastro;Reddis;3.07;2,84;2,37
-15/02/2026;;418;SPAIN 3;Porreres;Girona II;2.47;3,05;2,65
-15/02/2026;;419;SPAIN 3;UE Sant Andreu;Andratx;1.27;4,55;10,7
-15/02/2026;;420;SPAIN 3;Torrent;SD Ibiza;2.68;3,1;2,41
-15/02/2026;;421;SPAIN 3;UE Olot;Espanyol II;2.48;2,71;3,05
-15/02/2026;;422;SPAIN 3;Terrassa FC;Atletic Lleida;1.74;3,48;4,22
-15/02/2026;;423;SPAIN 4;Antoniano;Union Estepona CF;2.23;2,84;3,35
-15/02/2026;;424;SPAIN 4;Extremadura 1924;UD Melilla;1.82;3,24;4,18
-15/02/2026;;425;SPAIN 4;Recreativo de Huelva;Yeclano Deportivo;1.72;3,22;4,84
-15/02/2026;;426;SPAIN 4;UCAM Murcia CF;Almeria II;1.32;4,05;10,5
-15/02/2026;;427;SPAIN 4;La Union Atletico;Aguilas FC;2.46;2,81;2,97
-15/02/2026;;428;SPAIN 4;Real Jaen CF;Deportiva Minera;2.47;2,78;2,99
-15/02/2026;;429;SPAIN 4;Puente Genil;Xerez Deportivo;2.51;2,52;3,28
-15/02/2026;;430;SPAIN 4;Xerez CD;Linares;1.99;2,84;4,08
-15/02/2026;;431;SPAIN 4;CF Fuenlabrada;Las Palmas II;2.05;3,18;3,37
-15/02/2026;;432;SPAIN 4;CDA Navalcarnero;Intercity;2.73;2,78;2,6
-15/02/2026;;433;SPAIN 4;Quintanar del Rey;Tenerife II;2.54;2,88;2,71
-15/02/2026;;434;SPAIN 4;Rayo Majadahonda;Colonia Moscardo;1.25;4,8;11
-15/02/2026;;435;SPAIN 4;Rayo Vallecano II;SS Reyes;4.18;3,28;1,8
-15/02/2026;;436;SPAIN 4;UD Socuellamos;Real Madrid III;2.44;3,08;2,67
-15/02/2026;;437;SPAIN 4;CD Coria;UB Conquense;2.10;2,85;3,67
-15/02/2026;;438;SPAIN 4;RSD Alcala;Orihuela CF;2.40;3,04;2,84
-15/02/2026;;439;GREECE 1;Thun;Sion;1.81;3,85;3,92
-15/02/2026;;440;GREECE 1;Basel;Lugano;2.17;3,6;3,05
-15/02/2026;;441;GREECE 1;Lausanne Sport;Servette;2.32;3,45;2,88
-15/02/2026;;442;TUNISIA 1;Ben Guerdane;CS Sfaxien;3.63;2,75;2,16
-15/02/2026;;443;TUNISIA 1;Club Africain;Jeunesse Sportive Omrane;1.31;3,92;12
-15/02/2026;;444;TUNISIA 1;Monastir;Zarzis;1.72;3,06;5,17
-15/02/2026;;445;TURKEY 1;Kocaelispor;Gaziantep FK;1.98;3,47;4,2
-15/02/2026;;446;TURKEY 1;Goztepe;Kayserispor;1.62;3,99;6,08
-15/02/2026;;447;TURKEY 1;Istanbul Basaksehir;Besiktas;2.68;3,66;2,6
-15/02/2026;;448;TURKEY 2;Amed;Sakaryaspor;1.17;6,1;12,7
-15/02/2026;;449;TURKEY 2;Pendikspor;Sarıyer;1.86;3,34;3,81
+﻿Data;Hora;Nº;Liga;Mandante;Visitante;Odd Mandante;Odd Empate;Odd Visitante
+13/02/2026;Full-time;22;AUSTRALIA 1;Western Sydney Wanderers;Wellington Phoenix;1.73;4.45;4.40
+13/02/2026;Full-time;13;AUSTRALIA 1;Perth Glory FC;Newcastle Jets FC;3.34;4.19;2.03
+13/02/2026;16:45;--;BELGIUM 1;KV Mechelen;KRC Genk;3.32;3.43;2.20
+13/02/2026;16:00;--;BELGIUM 2;Club Brugge II;Patro Eisden;3.59;3.36;1.91
+13/02/2026;16:00;--;BELGIUM 2;Lierse Kempenzonen;RFC Seraing;1.96;3.36;3.43
+13/02/2026;51';10;BULGARIA 1;Spartak Varna;Lokomotiv Sofia 1929;3.67;3.28;2.03
+13/02/2026;18:00;--;CHILE 1;Everton;Huachipato;2.43;3.08;2.96
+13/02/2026;20:30;--;CHILE 1;Palestino;Universidad Chile;3.16;3.30;2.21
+13/02/2026;14:00;--;CROATIA 1;Slaven Koprivnica;Lokomotiva Zagreb;2.46;3.13;2.83
+13/02/2026;Full-time;10;CROATIA 2;Karlovac 1919;Bijelo Brdo;2.57;2.88;3.01
+13/02/2026;14:00;--;CYPRUS 1;Anorthosis;Digenis Ypsonas;1.77;3.44;4.67
+13/02/2026;15:00;--;DENMARK 1;Randers;Vejle;1.82;3.38;4.52
+13/02/2026;15:00;--;FRANCE 1;Rennes;PSG;7.21;5.43;1.44
+13/02/2026;17:05;--;FRANCE 1;Monaco;Nantes;1.48;5.08;6.91
+13/02/2026;16:00;--;FRANCE 2;Amiens SC;Dunkerque;3.97;3.50;1.89
+13/02/2026;16:00;--;FRANCE 2;Clermont;Rodez;2.37;3.30;2.92
+13/02/2026;16:00;--;FRANCE 2;Laval;Annecy;3.08;2.91;2.51
+13/02/2026;16:00;--;FRANCE 2;Pau;Boulogne;1.82;3.44;4.42
+13/02/2026;16:00;--;FRANCE 2;Red Star;Nancy;2.03;3.28;3.70
+13/02/2026;15:30;--;FRANCE 3;Aubagne;Bourg-en-Bresse;2.16;3.08;3.21
+13/02/2026;15:30;--;FRANCE 3;Chateauroux;Rouen;3.42;3.02;2.10
+13/02/2026;15:30;--;FRANCE 3;Dijon;Caen;1.78;3.18;4.49
+13/02/2026;15:30;--;FRANCE 3;Fleury 91;Villefranche;1.65;3.26;5.35
+13/02/2026;15:30;--;FRANCE 3;Le Puy F.43 Auvergne;Orleans;1.87;3.24;3.90
+13/02/2026;15:30;--;FRANCE 3;Sochaux;Paris 13 Atletico;1.63;3.44;5.13
+13/02/2026;15:30;--;FRANCE 3;Valenciennes;Stade Briochin;1.68;3.48;4.63
+13/02/2026;16:30;--;AUSTRIA 1;Borussia Dortmund;Mainz 05;1.66;4.47;5.33
+13/02/2026;14:30;--;GERMANY 2;Fortuna Dusseldorf;Preußen Munster;1.94;3.48;3.77
+13/02/2026;14:30;--;GERMANY 2;Nurnberg;Karlsruher SC;1.73;3.98;4.21
+13/02/2026;15:00;--;GERMANY 3;Viktoria Koln;Erzgebirge Aue;2.07;3.30;3.19
+13/02/2026;16:00;--;HUNGARY 1;Ujpest;Debrecen;2.12;3.32;3.06
+13/02/2026;16:45;--;IRELAND 1;Derry City;Dundalk;1.65;3.75;5.13
+13/02/2026;16:45;--;IRELAND 1;Drogheda United;Waterford;2.04;3.32;3.62
+13/02/2026;Postponed;--;IRELAND 1;St Patrick's Athl.;Galway United;1.85;3.38;4.33
+13/02/2026;Postponed;--;IRELAND 1;Shelbourne;Shamrock Rovers;2.29;2.81;3.63
+13/02/2026;Full-time;31;ISRAEL 1;Hapoel Tel Aviv;Hapoel Katamon;1.55;3.77;6.28
+13/02/2026;Full-time;20;ISRAEL 2;Hapoel Ramat Gan;Kiryat Yam SC;2.81;3.23;2.48
+13/02/2026;Full-time;1;ISRAEL 2;Hapoel Hadera;Hapoel Ra'anana;2.23;3.22;3.22
+13/02/2026;Full-time;23;ISRAEL 2;Hapoel Kfar Shalem;Hapoel Rishon LeZion;2.61;3.23;2.66
+13/02/2026;Full-time;51;ISRAEL 2;Maccabi Petah Tikva;Ironi Modi'in FC;1.25;5.64;11.30
+13/02/2026;Full-time;23;ISRAEL 2;Kafr Qasim;Hapoel Nazareth Illit;2.50;2.99;2.99
+13/02/2026;16:45;--;HUNGARY 2;Pisa;AC Milan;7.11;4.03;1.60
+13/02/2026;Full-time;20;J1 League;Vissel Kobe;V-Varen Nagasaki;1.65;3.74;5.17
+13/02/2026;Postponed;--;MOROCCO 1;FAR Rabat;RSB Berkane;--;--;--
+13/02/2026;Postponed;--;MOROCCO 1;Maghreb Fes;Wydad Casablanca;--;--;--
+13/02/2026;Postponed;--;MOROCCO 1;Olympic Safi;CR Khemis Zemamra;--;--;--
+13/02/2026;16:00;--;MOROCCO 1;Raja Casablanca;Yacoub El Mansour;1.34;4.15;8.90
+13/02/2026;16:00;--;NETHERLANDS 1;Volendam;PSV;11.10;6.80;1.24
+13/02/2026;16:00;--;NETHERLANDS 2;Almere City;Helmond Sport;1.42;4.85;6.13
+13/02/2026;16:00;--;NETHERLANDS 2;ADO Den Haag;MVV;1.19;6.50;13.00
+13/02/2026;16:00;--;NETHERLANDS 2;Dordrecht;Emmen;1.89;3.70;3.65
+13/02/2026;16:00;--;NETHERLANDS 2;PSV II;De Graafschap;2.67;3.98;2.23
+13/02/2026;16:00;--;NETHERLANDS 2;Oss;AZ II;2.38;3.65;2.60
+13/02/2026;16:00;--;NETHERLANDS 2;RKC Waalwijk;Roda JC;2.17;3.62;2.97
+13/02/2026;16:45;--;NORTHERN IRELAND 1;Dungannon Swifts;Cliftonville;2.67;3.20;2.36
+13/02/2026;14:00;--;POLAND 1;Radomiak Radom;Korona Kielce;2.18;3.53;3.22
+13/02/2026;16:30;--;POLAND 1;GKS Katowice;Legia Warszawa;3.33;3.30;2.13
+13/02/2026;14:00;--;Division 1 (POL);Gornik Łeczna;Stal Mielec;1.98;3.40;3.32
+13/02/2026;17:00;--;Division 1 (POL);Pogon Siedlce;Ruch Chorzow;2.92;3.05;2.33
+13/02/2026;15:30;--;PORTUGAL 1;Santa Clara;Benfica;6.86;4.16;1.55
+13/02/2026;17:45;--;PORTUGAL 1;CD Tondela;Alverca;2.62;3.11;3.05
+13/02/2026;15:00;--;Superliga (ROM);Petrolul 52;Arges;3.11;2.72;2.61
+13/02/2026;Full-time;25;Saudi Pro League;Al Shabab;Al Ahli;5.77;3.84;1.68
+13/02/2026;69';20;Saudi Pro League;Al Hilal;Al Ittifaq;1.20;7.80;15.20
+13/02/2026;14:30;--;Saudi Pro League;Al Ittihad;Al Feiha;1.44;4.10;6.22
+13/02/2026;16:45;--;ENGLAND 2;Airdrieonians;St. Johnstone;6.12;3.84;1.48
+13/02/2026;Half Time;0;Prva Liga (SRB);Loznica;Trajal Krusevac;2.04;3.13;3.86
+13/02/2026;14:30;--;Betway Prem.;Durban City;TS Galaxy;2.17;2.86;3.46
+13/02/2026;14:30;--;Betway Prem.;Magesi;Golden Arrows;2.06;2.73;4.04
+13/02/2026;17:00;--;SPAIN 1;Elche CF;CA Osasuna;2.99;3.23;2.69
+13/02/2026;16:30;--;SPAIN 2;Almeria;FC Andorra;1.76;4.01;4.46
+13/02/2026;17:15;--;Primera RFEF 1;Real Madrid B;Athletic Club II;2.22;3.06;3.11
+13/02/2026;15:00;--;Primera RFEF 2;Sanluqueno;Atl. Madrid B;4.85;3.13;1.75
+13/02/2026;15:30;--;SWITZERLAND 2;Bellinzona;Vaduz;4.40;3.84;1.64
+13/02/2026;15:30;--;SWITZERLAND 2;Wil;Rapperswil-Jona;2.09;3.20;3.25
+13/02/2026;16:15;--;SWITZERLAND 2;Etoile Carouge;Neuchatel Xamax;2.53;3.32;2.42
+13/02/2026;16:15;--;SWITZERLAND 2;Stade Lausanne-Ouchy;Aarau;2.17;3.60;2.77
+13/02/2026;16:15;--;SWITZERLAND 2;Yverdon Sport;Stade Nyonnais;1.59;3.78;4.87
+13/02/2026;Full-time;0;Ligue Prof. 1;Gabes;CA Bizertin;2.60;2.55;3.10
+13/02/2026;Full-time;12;Ligue Prof. 1;Kairouan;Etoile du Sahel;4.25;2.85;2.07
+13/02/2026;Postponed;--;Ligue Prof. 1;Metlaoui;ES Tunis;--;--;--
+13/02/2026;Full-time;32;Ligue Prof. 1;Stade Tunisien;Olympique Beja;1.21;5.41;18.60
+13/02/2026;14:00;--;TURKEY 1;Antalyaspor;Samsunspor;3.80;3.30;2.15
+13/02/2026;14:00;--;TURKEY 1;Galatasaray;Eyupspor;1.15;8.64;21.00
+13/02/2026;Full-time;11;TURKEY 2;76 Igdır Belediyespor;Umraniyespor;1.49;4.19;6.29
+13/02/2026;Full-time;31;TURKEY 2;Boluspor;Hatayspor;1.10;9.05;21.00
+13/02/2026;14:00;--;TURKEY 2;Corum Belediyespor;Istanbulspor;1.48;4.17;6.51
+13/02/2026;14:00;--;TURKEY 2;Erokspor;Manisa BBSK;1.49;4.30;6.03
