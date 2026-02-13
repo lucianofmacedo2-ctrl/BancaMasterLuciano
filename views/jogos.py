@@ -41,7 +41,6 @@ def mostrar_jogos(df_hist):
             return df
         except: return pd.DataFrame()
 
-    # --- PRÉ-PROCESSAMENTO DO HISTÓRICO ---
     if not df_hist.empty:
         cols_cantos = ['Corners_H', 'Corners_A', 'Total_Corners', 'Corners_H_HT', 'Corners_A_HT', 'Total_Corners_HT']
         for col in cols_cantos:
@@ -152,17 +151,24 @@ def mostrar_jogos(df_hist):
                                 icones += " 🔥🚩"
                                 sugestoes_cantos.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_cantos})
 
-                c1, c2, c3 = st.columns([4.2, 3.0, 1.3])
+                c1, c2, c3, c4 = st.columns([4.2, 3.0, 1.3, 1.3]) # Adicionado c4
                 with c1: st.write(f"**{row['Hora']}** | ({pos_m}º) {m_orig} vs {v_orig} ({pos_v}º){icones}")
                 with c2: st.write(f"Odds: **{row.get('Odd Mandante','-')}** | **{row.get('Odd Empate','-')}** | **{row.get('Odd Visitante','-')}**")
                 with c3:
                     if st.button("Analisar 🔍", key=f"btn_an_{idx}", use_container_width=True):
-                        st.session_state.liga_scout = liga_orig # ADICIONADO PARA FUNCIONAR
+                        st.session_state.liga_scout = liga_orig
                         st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
+                with c4:
+                    if st.button("Simular 🎲", key=f"btn_sim_{idx}", use_container_width=True):
+                        st.session_state.liga_simulador = liga_orig
+                        st.session_state.time_casa_simulador, st.session_state.time_fora_simulador = m_orig, v_orig
+                        st.session_state.menu_ativo = "🎲 Simulador" # Ajuste conforme o nome no seu menu lateral
+                        st.rerun()
 
     st.divider()
+    # ... (Restante do código de Top Performance e Sugestões permanece idêntico)
     st.subheader("🎯 Sugestões do Dia (Top 5)")
     col_s1, col_s2 = st.columns(2)
     with col_s1:
