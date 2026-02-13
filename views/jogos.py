@@ -41,9 +41,8 @@ def mostrar_jogos(df_hist):
             return df
         except: return pd.DataFrame()
 
-    # --- PRÉ-PROCESSAMENTO DO HISTÓRICO (IMPORTANTE) ---
+    # --- PRÉ-PROCESSAMENTO DO HISTÓRICO ---
     if not df_hist.empty:
-        # Garantir que colunas de cantos sejam numéricas
         cols_cantos = ['Corners_H', 'Corners_A', 'Total_Corners', 'Corners_H_HT', 'Corners_A_HT', 'Total_Corners_HT']
         for col in cols_cantos:
             if col in df_hist.columns:
@@ -158,6 +157,7 @@ def mostrar_jogos(df_hist):
                 with c2: st.write(f"Odds: **{row.get('Odd Mandante','-')}** | **{row.get('Odd Empate','-')}** | **{row.get('Odd Visitante','-')}**")
                 with c3:
                     if st.button("Analisar 🔍", key=f"btn_an_{idx}", use_container_width=True):
+                        st.session_state.liga_scout = liga_orig # ADICIONADO PARA FUNCIONAR
                         st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
                         st.session_state.menu_ativo = "🔎 Scout"
                         st.rerun()
@@ -187,13 +187,11 @@ def mostrar_jogos(df_hist):
             jogos_t = df_h[(df_h['M_T'] == t) | (df_h['V_T'] == t)]
             if jogos_t.empty: continue
             
-            # Cálculo de médias garantindo numérico
             gm_ft = jogos_t.apply(lambda r: r['Gols_Mandante_FT'] if r['M_T'] == t else r['Gols_Visitante_FT'], axis=1).mean()
             gs_ft = jogos_t.apply(lambda r: r['Gols_Visitante_FT'] if r['M_T'] == t else r['Gols_Mandante_FT'], axis=1).mean()
             gm_ht = jogos_t.apply(lambda r: r['Gols_Mandante_HT'] if r['M_T'] == t else r['Gols_Visitante_HT'], axis=1).mean()
             gs_ht = jogos_t.apply(lambda r: r['Gols_Visitante_HT'] if r['M_T'] == t else r['Gols_Mandante_HT'], axis=1).mean()
             
-            # Cantos (Corners_H, Corners_A, Total_Corners, Corners_H_HT, Corners_A_HT, Total_Corners_HT)
             cf_ft = jogos_t.apply(lambda r: r['Corners_H'] if r['M_T'] == t else r['Corners_A'], axis=1).mean()
             cs_ft = jogos_t.apply(lambda r: r['Corners_A'] if r['M_T'] == t else r['Corners_H'], axis=1).mean()
             cf_ht = jogos_t.apply(lambda r: r['Corners_H_HT'] if r['M_T'] == t else r['Corners_A_HT'], axis=1).mean()
