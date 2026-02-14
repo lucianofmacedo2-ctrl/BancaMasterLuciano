@@ -48,7 +48,7 @@ def mostrar_scout(df):
     st.divider()
     st.subheader(f"📊 {m_sel} vs {v_sel}")
 
-    # --- FUNÇÕES DE CÁLCULO (MANTIDAS DO ORIGINAL) ---
+    # --- FUNÇÕES DE CÁLCULO DE TABELA E FORMA ---
     def calcular_posicoes(df_liga):
         stats = {}
         for _, r in df_liga.iterrows():
@@ -82,61 +82,36 @@ def mostrar_scout(df):
             else: resultados.append("🔴")
         return " ".join(resultados)
 
-    # --- EXECUÇÃO DA TABELA ---
+    # --- MÉTRICAS DE TOPO ---
     tabela_liga = calcular_posicoes(df_l)
     try:
         pos_m = tabela_liga[tabela_liga['Time'] == m_sel]['Pos'].values[0]
         pos_v = tabela_liga[tabela_liga['Time'] == v_sel]['Pos'].values[0]
-        dif = abs(pos_m - pos_v)
-
+        
         st.markdown("""
             <style>
-            div[data-testid="stMetricValue"] > div { text-align: center !important; color: #000000 !important; font-weight: bold !important; justify-content: center !important; }
+            div[data-testid="stMetricValue"] > div { text-align: center !important; color: #1f77b4 !important; font-weight: bold !important; justify-content: center !important; }
             div[data-testid="stMetricLabel"] > div { text-align: center !important; justify-content: center !important; color: #31333F !important; }
-            [data-testid="stMetric"] { text-align: center; display: flex; flex-direction: column; align-items: center; }
-            [data-testid="stTable"] td, [data-testid="stTable"] th { text-align: center !important; }
+            [data-testid="stMetric"] { text-align: center; display: flex; flex-direction: column; align-items: center; background: #f0f2f6; padding: 10px; border-radius: 10px; }
             </style>
             """, unsafe_allow_html=True)
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         with c1: st.metric(label=f"Posição {m_sel}", value=f"{pos_m}º")
         with c2: st.metric(label=f"Posição {v_sel}", value=f"{pos_v}º")
-        with c3: st.metric(label="Diferença de Tabela", value=f"{dif} pos.")
+        with c3: st.metric(label="Forma Casa", value=get_forma(df_l, m_sel, True, 'Casa'))
+        with c4: st.metric(label="Forma Fora", value=get_forma(df_l, v_sel, True, 'Fora'))
     except:
-        st.info("Selecione os times.")
+        st.info("Aguardando seleção...")
 
     st.divider()
-    
-    # --- NOVAS MÉTRICAS DE XG E POSSE (DO ARQUIVO TXT) ---
-    def get_avg_metric(df_hist, time, col_h, col_a):
-        val = pd.concat([df_hist[df_hist['Mandante'] == time][col_h], df_hist[df_hist['Visitante'] == time][col_a]])
-        return val.mean()
 
+    # --- FILTRAGEM DOS ÚLTIMOS JOGOS ---
     df_m_last = df_l[(df_l['Mandante'] == m_sel) | (df_l['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
     df_v_last = df_l[(df_l['Mandante'] == v_sel) | (df_l['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(n_jogos)
 
-    st.markdown("### 🚀 Expectativa e Pressão")
-    cx1, cx2, cx3, cx4 = st.columns(4)
-    with cx1: st.metric("xG Médio", f"{get_avg_metric(df_m_last, m_sel, 'xG_Mandante', 'xG_Visitante'):.2f}")
-    with cx2: st.metric("Posse Bola %", f"{get_avg_metric(df_m_last, m_sel, 'Possession_H', 'Possession_A'):.1f}%")
-    with cx3: st.metric("Ataques Perigosos", f"{get_avg_metric(df_m_last, m_sel, 'DangerousAttacks_H', 'DangerousAttacks_A'):.1f}")
-    with cx4: st.metric("Chutes no Gol", f"{get_avg_metric(df_m_last, m_sel, 'ShotsOnTarget_H', 'ShotsOnTarget_A'):.1f}")
-
-    st.divider()
-    st.markdown("### 📈 Forma Recente (Últimos 5 Jogos)")
-    cf1, cf2 = st.columns(2)
-    with cf1:
-        st.write(f"**{m_sel}**")
-        st.write(f"Geral: {get_forma(df_l, m_sel)}")
-        st.write(f"Em Casa: {get_forma(df_l, m_sel, True, 'Casa')}")
-    with cf2:
-        st.write(f"**{v_sel}**")
-        st.write(f"Geral: {get_forma(df_l, v_sel)}")
-        st.write(f"Fora: {get_forma(df_l, v_sel, True, 'Fora')}")
-
-    # --- TABELA TÉCNICA COMPLETA ---
-    st.divider()
-    st.markdown("### 📉 Estatísticas Técnicas (Últimos Jogos)")
+    # --- TABELA TÉCNICA ULTRA DETALHADA (COM COLUNAS DO TXT) ---
+    st.markdown("### 📉 Estatísticas de Performance (Últimos Jogos)")
 
     def get_stats_combo(series):
         if series.empty: return [0.0]*5
@@ -146,92 +121,89 @@ def mostrar_scout(df):
         std = series.std(); cv = (std / mean) if mean != 0 else 0.0
         return [mean, median, mode, std, cv]
 
-    def preparar_tabela_tecnica(df_hist, time):
-        # Mapeamento de colunas dinâmico conforme o TXT
-        col_cn_h = 'Corners_H'; col_cn_a = 'Corners_A'
-        col_cn_h_ht = 'Corners_H_HT'; col_cn_a_ht = 'Corners_A_HT'
-        
-        g_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Mandante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Visitante_FT']])
-        g_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time]['Gols_Visitante_FT'], df_hist[df_hist['Visitante'] == time]['Gols_Mandante_FT']])
-        
-        c_pro_ft = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_h, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_a, pd.Series(0))])
-        c_con_ft = pd.concat([df_hist[df_hist['Mandante'] == time].get(col_cn_a, pd.Series(0)), df_hist[df_hist['Visitante'] == time].get(col_cn_h, pd.Series(0))])
-        
-        # Inclusão de novos dados do TXT: Shots e Fouls
-        shots = pd.concat([df_hist[df_hist['Mandante'] == time].get('Shots_H', pd.Series(0)), df_hist[df_hist['Visitante'] == time].get('Shots_A', pd.Series(0))])
-        fouls = pd.concat([df_hist[df_hist['Mandante'] == time].get('Fouls_H', pd.Series(0)), df_hist[df_hist['Visitante'] == time].get('Fouls_A', pd.Series(0))])
+    def preparar_tabela_tecnica_v2(df_hist, time):
+        # Selecionando dados quando o time é mandante e quando é visitante
+        m = df_hist['Mandante'] == time
+        v = df_hist['Visitante'] == time
+
+        def extrair(col_h, col_a):
+            return pd.concat([df_hist[m][col_h], df_hist[v][col_a]])
 
         data = [
-            ['Gols Marcados (FT)']+get_stats_combo(g_pro_ft), 
-            ['Gols Sofridos (FT)']+get_stats_combo(g_con_ft), 
-            ['Cantos FT (Pro)']+get_stats_combo(c_pro_ft), 
-            ['Cantos FT (Contra)']+get_stats_combo(c_con_ft),
-            ['Finalizações (Total)']+get_stats_combo(shots),
-            ['Faltas Cometidas']+get_stats_combo(fouls)
+            ['Gols Marcados (FT)'] + get_stats_combo(extrair('Gols_Mandante_FT', 'Gols_Visitante_FT')),
+            ['Gols Sofridos (FT)'] + get_stats_combo(extrair('Gols_Visitante_FT', 'Gols_Mandante_FT')),
+            ['xG (Expectativa de Gols)'] + get_stats_combo(extrair('xG_Mandante', 'xG_Visitante')),
+            ['Posse de Bola (%)'] + get_stats_combo(extrair('Possession_H', 'Possession_A')),
+            ['Ataques Perigosos'] + get_stats_combo(extrair('DangerousAttacks_H', 'DangerousAttacks_A')),
+            ['Finalizações (Total)'] + get_stats_combo(extrair('Shots_H', 'Shots_A')),
+            ['Chutes no Gol'] + get_stats_combo(extrair('ShotsOnTarget_H', 'ShotsOnTarget_A')),
+            ['Cantos (Escanteios)'] + get_stats_combo(extrair('Corners_H', 'Corners_A')),
+            ['Faltas Cometidas'] + get_stats_combo(extrair('Fouls_H', 'Fouls_A')),
+            ['Cartões Amarelos'] + get_stats_combo(extrair('Yellow_Cards_H', 'Yellow_Cards_A')),
+            ['Impedimentos (Offsides)'] + get_stats_combo(extrair('Offsides_H', 'Offsides_A'))
         ]
         return pd.DataFrame(data, columns=['Métrica', 'Média', 'Mediana', 'Moda', 'DP', 'CV'])
 
     col_t1, col_t2 = st.columns(2)
     with col_t1: 
         st.write(f"📈 **Estatísticas: {m_sel}**")
-        st.table(preparar_tabela_tecnica(df_m_last, m_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
+        st.table(preparar_tabela_tecnica_v2(df_m_last, m_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
     with col_t2: 
         st.write(f"📈 **Estatísticas: {v_sel}**")
-        st.table(preparar_tabela_tecnica(df_v_last, v_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
+        st.table(preparar_tabela_tecnica_v2(df_v_last, v_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
 
-    # --- INCIDÊNCIA DE MERCADOS (%) ---
+    # --- INCIDÊNCIA DE MERCADOS COM ODDS ---
     st.divider()
-    st.markdown("### 💰 Incidência de Mercados (%)")
-    def calcular_incidencia(df_hist):
+    st.markdown("### 💰 Incidência de Mercados e Filtros de Odds")
+    
+    def calcular_incidencia_v2(df_hist):
         df_hist = df_hist.copy()
-        df_hist['Total_HT'] = pd.to_numeric(df_hist['Gols_Mandante_HT'], errors='coerce').fillna(0) + pd.to_numeric(df_hist['Gols_Visitante_HT'], errors='coerce').fillna(0)
-        df_hist['Total_FT'] = pd.to_numeric(df_hist['Gols_Mandante_FT'], errors='coerce').fillna(0) + pd.to_numeric(df_hist['Gols_Visitante_FT'], errors='coerce').fillna(0)
-        df_hist['BTTS_FT'] = (pd.to_numeric(df_hist['Gols_Mandante_FT']) > 0) & (pd.to_numeric(df_hist['Gols_Visitante_FT']) > 0)
-        
-        # Novos mercados do TXT
-        df_hist['Over05_HT_Check'] = df_hist['Total_HT'] > 0.5
-        df_hist['Over25_FT_Check'] = df_hist['Total_FT'] > 2.5
+        df_hist['Total_HT'] = pd.to_numeric(df_hist['Total_Gols_HT'], errors='coerce').fillna(0)
+        df_hist['Total_FT'] = pd.to_numeric(df_hist['Total_Gols_FT'], errors='coerce').fillna(0)
+        df_hist['BTTS'] = (pd.to_numeric(df_hist['Gols_Mandante_FT']) > 0) & (pd.to_numeric(df_hist['Gols_Visitante_FT']) > 0)
+        df_hist['C_HT'] = pd.to_numeric(df_hist['Total_Corners_HT'], errors='coerce').fillna(0)
 
         linhas = [
-            {'Mercado': 'Over 0.5 Gols HT', 'Freq (%)': f"{(df_hist['Over05_HT_Check']).mean()*100:.2f}%"},
-            {'Mercado': 'Over 1.5 Gols FT', 'Freq (%)': f"{(df_hist['Total_FT'] > 1.5).mean()*100:.2f}%"},
-            {'Mercado': 'Over 2.5 Gols FT', 'Freq (%)': f"{(df_hist['Over25_FT_Check']).mean()*100:.2f}%"},
-            {'Mercado': 'Ambas Marcam FT', 'Freq (%)': f"{df_hist['BTTS_FT'].mean()*100:.2f}%"}
+            {'Mercado': 'Over 0.5 HT', 'Freq (%)': f"{(df_hist['Total_HT'] > 0.5).mean()*100:.1f}%", 'Média Odds': f"{df_hist['Odd_Over05_HT'].mean():.2f}"},
+            {'Mercado': 'Over 1.5 FT', 'Freq (%)': f"{(df_hist['Total_FT'] > 1.5).mean()*100:.1f}%", 'Média Odds': f"{df_hist['Odd_Over15_FT'].mean():.2f}"},
+            {'Mercado': 'Over 2.5 FT', 'Freq (%)': f"{(df_hist['Total_FT'] > 2.5).mean()*100:.1f}%", 'Média Odds': f"{df_hist['Odd_Over25_FT'].mean():.2f}"},
+            {'Mercado': 'Ambas Marcam (BTTS)', 'Freq (%)': f"{df_hist['BTTS'].mean()*100:.1f}%", 'Média Odds': f"{df_hist['Odd_BTTS_Sim'].mean():.2f}"},
+            {'Mercado': 'Cantos Over 3.5 HT', 'Freq (%)': f"{(df_hist['C_HT'] > 3.5).mean()*100:.1f}%", 'Média Odds': '---'}
         ]
         return pd.DataFrame(linhas)
 
     cm1, cm2 = st.columns(2)
-    with cm1: st.table(calcular_incidencia(df_m_last))
-    with cm2: st.table(calcular_incidencia(df_v_last))
+    with cm1: 
+        st.write(f"**Mercados: {m_sel}**")
+        st.table(calcular_incidencia_v2(df_m_last))
+    with cm2: 
+        st.write(f"**Mercados: {v_sel}**")
+        st.table(calcular_incidencia_v2(df_v_last))
 
-    # --- DISTRIBUIÇÃO POR MINUTOS ---
+    # --- DISTRIBUIÇÃO DE GOLS POR MINUTOS (TODAS AS FAIXAS DO TXT) ---
     st.divider()
-    st.markdown("### ⏰ Distribuição de Gols por Minutos")
+    st.markdown("### ⏰ Gols por Faixa de Minutos")
     faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
-    def preparar_minutos(df_hist, time):
+    
+    def preparar_minutos_v2(df_hist, time):
         marc, sofr = [], []
         for f in faixas:
             col_m = f'{f}_Mandante'; col_v = f'{f}_Visitante'
-            m = 0; s = 0
-            if col_m in df_hist.columns and col_v in df_hist.columns:
-                m = df_hist[df_hist['Mandante'] == time][col_m].sum() + df_hist[df_hist['Visitante'] == time][col_v].sum()
-                s = df_hist[df_hist['Mandante'] == time][col_v].sum() + df_hist[df_hist['Visitante'] == time][col_m].sum()
+            m = df_hist[df_hist['Mandante'] == time][col_m].sum() + df_hist[df_hist['Visitante'] == time][col_v].sum()
+            s = df_hist[df_hist['Mandante'] == time][col_v].sum() + df_hist[df_hist['Visitante'] == time][col_m].sum()
             marc.append(int(m)); sofr.append(int(s))
-        return pd.DataFrame({'Intervalo': faixas, 'Gols Marcados': marc, 'Gols Sofridos': sofr})
-    
-    def highlight_max(s):
-        is_max = s == s.max()
-        return ['background-color: #1f77b4; color: white; font-weight: bold' if v and v > 0 else '' for v in is_max]
-    
-    cmin1, cmin2 = st.columns(2)
-    with cmin1: st.table(preparar_minutos(df_m_last, m_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
-    with cmin2: st.table(preparar_minutos(df_v_last, v_sel).style.apply(highlight_max, subset=['Gols Marcados', 'Gols Sofridos']))
+        return pd.DataFrame({'Intervalo': faixas, 'Marcados': marc, 'Sofridos': sofr}).set_index('Intervalo').T
 
-    # --- HISTÓRICO COM ODDS (ADICIONADO DO TXT) ---
+    st.write(f"📊 **Distribuição {m_sel}**")
+    st.dataframe(preparar_minutos_v2(df_m_last, m_sel), use_container_width=True)
+    st.write(f"📊 **Distribuição {v_sel}**")
+    st.dataframe(preparar_minutos_v2(df_v_last, v_sel), use_container_width=True)
+
+    # --- HISTÓRICO DETALHADO COM ODDS E XG ---
     st.divider()
-    st.markdown("### 📝 Histórico Detalhado e Odds")
+    st.markdown("### 📝 Histórico Detalhado (Últimos 10 Jogos)")
     
-    def preparar_historico_odds(df_hist, time):
+    def preparar_hist_final(df_hist, time):
         df_hist = df_hist.copy()
         df_hist['Data'] = pd.to_datetime(df_hist['Data'], errors='coerce')
         df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
@@ -240,22 +212,22 @@ def mostrar_scout(df):
         for _, r in df_f.iterrows():
             oponente = r['Visitante'] if r['Mandante'] == time else r['Mandante']
             mando = "Casa" if r['Mandante'] == time else "Fora"
-            placar = f"{int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])}"
+            res = f"{int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])}"
+            xg = f"{r['xG_Mandante']:.1f} vs {r['xG_Visitante']:.1f}"
             
             jogos.append({
                 'Data': r['Data'].strftime('%d/%m/%Y') if pd.notnull(r['Data']) else "N/A",
+                'Mando': mando,
                 'Oponente': oponente,
-                'Resultado': placar,
-                'Odd H HT': r.get('Odd_H_HT', 0),
-                'Odd Over 2.5 FT': r.get('Odd_Over25_FT', 0),
-                'Odd BTTS Sim': r.get('Odd_BTTS_Sim', 0)
+                'Placar': res,
+                'xG Jogo': xg,
+                'Odd Casa': r['Odd_Mandante_FT'],
+                'Odd Empate': r['Odd_Empate_FT'],
+                'Odd Fora': r['Odd_Visitante_FT']
             })
         return pd.DataFrame(jogos)
 
-    clist1, clist2 = st.columns(2)
-    with clist1:
-        st.write(f"**Últimos Jogos: {m_sel}**")
-        st.table(preparar_historico_odds(df_l, m_sel))
-    with clist2:
-        st.write(f"**Últimos Jogos: {v_sel}**")
-        st.table(preparar_historico_odds(df_l, v_sel))
+    st.write(f"**Jogos de {m_sel}**")
+    st.table(preparar_hist_final(df_l, m_sel))
+    st.write(f"**Jogos de {v_sel}**")
+    st.table(preparar_hist_final(df_l, v_sel))
