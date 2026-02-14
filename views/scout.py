@@ -174,7 +174,7 @@ def mostrar_scout(df):
     with cm1: st.table(calcular_incidencia_v2(df_m_last))
     with cm2: st.table(calcular_incidencia_v2(df_v_last))
 
-    # --- DISTRIBUIÇÃO POR MINUTOS ---
+    # --- DISTRIBUIÇÃO POR MINUTOS COM DEGRADÊ (RDYLGREEN) ---
     st.divider()
     st.markdown("### ⏰ Gols por Faixa de Minutos")
     faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
@@ -188,16 +188,19 @@ def mostrar_scout(df):
             marc.append(int(m)); sofr.append(int(s))
         return pd.DataFrame({'Intervalo': faixas, 'Marcados': marc, 'Sofridos': sofr}).set_index('Intervalo').T
 
+    # Renderizando com degradê RdYlGn (Red-Yellow-Green)
     st.write(f"📊 **Distribuição {m_sel}**")
-    st.dataframe(preparar_minutos_v2(df_m_last, m_sel), use_container_width=True)
+    df_min_m = preparar_minutos_v2(df_m_last, m_sel)
+    st.dataframe(df_min_m.style.background_gradient(cmap='RdYlGn', axis=1), use_container_width=True)
+
     st.write(f"📊 **Distribuição {v_sel}**")
-    st.dataframe(preparar_minutos_v2(df_v_last, v_sel), use_container_width=True)
+    df_min_v = preparar_minutos_v2(df_v_last, v_sel)
+    st.dataframe(df_min_v.style.background_gradient(cmap='RdYlGn', axis=1), use_container_width=True)
 
     # --- HISTÓRICO DETALHADO COM FILTRO DE MANDO ---
     st.divider()
     st.markdown("### 📝 Histórico Detalhado")
     
-    # Selectbox para alternar o tipo de histórico
     tipo_hist = st.selectbox("🎯 Filtrar Histórico por Mando", ["Geral", "Casa/Casa e Fora/Fora"])
 
     def preparar_hist_final(df_hist, time, apenas_mando=False, mando="Casa"):
