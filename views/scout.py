@@ -110,7 +110,7 @@ def mostrar_scout(df):
     df_m_last = df_l[(df_l['Mandante'] == m_sel) | (df_l['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
     df_v_last = df_l[(df_l['Mandante'] == v_sel) | (df_l['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(n_jogos)
 
-    # --- TABELA TÉCNICA ULTRA DETALHADA (COM COLUNAS DO TXT) ---
+    # --- TABELA TÉCNICA ULTRA DETALHADA ---
     st.markdown("### 📉 Estatísticas de Performance (Últimos Jogos)")
 
     def get_stats_combo(series):
@@ -122,10 +122,8 @@ def mostrar_scout(df):
         return [mean, median, mode, std, cv]
 
     def preparar_tabela_tecnica_v2(df_hist, time):
-        # Selecionando dados quando o time é mandante e quando é visitante
         m = df_hist['Mandante'] == time
         v = df_hist['Visitante'] == time
-
         def extrair(col_h, col_a):
             return pd.concat([df_hist[m][col_h], df_hist[v][col_a]])
 
@@ -152,7 +150,7 @@ def mostrar_scout(df):
         st.write(f"📈 **Estatísticas: {v_sel}**")
         st.table(preparar_tabela_tecnica_v2(df_v_last, v_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
 
-    # --- INCIDÊNCIA DE MERCADOS COM ODDS ---
+    # --- INCIDÊNCIA DE MERCADOS ---
     st.divider()
     st.markdown("### 💰 Incidência de Mercados e Filtros de Odds")
     
@@ -173,14 +171,10 @@ def mostrar_scout(df):
         return pd.DataFrame(linhas)
 
     cm1, cm2 = st.columns(2)
-    with cm1: 
-        st.write(f"**Mercados: {m_sel}**")
-        st.table(calcular_incidencia_v2(df_m_last))
-    with cm2: 
-        st.write(f"**Mercados: {v_sel}**")
-        st.table(calcular_incidencia_v2(df_v_last))
+    with cm1: st.table(calcular_incidencia_v2(df_m_last))
+    with cm2: st.table(calcular_incidencia_v2(df_v_last))
 
-    # --- DISTRIBUIÇÃO DE GOLS POR MINUTOS (TODAS AS FAIXAS DO TXT) ---
+    # --- DISTRIBUIÇÃO POR MINUTOS ---
     st.divider()
     st.markdown("### ⏰ Gols por Faixa de Minutos")
     faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
@@ -199,25 +193,35 @@ def mostrar_scout(df):
     st.write(f"📊 **Distribuição {v_sel}**")
     st.dataframe(preparar_minutos_v2(df_v_last, v_sel), use_container_width=True)
 
-    # --- HISTÓRICO DETALHADO COM ODDS E XG ---
+    # --- HISTÓRICO DETALHADO COM FILTRO DE MANDO ---
     st.divider()
-    st.markdown("### 📝 Histórico Detalhado (Últimos 10 Jogos)")
+    st.markdown("### 📝 Histórico Detalhado")
     
-    def preparar_hist_final(df_hist, time):
+    # Selectbox para alternar o tipo de histórico
+    tipo_hist = st.selectbox("🎯 Filtrar Histórico por Mando", ["Geral", "Casa/Casa e Fora/Fora"])
+
+    def preparar_hist_final(df_hist, time, apenas_mando=False, mando="Casa"):
         df_hist = df_hist.copy()
         df_hist['Data'] = pd.to_datetime(df_hist['Data'], errors='coerce')
-        df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
+        
+        if apenas_mando:
+            if mando == "Casa":
+                df_f = df_hist[df_hist['Mandante'] == time].sort_values('Data', ascending=False).head(10)
+            else:
+                df_f = df_hist[df_hist['Visitante'] == time].sort_values('Data', ascending=False).head(10)
+        else:
+            df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(10)
         
         jogos = []
         for _, r in df_f.iterrows():
             oponente = r['Visitante'] if r['Mandante'] == time else r['Mandante']
-            mando = "Casa" if r['Mandante'] == time else "Fora"
+            m_label = "Casa" if r['Mandante'] == time else "Fora"
             res = f"{int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])}"
             xg = f"{r['xG_Mandante']:.1f} vs {r['xG_Visitante']:.1f}"
             
             jogos.append({
                 'Data': r['Data'].strftime('%d/%m/%Y') if pd.notnull(r['Data']) else "N/A",
-                'Mando': mando,
+                'Mando': m_label,
                 'Oponente': oponente,
                 'Placar': res,
                 'xG Jogo': xg,
@@ -227,7 +231,10 @@ def mostrar_scout(df):
             })
         return pd.DataFrame(jogos)
 
-    st.write(f"**Jogos de {m_sel}**")
-    st.table(preparar_hist_final(df_l, m_sel))
-    st.write(f"**Jogos de {v_sel}**")
-    st.table(preparar_hist_final(df_l, v_sel))
+    is_mando = True if tipo_hist == "Casa/Casa e Fora/Fora" else False
+
+    st.write(f"**Últimos 10 Jogos: {m_sel} ({'Apenas em Casa' if is_mando else 'Geral'})**")
+    st.table(preparar_hist_final(df_l, m_sel, is_mando, "Casa"))
+    
+    st.write(f"**Últimos 10 Jogos: {v_sel} ({'Apenas Fora' if is_mando else 'Geral'})**")
+    st.table(preparar_hist_final(df_l, v_sel, is_mando, "Fora"))
