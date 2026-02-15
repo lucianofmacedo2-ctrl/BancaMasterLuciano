@@ -121,44 +121,44 @@ def mostrar_scout(df):
     except:
         st.info("Aguardando seleção...")
 
-    # --- MELHORIA 5: RADAR DE ESTILO ---
+    # --- MELHORIA 5: RADAR DE ESTILO (NORMALIZADO) ---
     st.divider()
-    st.subheader("🕸️ Radar Comparativo de Estilo de Jogo")
+    st.subheader("🕸️ Radar de Estilo de Jogo (Normalizado 0-100)")
     
-    def criar_radar(df_m, df_v, t1, t2):
+    def criar_radar_normalizado(df_m, df_v, t1, t2):
         metrics = ['xG', 'Posse %', 'Atq. Perigosos', 'Finalizações', 'Cantos', 'Faltas']
         
-        # Função interna para garantir que não dê erro se vazio
-        def safe_mean(series): return series.mean() if not series.empty else 0
+        def get_means(df_h, t):
+            return [
+                extrair_metrica(df_h, t, 'xG_Mandante', 'xG_Visitante').mean(),
+                extrair_metrica(df_h, t, 'Possession_H', 'Possession_A').mean(),
+                extrair_metrica(df_h, t, 'DangerousAttacks_H', 'DangerousAttacks_A').mean(),
+                extrair_metrica(df_h, t, 'Shots_H', 'Shots_A').mean(),
+                extrair_metrica(df_h, t, 'Corners_H', 'Corners_A').mean(),
+                extrair_metrica(df_h, t, 'Fouls_H', 'Fouls_A').mean()
+            ]
 
-        val1 = [
-            safe_mean(extrair_metrica(df_m, t1, 'xG_Mandante', 'xG_Visitante')),
-            safe_mean(extrair_metrica(df_m, t1, 'Possession_H', 'Possession_A')),
-            safe_mean(extrair_metrica(df_m, t1, 'DangerousAttacks_H', 'DangerousAttacks_A')) / 1.5, # Ajuste escala
-            safe_mean(extrair_metrica(df_m, t1, 'Shots_H', 'Shots_A')),
-            safe_mean(extrair_metrica(df_m, t1, 'Corners_H', 'Corners_A')),
-            safe_mean(extrair_metrica(df_m, t1, 'Fouls_H', 'Fouls_A'))
-        ]
-        val2 = [
-            safe_mean(extrair_metrica(df_v, t2, 'xG_Mandante', 'xG_Visitante')),
-            safe_mean(extrair_metrica(df_v, t2, 'Possession_H', 'Possession_A')),
-            safe_mean(extrair_metrica(df_v, t2, 'DangerousAttacks_H', 'DangerousAttacks_A')) / 1.5,
-            safe_mean(extrair_metrica(df_v, t2, 'Shots_H', 'Shots_A')),
-            safe_mean(extrair_metrica(df_v, t2, 'Corners_H', 'Corners_A')),
-            safe_mean(extrair_metrica(df_v, t2, 'Fouls_H', 'Fouls_A'))
-        ]
+        m1 = get_means(df_m, t1)
+        m2 = get_means(df_v, t2)
+
+        # Normalização dinâmica para escala 0-100
+        max_values = [3.0, 100.0, 120.0, 25.0, 12.0, 25.0]
+        norm1 = [(v / m) * 100 if m > 0 else 0 for v, m in zip(m1, max_values)]
+        norm2 = [(v / m) * 100 if m > 0 else 0 for v, m in zip(m2, max_values)]
 
         fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(r=val1, theta=metrics, fill='toself', name=t1, line_color='blue'))
-        fig.add_trace(go.Scatterpolar(r=val2, theta=metrics, fill='toself', name=t2, line_color='red'))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=True, height=450)
+        fig.add_trace(go.Scatterpolar(r=norm1, theta=metrics, fill='toself', name=t1, line_color='blue', 
+                                      text=[f"{v:.2f}" for v in m1], hoverinfo="name+text+theta"))
+        fig.add_trace(go.Scatterpolar(r=norm2, theta=metrics, fill='toself', name=t2, line_color='red', 
+                                      text=[f"{v:.2f}" for v in m2], hoverinfo="name+text+theta"))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True, height=450)
         return fig
 
-    st.plotly_chart(criar_radar(df_m_last, df_v_last, m_sel, v_sel), use_container_width=True)
+    st.plotly_chart(criar_radar_normalizado(df_m_last, df_v_last, m_sel, v_sel), use_container_width=True)
 
     # --- MELHORIA 2: MOMENTUM DE GOLS ---
     st.divider()
-    st.subheader("⏱️ Momentum de Gols (Distribuição Real)")
+    st.subheader("⏱️ Momentum de Gols (Quando os gols acontecem)")
     faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
     
     def plot_momentum(df_m, df_v, t1, t2):
@@ -171,7 +171,7 @@ def mostrar_scout(df):
         fig = go.Figure()
         fig.add_trace(go.Bar(x=faixas, y=m_gols, name=f"Gols {t1}", marker_color='blue', opacity=0.7))
         fig.add_trace(go.Bar(x=faixas, y=v_gols, name=f"Gols {t2}", marker_color='red', opacity=0.7))
-        fig.update_layout(barmode='group', xaxis_title="Intervalo de Minutos", yaxis_title="Total de Gols Acumulados")
+        fig.update_layout(barmode='group', xaxis_title="Minutos", yaxis_title="Total de Gols Acumulados")
         return fig
 
     st.plotly_chart(plot_momentum(df_m_last, df_v_last, m_sel, v_sel), use_container_width=True)
@@ -186,22 +186,24 @@ def mostrar_scout(df):
     with col_al1:
         my_avg_c = extrair_metrica(df_m_last, m_sel, 'Corners_H', 'Corners_A').mean()
         diff_c = (my_avg_c * 2) - avg_liga_corners
-        st.metric(f"Cantos Esperados ({m_sel})", f"{my_avg_c:.2f}", delta=f"{diff_c:.2f} vs Liga", delta_color="normal")
+        st.metric(f"Cantos/Jogo ({m_sel})", f"{my_avg_c:.2f}", delta=f"{diff_c:.2f} vs Liga")
     with col_al2:
         my_avg_g = extrair_metrica(df_v_last, v_sel, 'Gols_Mandante_FT', 'Gols_Visitante_FT').mean()
         diff_g = my_avg_g - (avg_liga_gols / 2)
-        st.metric(f"Gols Marcados Média ({v_sel})", f"{my_avg_g:.2f}", delta=f"{diff_g:.2f} vs Liga", delta_color="normal")
+        st.metric(f"Gols Marcados Média ({v_sel})", f"{my_avg_g:.2f}", delta=f"{diff_g:.2f} vs Liga")
 
     # --- TABELA TÉCNICA ULTRA DETALHADA ---
     st.divider()
-    st.markdown("### 📉 Estatísticas de Performance")
+    st.markdown("### 📉 Estatísticas de Performance Detalhadas")
 
     def get_stats_combo(series):
         if series.empty: return [0.0]*5
         series = pd.to_numeric(series, errors='coerce').fillna(0)
-        mean = series.mean(); median = series.median()
+        mean = series.mean()
+        median = series.median()
         mode = series.mode().iloc[0] if not series.mode().empty else 0.0
-        std = series.std(); cv = (std / mean) if mean != 0 else 0.0
+        std = series.std()
+        cv = (std / mean) if mean != 0 else 0.0
         return [mean, median, mode, std, cv]
 
     def preparar_tabela_tecnica_v2(df_hist, time):
@@ -252,9 +254,9 @@ def mostrar_scout(df):
     with cm1: st.table(calcular_incidencia_v2(df_m_last))
     with cm2: st.table(calcular_incidencia_v2(df_v_last))
 
-    # --- MELHORIA 4: CALCULADORA DE VALOR (ODDS JUSTAS) ---
+    # --- MELHORIA 4: CALCULADORA DE VALOR ---
     st.divider()
-    st.subheader("💎 Calculadora de Valor (Odds Justas baseadas na Amostragem)")
+    st.subheader("💎 Calculadora de Valor (Odds Justas)")
     
     def calcular_valor(df_hist, mercado):
         if df_hist.empty: return "0.00", "N/A"
