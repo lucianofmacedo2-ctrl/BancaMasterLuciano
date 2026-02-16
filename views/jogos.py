@@ -42,8 +42,9 @@ def mostrar_jogos(df_hist):
         except: return pd.DataFrame()
 
     if not df_hist.empty:
-        cols_cantos = ['Corners_H', 'Corners_A', 'Total_Corners', 'Corners_H_HT', 'Corners_A_HT', 'Total_Corners_HT']
-        for col in cols_cantos:
+        # Garante que as colunas numéricas de cantos e gols estão corretas
+        cols_num = ['Corners_H', 'Corners_A', 'Total_Corners', 'Total_Gols_FT', 'Total_Gols_HT']
+        for col in cols_num:
             if col in df_hist.columns:
                 df_hist[col] = pd.to_numeric(df_hist[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
 
@@ -98,8 +99,10 @@ def mostrar_jogos(df_hist):
     data_alvo = st.session_state.data_exibicao[0:5] 
     df_dia = df_agenda[df_agenda['Data'].str.contains(data_alvo, na=False)] if not df_agenda.empty else pd.DataFrame()
 
-    sugestoes_gols = []
-    sugestoes_cantos = []
+    # Listas para Sugestões
+    sugestoes_gols, sugestoes_cantos = [], []
+    sugestoes_ht, sugestoes_btts, sugestoes_cantos_ht = [], [], []
+    
     times_do_dia_tratados = []
 
     if df_dia.empty:
@@ -119,13 +122,7 @@ def mostrar_jogos(df_hist):
                 if v_match: times_do_dia_tratados.append(v_match)
 
                 pos_m = dict_posicoes.get(f"{liga_tratada}_{m_match}", "?")
-                if pos_m == "?" and m_match:
-                    for k, p in dict_posicoes.items():
-                        if k.endswith(f"_{m_match}"): pos_m = p; break
                 pos_v = dict_posicoes.get(f"{liga_tratada}_{v_match}", "?")
-                if pos_v == "?" and v_match:
-                    for k, p in dict_posicoes.items():
-                        if k.endswith(f"_{v_match}"): pos_v = p; break
 
                 icones = ""
                 try:
@@ -139,19 +136,35 @@ def mostrar_jogos(df_hist):
                 if not df_hist.empty and m_match and v_match:
                     h_m = df_hist[(df_hist['Mandante'].apply(tratar_string) == m_match) | (df_hist['Visitante'].apply(tratar_string) == m_match)]
                     h_v = df_hist[(df_hist['Mandante'].apply(tratar_string) == v_match) | (df_hist['Visitante'].apply(tratar_string) == v_match)]
+                    
                     if not h_m.empty and not h_v.empty:
+                        # Cálculos para Sugestões
                         m_gols = (h_m['Total_Gols_FT'].mean() + h_v['Total_Gols_FT'].mean()) / 2
+                        m_gols_ht = (h_m['Total_Gols_HT'].mean() + h_v['Total_Gols_HT'].mean()) / 2
+                        m_btts = (h_m['BTTS_Realizado'].mean() + h_v['BTTS_Realizado'].mean()) / 2
+                        m_cantos_ht = (h_m['Total_Corners_HT'].mean() + h_v['Total_Corners_HT'].mean()) / 2
+                        
                         if m_gols > 3.0: 
                             icones += " 🔥⚽"
                             sugestoes_gols.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_gols})
                         
+                        if m_gols_ht > 1.2:
+                            sugestoes_ht.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_gols_ht})
+                            
+                        if m_btts > 0.65:
+                            icones += " 🤝"
+                            sugestoes_btts.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_btts})
+
+                        if m_cantos_ht > 4.5:
+                            sugestoes_cantos_ht.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_cantos_ht})
+
                         if 'Total_Corners' in df_hist.columns:
                             m_cantos = (h_m['Total_Corners'].mean() + h_v['Total_Corners'].mean()) / 2
                             if m_cantos > 11.0: 
                                 icones += " 🔥🚩"
                                 sugestoes_cantos.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_cantos})
 
-                c1, c2, c3, c4 = st.columns([4.2, 3.0, 1.3, 1.3]) # Adicionado c4
+                c1, c2, c3, c4 = st.columns([4.2, 3.0, 1.3, 1.3])
                 with c1: st.write(f"**{row['Hora']}** | ({pos_m}º) {m_orig} vs {v_orig} ({pos_v}º){icones}")
                 with c2: st.write(f"Odds: **{row.get('Odd Mandante','-')}** | **{row.get('Odd Empate','-')}** | **{row.get('Odd Visitante','-')}**")
                 with c3:
@@ -164,22 +177,40 @@ def mostrar_jogos(df_hist):
                     if st.button("Simular 🎲", key=f"btn_sim_{idx}", use_container_width=True):
                         st.session_state.liga_simulador = liga_orig
                         st.session_state.time_casa_simulador, st.session_state.time_fora_simulador = m_orig, v_orig
-                        st.session_state.menu_ativo = "🎲 Simulador" # Ajuste conforme o nome no seu menu lateral
+                        st.session_state.menu_ativo = "🎲 Simulador"
                         st.rerun()
 
+    # --- NOVA SEÇÃO DE SUGESTÕES INCREMENTADA ---
     st.divider()
-    # ... (Restante do código de Top Performance e Sugestões permanece idêntico)
-    st.subheader("🎯 Sugestões do Dia (Top 5)")
+    st.subheader("🎯 Sugestões do Dia (Top Performance)")
+    
+    # Primeira Linha de Sugestões (Gols e Cantos FT)
     col_s1, col_s2 = st.columns(2)
     with col_s1:
-        st.write("⚽ **Over 2.5 Gols FT**")
+        st.markdown("##### ⚽ Over 2.5 Gols FT")
         s_gols = sorted(sugestoes_gols, key=lambda x: x['valor'], reverse=True)[:5]
-        for s in s_gols: st.success(f"{s['jogo']} ({s['valor']:.2f})")
+        for s in s_gols: st.success(f"{s['jogo']} (Média: {s['valor']:.2f})")
     with col_s2:
-        st.write("🚩 **Over 9.5 Cantos FT**")
+        st.markdown("##### 🚩 Over 9.5 Cantos FT")
         s_cantos = sorted(sugestoes_cantos, key=lambda x: x['valor'], reverse=True)[:5]
-        for s in s_cantos: st.warning(f"{s['jogo']} ({s['valor']:.2f})")
+        for s in s_cantos: st.warning(f"{s['jogo']} (Média: {s['valor']:.2f})")
 
+    # Segunda Linha de Sugestões (Novas Metas: HT e BTTS)
+    col_s3, col_s4, col_s5 = st.columns(3)
+    with col_s3:
+        st.markdown("##### ⏱️ Over 0.5 Gols HT")
+        s_ht = sorted(sugestoes_ht, key=lambda x: x['valor'], reverse=True)[:5]
+        for s in s_ht: st.info(f"{s['jogo']} (Tend: {s['valor']:.2f})")
+    with col_s4:
+        st.markdown("##### 🤝 Ambas Marcam (BTTS)")
+        s_btts = sorted(sugestoes_btts, key=lambda x: x['valor'], reverse=True)[:5]
+        for s in s_btts: st.success(f"{s['jogo']} ({s['valor']*100:.1f}%)")
+    with col_s5:
+        st.markdown("##### 🚩 Over 4.5 Cantos HT")
+        s_cht = sorted(sugestoes_cantos_ht, key=lambda x: x['valor'], reverse=True)[:5]
+        for s in s_cht: st.warning(f"{s['jogo']} (Média: {s['valor']:.2f})")
+
+    # --- BLOCO DE TOP PERFORMANCE POR TIME ---
     if not df_hist.empty and times_do_dia_tratados:
         st.divider()
         st.subheader(f"📊 Top 5 Performance (Times que jogam em {st.session_state.data_exibicao})")
