@@ -1,237 +1,202 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-from difflib import get_close_matches
+from datetime import datetime
 
-def mostrar_scout(df):
-    st.markdown("## 🔎 Painel de Análise Profissional Ultra")
-    
-    # 1. Ajuste e Limpeza de Colunas 
-    df.columns = [c.strip() for c in df.columns]
+# Links dos arquivos
+URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
+ARQUIVO_HISTORICO = 'dados_25_26.csv'
 
-    # --- LÓGICA DE INDEXAÇÃO AUTOMÁTICA ---
-    lista_ligas = sorted(df['Liga'].unique()) [cite: 1, 5]
-    idx_liga = 0
-    if 'liga_scout' in st.session_state:
-        matches_l = get_close_matches(st.session_state.liga_scout, lista_ligas, n=1, cutoff=0.6)
-        if matches_l:
-            idx_liga = lista_ligas.index(matches_l[0])
-
-    # 2. SELEÇÃO DA LIGA 
-    liga_sel = st.selectbox("🏆 Escolha a Liga", lista_ligas, index=idx_liga)
-    df_l = df[df['Liga'] == liga_sel].copy()
-
-    # --- TIMES DA LIGA SELECIONADA ---
-    lista_times = sorted(df_l['Mandante'].unique()) [cite: 1, 5]
-    
-    idx_casa = 0
-    if 'time_casa_scout' in st.session_state:
-        matches_m = get_close_matches(st.session_state.time_casa_scout, lista_times, n=1, cutoff=0.6)
-        if matches_m:
-            idx_casa = lista_times.index(matches_m[0])
-
-    # 3. SELEÇÃO DOS TIMES 
-    m_sel = st.selectbox("🏠 Time da Casa", lista_times, index=idx_casa)
-    
-    visitantes_disp = [t for t in lista_times if t != m_sel]
-    idx_fora = 0
-    if 'time_fora_scout' in st.session_state:
-        matches_v = get_close_matches(st.session_state.time_fora_scout, visitantes_disp, n=1, cutoff=0.6)
-        if matches_v:
-            idx_fora = visitantes_disp.index(matches_v[0])
-
-    v_sel = st.selectbox("🚌 Time de Fora", visitantes_disp, index=idx_fora)
-
-    # 4. CONFIGURAÇÃO (Sidebar)
-    n_jogos = st.sidebar.slider("Amostragem (Últimos Jogos)", 5, 50, 10)
-    mando_only = st.sidebar.checkbox("Analisar apenas Casa/Fora (Split)")
-
-    st.divider()
-    st.subheader(f"📊 {m_sel} vs {v_sel}")
-
-    # --- FUNÇÕES DE APOIO ---
-    def extrair_metrica(df_hist, time, col_h, col_a):
-        m = df_hist['Mandante'] == time
-        v = df_hist['Visitante'] == time
-        return pd.concat([df_hist[m][col_h], df_hist[v][col_a]])
-
-    def calcular_posicoes(df_liga):
-        stats = {}
-        for _, r in df_liga.iterrows():
-            m, v = r['Mandante'], r['Visitante']
-            gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT'] [cite: 1, 2, 5]
-            for t in [m, v]:
-                if t not in stats: stats[t] = {'P': 0, 'V': 0, 'SG': 0}
-            stats[m]['SG'] += (gm - gv); stats[v]['SG'] += (gv - gm)
-            if gm > gv: stats[m]['P'] += 3; stats[m]['V'] += 1
-            elif gm == gv: stats[m]['P'] += 1; stats[v]['P'] += 1
-            else: stats[v]['P'] += 3; stats[v]['V'] += 1
-        tab = pd.DataFrame.from_dict(stats, orient='index').reset_index().rename(columns={'index':'Time'})
-        tab = tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
-        tab['Pos'] = tab.index + 1
-        return tab
-
-    def get_forma(df_hist, time, apenas_mando=False, mando="Casa"):
-        if apenas_mando:
-            df_f = df_hist[df_hist['Mandante' if mando=="Casa" else 'Visitante'] == time].sort_values('Data', ascending=False).head(5)
-        else:
-            df_f = df_hist[(df_hist['Mandante'] == time) | (df_hist['Visitante'] == time)].sort_values('Data', ascending=False).head(5)
-        
-        resultados = []
-        for _, r in df_f.iterrows():
-            if r['Gols_Mandante_FT'] == r['Gols_Visitante_FT']: resultados.append("🟡")
-            elif (r['Mandante'] == time and r['Gols_Mandante_FT'] > r['Gols_Visitante_FT']) or \
-                 (r['Visitante'] == time and r['Gols_Visitante_FT'] > r['Gols_Mandante_FT']): resultados.append("🟢")
-            else: resultados.append("🔴")
-        return " ".join(resultados)
-
-    # --- FILTRAGEM DOS JOGOS ---
-    if mando_only:
-        df_m_last = df_l[df_l['Mandante'] == m_sel].sort_values('Data', ascending=False).head(n_jogos)
-        df_v_last = df_l[df_l['Visitante'] == v_sel].sort_values('Data', ascending=False).head(n_jogos)
-    else:
-        df_m_last = df_l[(df_l['Mandante'] == m_sel) | (df_l['Visitante'] == m_sel)].sort_values('Data', ascending=False).head(n_jogos)
-        df_v_last = df_l[(df_l['Mandante'] == v_sel) | (df_l['Visitante'] == v_sel)].sort_values('Data', ascending=False).head(n_jogos)
-
-    # --- MÉTRICAS DE TOPO ---
-    tabela_liga = calcular_posicoes(df_l)
+def carregar_dados():
     try:
-        pos_m = tabela_liga[tabela_liga['Time'] == m_sel]['Pos'].values[0]
-        pos_v = tabela_liga[tabela_liga['Time'] == v_sel]['Pos'].values[0]
+        # Carregando Histórico
+        df_h = pd.read_csv(ARQUIVO_HISTORICO, sep=None, engine='python', encoding='utf-8-sig')
+        df_h.columns = [c.strip() for c in df_h.columns]
+        df_h['dt_formatada'] = pd.to_datetime(df_h['Data'], dayfirst=True, errors='coerce').dt.strftime('%d/%m/%Y')
         
-        st.markdown("""<style>
-            div[data-testid="stMetricValue"] > div { text-align: center !important; color: #1f77b4 !important; font-weight: bold !important; justify-content: center !important; }
-            div[data-testid="stMetricLabel"] > div { text-align: center !important; justify-content: center !important; color: #31333F !important; }
-            [data-testid="stMetric"] { text-align: center; display: flex; flex-direction: column; align-items: center; background: #f0f2f6; padding: 10px; border-radius: 10px; }
-            </style>""", unsafe_allow_html=True)
-
-        c1, c2, c3, c4 = st.columns(4)
-        with c1: st.metric(label=f"Pos {m_sel}", value=f"{pos_m}º")
-        with c2: st.metric(label=f"Pos {v_sel}", value=f"{pos_v}º")
-        with c3: st.metric(label="Forma Casa", value=get_forma(df_l, m_sel, True, 'Casa'))
-        with c4: st.metric(label="Forma Fora", value=get_forma(df_l, v_sel, True, 'Fora'))
-    except: st.info("Aguardando seleção...")
-
-    # --- RADAR NORMALIZADO  ---
-    st.divider()
-    st.subheader("🕸️ Radar de Estilo de Jogo (Dados Normalizados)")
-    
-    def criar_radar_normalizado(df_m, df_v, t1, t2):
-        metrics = ['xG', 'Posse %', 'Atq. Perigosos', 'Finalizações', 'Cantos', 'Faltas'] [cite: 1, 2, 5]
+        # Ajuste de colunas numéricas de Odds (Conforme seu arquivo)
+        colunas_odds = ['Odd_Mandante_HT', 'Odd_Empate_HT', 'Odd_Visitante_HT', 'Odd_Over25_FT', 'Odd_BTTS_Sim', 'Odd_Mandante_FT', 'Odd_Visitante_FT']
+        for col in colunas_odds:
+            if col in df_h.columns:
+                df_h[col] = pd.to_numeric(df_h[col].astype(str).str.replace(',', '.'), errors='coerce')
         
-        def get_means(df_h, t):
-            return [
-                extrair_metrica(df_h, t, 'xG_Mandante', 'xG_Visitante').mean(), [cite: 1, 2, 5]
-                extrair_metrica(df_h, t, 'Possession_H', 'Possession_A').mean(), [cite: 1, 2, 5]
-                extrair_metrica(df_h, t, 'DangerousAttacks_H', 'DangerousAttacks_A').mean(), [cite: 1, 2, 5]
-                extrair_metrica(df_h, t, 'Shots_H', 'Shots_A').mean(), [cite: 1, 2, 5]
-                extrair_metrica(df_h, t, 'Corners_H', 'Corners_A').mean(), [cite: 1, 2, 5]
-                extrair_metrica(df_h, t, 'Fouls_H', 'Fouls_A').mean() [cite: 1, 2, 5]
-            ]
+        df_h = df_h.dropna(subset=['dt_formatada'])
+    except Exception as e:
+        st.error(f"Erro ao carregar histórico: {e}")
+        df_h = pd.DataFrame()
+        
+    try:
+        # Carregando Agenda (Lista de Jogos)
+        df_a = pd.read_csv(URL_AGENDA, sep=None, engine='python', encoding='utf-8-sig')
+        df_a.columns = [c.strip() for c in df_a.columns]
+        df_a['dt_obj'] = pd.to_datetime(df_a['Data'], dayfirst=True, errors='coerce')
+        data_corte = datetime(2026, 1, 22)
+        df_a = df_a[df_a['dt_obj'] >= data_corte].copy()
+        df_a['dt_formatada'] = df_a['dt_obj'].dt.strftime('%d/%m/%Y')
+        df_a = df_a.dropna(subset=['dt_formatada'])
+    except Exception as e:
+        st.error(f"Erro ao carregar agenda: {e}")
+        df_a = pd.DataFrame()
+        
+    return df_h, df_a
 
-        m1 = get_means(df_m, t1)
-        m2 = get_means(df_v, t2)
+def calcular_winrate(df):
+    if df.empty: return 0
+    # Média de acerto considerando as 3 colunas principais
+    hits = (len(df[df['0.5 HT?'] == "✅"]) + len(df[df['Over 2.5'] == "✅"]) + len(df[df['Over 9.5'] == "✅"]))
+    total = len(df) * 3
+    return (hits / total) * 100 if total > 0 else 0
 
-        # Lógica de Normalização (Escala 0-100) 
-        max_values = [3.0, 100.0, 100.0, 20.0, 12.0, 20.0]
-        norm1 = [(v / m) * 100 for v, m in zip(m1, max_values)]
-        norm2 = [(v / m) * 100 for v, m in zip(m2, max_values)]
+def processar_metricas_categoria(df_cat, titulo_aba):
+    if df_cat.empty:
+        st.warning(f"Sem jogos processados para: {titulo_aba}")
+        return
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(r=norm1, theta=metrics, fill='toself', name=t1, line_color='blue', hoverinfo="text", text=[f"{v:.2f}" for v in m1]))
-        fig.add_trace(go.Scatterpolar(r=norm2, theta=metrics, fill='toself', name=t2, line_color='red', hoverinfo="text", text=[f"{v:.2f}" for v in m2]))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True, height=450)
-        return fig
+    total_j = len(df_cat)
+    taxa_ht = (len(df_cat[df_cat['0.5 HT?'] == "✅"]) / total_j * 100)
+    taxa_ft = (len(df_cat[df_cat['Over 2.5'] == "✅"]) / total_j * 100)
+    taxa_cnt = (len(df_cat[df_cat['Over 9.5'] == "✅"]) / total_j * 100)
 
-    st.plotly_chart(criar_radar_normalizado(df_m_last, df_v_last, m_sel, v_sel), use_container_width=True)
+    st.markdown(f"### 📊 Performance: {titulo_aba}")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Jogos", total_j)
+    c2.metric("Taxa 0.5 HT", f"{taxa_ht:.1f}%")
+    c3.metric("Taxa 2.5 FT", f"{taxa_ft:.1f}%")
+    c4.metric("Taxa 9.5 Cantos", f"{taxa_cnt:.1f}%")
 
-    # --- MOMENTUM DE GOLS  ---
-    st.divider()
-    st.subheader("⏱️ Momentum de Gols (Faixas de 15 min)") [cite: 3, 4]
-    faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+'] [cite: 3, 4]
+    def style_results(val):
+        if val == "✅": return 'background-color: #d4edda; color: #155724; font-weight: bold'
+        if val == "❌": return 'background-color: #f8d7da; color: #721c24; font-weight: bold'
+        return ''
+
+    st.dataframe(
+        df_cat.style.applymap(style_results, subset=['0.5 HT?', 'Over 2.5', 'Over 9.5']),
+        use_container_width=True, hide_index=True
+    )
+
+def mostrar_backtest():
+    st.title("🧪 Backtest Profissional")
+
+    df_hist, df_agenda = carregar_dados()
     
-    def plot_momentum(df_m, df_v, t1, t2):
-        def get_marcados(df_hist, t):
-            return [df_hist[df_hist['Mandante']==t][f'{f}_Mandante'].sum() + df_hist[df_hist['Visitante']==t][f'{f}_Visitante'].sum() for f in faixas] [cite: 1, 3, 5]
-        fig = go.Figure()
-        fig.add_trace(go.Bar(x=faixas, y=get_marcados(df_m, t1), name=f"Gols {t1}", marker_color='blue'))
-        fig.add_trace(go.Bar(x=faixas, y=get_marcados(df_v, t2), name=f"Gols {t2}", marker_color='red'))
-        fig.update_layout(barmode='group', height=400)
-        return fig
-    st.plotly_chart(plot_momentum(df_m_last, df_v_last, m_sel, v_sel), use_container_width=True)
+    if df_hist.empty or df_agenda.empty:
+        st.warning("Bases de dados não encontradas ou vazias.")
+        return
 
-    # --- TABELAS TÉCNICAS ULTRA DETALHADAS  ---
-    st.divider()
-    st.markdown("### 📉 Estatísticas de Performance")
+    # --- FILTROS ---
+    st.subheader("🔍 Filtros de Estratégia")
+    with st.expander("Configurações de Filtro (Odds e Gap)", expanded=True):
+        f_c1, f_c2 = st.columns(2)
+        with f_c1:
+            usar_filtro = st.radio("Filtrar por Range de Odd?", ["Não", "Sim"], horizontal=True)
+        with f_c2:
+            gap_minimo = st.number_input("Gap Mínimo (Odd Visitante - Mandante):", value=0.0, step=0.1)
 
-    def get_stats_combo(series):
-        if series.empty: return [0.0]*5
-        series = pd.to_numeric(series, errors='coerce').fillna(0)
-        mean = series.mean(); median = series.median(); mode = series.mode().iloc[0] if not series.mode().empty else 0.0
-        std = series.std(); cv = (std / mean) if mean != 0 else 0.0
-        return [mean, median, mode, std, cv]
+        df_filtered_hist = df_hist.copy()
+        col_alvo = None
 
-    def preparar_tabela_tecnica(df_hist, time):
-        data = [
-            ['Gols Marcados (FT)'] + get_stats_combo(extrair_metrica(df_hist, time, 'Gols_Mandante_FT', 'Gols_Visitante_FT')), [cite: 1, 2, 5]
-            ['Gols Sofridos (FT)'] + get_stats_combo(extrair_metrica(df_hist, time, 'Gols_Visitante_FT', 'Gols_Mandante_FT')), [cite: 1, 2, 5]
-            ['xG (Expectativa)'] + get_stats_combo(extrair_metrica(df_hist, time, 'xG_Mandante', 'xG_Visitante')), [cite: 1, 2, 5]
-            ['Posse de Bola (%)'] + get_stats_combo(extrair_metrica(df_hist, time, 'Possession_H', 'Possession_A')), [cite: 1, 2, 5]
-            ['Ataques Perigosos'] + get_stats_combo(extrair_metrica(df_hist, time, 'DangerousAttacks_H', 'DangerousAttacks_A')), [cite: 1, 2, 5]
-            ['Finalizações (Total)'] + get_stats_combo(extrair_metrica(df_hist, time, 'Shots_H', 'Shots_A')), [cite: 1, 2, 5]
-            ['Chutes no Gol'] + get_stats_combo(extrair_metrica(df_hist, time, 'ShotsOnTarget_H', 'ShotsOnTarget_A')), [cite: 1, 2, 5]
-            ['Escanteios (Cantos)'] + get_stats_combo(extrair_metrica(df_hist, time, 'Corners_H', 'Corners_A')), [cite: 1, 2, 5]
-            ['Faltas Cometidas'] + get_stats_combo(extrair_metrica(df_hist, time, 'Fouls_H', 'Fouls_A')), [cite: 1, 2, 5]
-            ['Cartões Amarelos'] + get_stats_combo(extrair_metrica(df_hist, time, 'Yellow_Cards_H', 'Yellow_Cards_A')) [cite: 1, 2, 5]
+        if usar_filtro == "Sim":
+            c1, c2, c3 = st.columns([2, 1, 1])
+            with c1:
+                mercado = st.selectbox("Selecione o Mercado:", ["Over 2.5 Gols FT", "Mandante HT", "Empate HT", "Visitante HT", "Ambas Marcam (BTTS)"])
+                mapa = {
+                    "Over 2.5 Gols FT": "Odd_Over25_FT", 
+                    "Mandante HT": "Odd_H_HT", 
+                    "Empate HT": "Odd_D_HT", 
+                    "Visitante HT": "Odd_A_HT", 
+                    "Ambas Marcam (BTTS)": "Odd_BTTS_Sim"
+                }
+                col_alvo = mapa[mercado]
+            with c2:
+                o_min = st.number_input("Odd Mínima", value=1.0, step=0.05)
+            with c3:
+                o_max = st.number_input("Odd Máxima", value=10.0, step=0.05)
+            
+            if col_alvo in df_filtered_hist.columns:
+                df_filtered_hist = df_filtered_hist[(df_filtered_hist[col_alvo] >= o_min) & (df_filtered_hist[col_alvo] <= o_max)]
+
+    back_gols, back_cantos, back_equi, back_combo = [], [], [], []
+
+    # Processamento do Backtest
+    for _, row in df_agenda.iterrows():
+        mandante = str(row['Mandante']).strip()
+        visitante = str(row['Visitante']).strip()
+        data_j = row['dt_formatada']
+        
+        # Filtro de Gap
+        try:
+            # Buscando as odds no histórico para o gap
+            o_m = float(str(row.get('Odd Mandante', 0)).replace(',', '.'))
+            o_v = float(str(row.get('Odd Visitante', 0)).replace(',', '.'))
+            if abs(o_m - o_v) < gap_minimo: continue
+        except: 
+            continue
+
+        # Dados Históricos dos times
+        df_m_h = df_hist[df_hist['Mandante'] == mandante]
+        df_v_h = df_hist[df_hist['Visitante'] == visitante]
+        
+        tem_gol, tem_canto, equi = False, False, False
+
+        if not df_m_h.empty and not df_v_h.empty:
+            # Cálculo de Médias usando nomes de colunas CORRETOS (Corners_H, Gols_Mandante_FT...)
+            m_gols = (df_m_h['Total_Gols_FT'].mean() + df_v_h['Total_Gols_FT'].mean()) / 2
+            m_cants = (df_m_h['Total_Corners'].mean() + df_v_h['Total_Corners'].mean()) / 2
+            
+            if m_gols > 2.5: tem_gol = True
+            if m_cants > 9.0: tem_canto = True
+        
+        try:
+            if abs(o_m - o_v) <= 1.2: equi = True
+        except: pass
+
+        # Verifica se o jogo da agenda já aconteceu no histórico para validar o Green/Red
+        res_p = df_filtered_hist[(df_filtered_hist['Mandante'] == mandante) & 
+                                 (df_filtered_hist['Visitante'] == visitante) & 
+                                 (df_filtered_hist['dt_formatada'] == data_j)]
+        
+        if not res_p.empty:
+            res = res_p.iloc[0]
+            g_ht = res['Total_Gols_HT']
+            g_ft = res['Total_Gols_FT']
+            c_ft = res['Total_Corners']
+            
+            item = {
+                "Data": res['Data'], 
+                "Jogo": f"{mandante} x {visitante}", 
+                "Odd": res[col_alvo] if col_alvo and usar_filtro == "Sim" else "-", 
+                "Placar FT": f"{int(res['Gols_Mandante_FT'])}x{int(res['Gols_Visitante_FT'])}", 
+                "0.5 HT?": "✅" if g_ht >= 0.5 else "❌", 
+                "Over 2.5": "✅" if g_ft > 2.5 else "❌", 
+                "Over 9.5": "✅" if c_ft > 9.5 else "❌"
+            }
+            if tem_gol: back_gols.append(item)
+            if tem_canto: back_cantos.append(item)
+            if equi: back_equi.append(item)
+            if tem_gol and tem_canto: back_combo.append(item)
+
+    # --- RANKING E ABAS ---
+    if any([back_gols, back_cantos, back_equi, back_combo]):
+        st.divider()
+        st.subheader("🏆 Ranking de Assertividade")
+        
+        df_g, df_c, df_e, df_cb = pd.DataFrame(back_gols), pd.DataFrame(back_cantos), pd.DataFrame(back_equi), pd.DataFrame(back_combo)
+        
+        ranks = [
+            {"Estratégia": "🔥 Gols", "Winrate": calcular_winrate(df_g), "Jogos": len(df_g)},
+            {"Estratégia": "🚩 Cantos", "Winrate": calcular_winrate(df_c), "Jogos": len(df_c)},
+            {"Estratégia": "⚖️ Equilíbrio", "Winrate": calcular_winrate(df_e), "Jogos": len(df_e)},
+            {"Estratégia": "🔥🚩 Combo", "Winrate": calcular_winrate(df_cb), "Jogos": len(df_cb)},
         ]
-        return pd.DataFrame(data, columns=['Métrica', 'Média', 'Mediana', 'Moda', 'DP', 'CV'])
-
-    ct1, ct2 = st.columns(2)
-    with ct1: st.table(preparar_tabela_tecnica(df_m_last, m_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
-    with ct2: st.table(preparar_tabela_tecnica(df_v_last, v_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
-
-    # --- HISTÓRICO DETALHADO COM ODDS  ---
-    st.divider()
-    st.markdown("### 📝 Histórico Detalhado (Últimos Jogos)")
-    
-    def preparar_h(df_h, time, apenas_mando=False, mando="Casa"):
-        df_h = df_h.copy()
-        if apenas_mando:
-            df_f = df_h[df_h['Mandante' if mando=="Casa" else 'Visitante'] == time].sort_values('Data', ascending=False).head(10)
-        else:
-            df_f = df_h[(df_h['Mandante']==time)|(df_h['Visitante']==time)].sort_values('Data', ascending=False).head(10)
+        df_rank = pd.DataFrame(ranks).sort_values(by="Winrate", ascending=False)
         
-        res = []
-        for _, r in df_f.iterrows():
-            res.append({
-                'Data': r['Data'], [cite: 1, 5]
-                'Oponente': r['Visitante'] if r['Mandante']==time else r['Mandante'], [cite: 1, 5]
-                'Placar HT': f"{int(r['Gols_Mandante_HT'])}x{int(r['Gols_Visitante_HT'])}", [cite: 1, 2, 5]
-                'Placar FT': f"{int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])}", [cite: 1, 2, 5]
-                'Odd 1 HT': r['Odd_H_HT'], 'Odd D HT': r['Odd_D_HT'], 'Odd 2 HT': r['Odd_A_HT'], [cite: 1, 2, 5]
-                'Odd O25 FT': r['Odd_Over25_FT'], 'Odd BTTS': r['Odd_BTTS_Sim'], [cite: 1, 2, 5]
-                'xG Jogo': f"{r['xG_Mandante']:.1f}-{r['xG_Visitante']:.1f}" [cite: 1, 2, 5]
-            })
-        return pd.DataFrame(res)
-    
-    st.write(f"**Jogos de {m_sel}**")
-    st.table(preparar_h(df_l, m_sel, mando_only, "Casa"))
-    st.write(f"**Jogos de {v_sel}**")
-    st.table(preparar_h(df_l, v_sel, mando_only, "Fora"))
+        cols_r = st.columns(4)
+        for i, row_r in enumerate(df_rank.iterrows()):
+            cols_r[i].metric(row_r[1]['Estratégia'], f"{row_r[1]['Winrate']:.1f}%", f"{row_r[1]['Jogos']} jgs")
 
-    # --- OUTROS DADOS E INCIDÊNCIA  ---
-    st.divider()
-    st.subheader("📊 Outras Estatísticas e Incidência")
-    
-    def calc_incidencia(df_hist):
-        return pd.DataFrame([
-            {'Mercado': 'Over 0.5 FT', 'Frequência': f"{(df_hist['Over05_Realizado']=='✅').mean()*100:.1f}%"}, [cite: 1, 2, 5]
-            {'Mercado': 'Over 1.5 FT', 'Frequência': f"{(df_hist['Over15_Realizado']=='✅').mean()*100:.1f}%"}, [cite: 1, 2, 5]
-            {'Mercado': 'Over 2.5 FT', 'Frequência': f"{(df_hist['Over25_Realizado']=='✅').mean()*100:.1f}%"}, [cite: 1, 2, 5]
-            {'Mercado': 'BTTS Sim', 'Frequência': f"{(df_hist['BTTS_Realizado']=='✅').mean()*100:.1f}%"} [cite: 1, 2, 5]
-        ])
-
-    ci1, ci2 = st.columns(2)
-    with ci1: st.write(f"Incidência {m_sel}"); st.table(calc_incidencia(df_m_last))
-    with ci2: st.write(f"Incidência {v_sel}"); st.table(calc_incidencia(df_v_last))
+        t1, t2, t3, t4 = st.tabs(["🔥 Gols", "🚩 Cantos", "⚖️ Equilíbrio", "🔥🚩 Fogo Combo"])
+        with t1: processar_metricas_categoria(df_g, "Estratégia Gols")
+        with t2: processar_metricas_categoria(df_c, "Estratégia Cantos")
+        with t3: processar_metricas_categoria(df_e, "Estratégia Equilíbrio")
+        with t4: processar_metricas_categoria(df_cb, "Estratégia Fogo Combo")
+    else:
+        st.info("Nenhum jogo encontrado para os filtros atuais nos dados históricos.")
