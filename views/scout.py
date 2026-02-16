@@ -10,7 +10,7 @@ def mostrar_scout(df):
     # 1. Ajuste e Limpeza de Colunas
     df.columns = [c.strip() for c in df.columns]
 
-    # --- LÓGICA DE INDEXAÇÃO AUTOMÁTICA (Persistência de Estado) ---
+    # --- LÓGICA DE INDEXAÇÃO AUTOMÁTICA ---
     lista_ligas = sorted(df['Liga'].unique())
     idx_liga = 0
     if 'liga_scout' in st.session_state:
@@ -113,7 +113,7 @@ def mostrar_scout(df):
         with c4: st.metric(label="Forma Fora", value=get_forma(df_l, v_sel, True, 'Fora'))
     except: st.info("Aguardando seleção...")
 
-    # --- RADAR DE ESTILO (NORMALIZADO) ---
+    # --- RADAR DE ESTILO ---
     st.divider()
     st.subheader("🕸️ Radar de Estilo de Jogo (Normalizado 0-100)")
     def criar_radar_normalizado(df_m, df_v, t1, t2):
@@ -138,7 +138,7 @@ def mostrar_scout(df):
         return fig
     st.plotly_chart(criar_radar_normalizado(df_m_last, df_v_last, m_sel, v_sel), use_container_width=True)
 
-    # --- MOMENTUM E ALERTAS DE LIGA ---
+    # --- MOMENTUM E ALERTAS ---
     st.divider()
     st.subheader("⏱️ Momentum e Alerta de Tendências (Vs Liga)")
     faixas = ['0-15', '16-30', '31-45+', '46-60', '61-75', '76-90+']
@@ -158,13 +158,13 @@ def mostrar_scout(df):
         fig = go.Figure()
         fig.add_trace(go.Bar(x=faixas, y=get_g(df_m, t1), name=t1, marker_color='blue'))
         fig.add_trace(go.Bar(x=faixas, y=get_g(df_v, t2), name=t2, marker_color='red'))
-        fig.update_layout(barmode='group', height=350, title="Distribuição de Gols Marcados por Tempo")
+        fig.update_layout(barmode='group', height=350, title="Gols Marcados por Faixa de Tempo")
         return fig
     st.plotly_chart(plot_momentum(df_m_last, df_v_last, m_sel, v_sel), use_container_width=True)
 
-    # --- TABELAS TÉCNICAS (ESTATÍSTICAS COMPLETAS) ---
+    # --- TABELAS TÉCNICAS ---
     st.divider()
-    st.markdown("### 📉 Estatísticas de Performance")
+    st.markdown("### 📉 Estatísticas de Performance Detalhadas")
     def get_stats_combo(series):
         if series.empty: return [0.0]*5
         series = pd.to_numeric(series, errors='coerce').fillna(0)
@@ -188,25 +188,23 @@ def mostrar_scout(df):
     with ct1: st.write(f"**Estatísticas {m_sel}**"); st.table(preparar_tabela_tecnica(df_m_last, m_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
     with ct2: st.write(f"**Estatísticas {v_sel}**"); st.table(preparar_tabela_tecnica(df_v_last, v_sel).style.format({c: "{:.2f}" for c in ['Média', 'Mediana', 'Moda', 'DP', 'CV']}))
 
-    # --- CALCULADORA DE VALOR E INCIDÊNCIA ---
+    # --- CALCULADORA DE VALOR ---
     st.divider()
     st.subheader("💎 Calculadora de Valor e Incidência")
     def calc_inc(df_h):
+        df_h = df_h.copy()
         df_h['BTTS'] = (df_h['Gols_Mandante_FT']>0) & (df_h['Gols_Visitante_FT']>0)
-        df_h['Total_HT'] = df_h['Total_Gols_HT']
-        df_h['Total_FT'] = df_h['Total_Gols_FT']
-        linhas = []
-        for merc, cond in zip(['Over 0.5 HT', 'Over 2.5 FT', 'BTTS Sim'], [df_h['Total_HT']>0, df_h['Total_FT']>2.5, df_h['BTTS']]):
-            freq = cond.mean()
-            odd_j = 1/freq if freq > 0 else 0
-            linhas.append({'Mercado': merc, 'Freq': f"{freq*100:.1f}%", 'Odd Justa': f"{odd_j:.2f}" if odd_j > 0 else "N/A"})
-        return pd.DataFrame(linhas)
+        res = []
+        for m, c in zip(['Over 0.5 HT', 'Over 2.5 FT', 'BTTS Sim'], [df_h['Total_Gols_HT']>0, df_h['Total_Gols_FT']>2.5, df_h['BTTS']]):
+            freq = c.mean()
+            res.append({'Mercado': m, 'Freq': f"{freq*100:.1f}%", 'Odd Justa': f"{1/freq:.2f}" if freq > 0 else "N/A"})
+        return pd.DataFrame(res)
     
     ci1, ci2 = st.columns(2)
-    with ci1: st.write(f"Valor {m_sel}"); st.table(calc_inc(df_m_last))
-    with ci2: st.write(f"Valor {v_sel}"); st.table(calc_inc(df_v_last))
+    with ci1: st.write(f"Mercados {m_sel}"); st.table(calc_inc(df_m_last))
+    with ci2: st.write(f"Mercados {v_sel}"); st.table(calc_inc(df_v_last))
 
-    # --- MAPA DE CALOR DE GOLS POR MINUTO ---
+    # --- MAPA DE CALOR ---
     st.divider()
     st.markdown("### ⏰ Mapa de Gols por Faixa de Minutos")
     def preparar_minutos_mapa(df_hist, time):
@@ -217,9 +215,9 @@ def mostrar_scout(df):
             marc.append(int(m)); sofr.append(int(s))
         return pd.DataFrame({'Intervalo': faixas, 'Marcados': marc, 'Sofridos': sofr}).set_index('Intervalo').T
 
-    st.write(f"📊 **Mapa {m_sel}**")
+    st.write(f"📊 **Distribuição {m_sel}**")
     st.dataframe(preparar_minutos_mapa(df_m_last, m_sel).style.background_gradient(cmap='RdYlGn', axis=1), use_container_width=True)
-    st.write(f"📊 **Mapa {v_sel}**")
+    st.write(f"📊 **Distribuição {v_sel}**")
     st.dataframe(preparar_minutos_mapa(df_v_last, v_sel).style.background_gradient(cmap='RdYlGn', axis=1), use_container_width=True)
 
     # --- HISTÓRICO DETALHADO ---
