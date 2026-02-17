@@ -57,7 +57,7 @@ def carregar_dados_auditoria():
 
 def mostrar_backtest():
     st.markdown("<style>[data-testid='stMetricValue'] { color: #31333F !important; }</style>", unsafe_allow_html=True)
-    st.title("🧪 Auditoria & Backtest por Estratégia")
+    st.title("🧪 Auditoria Inteligente de Sinais")
 
     df_h, df_a = carregar_dados_auditoria()
     if df_h.empty or df_a.empty:
@@ -83,35 +83,29 @@ def mostrar_backtest():
                 if m_c > 9.5: sinais.append("🔥🚩")
 
                 try:
-                    odd_m = float(str(row.get('Odd Mandante', 0)).replace(',','.'))
-                    odd_v = float(str(row.get('Odd Visitante', 0)).replace(',','.'))
+                    odd_m, odd_v = float(str(row.get('Odd Mandante', 0)).replace(',','.')), float(str(row.get('Odd Visitante', 0)).replace(',','.'))
                     if odd_m < 1.4 or odd_v < 1.4: sinais.append("🌟")
                     elif 1.40 <= odd_m <= 1.80 or 1.40 <= odd_v <= 1.80: sinais.append("⭐")
                     if abs(odd_m - odd_v) <= 1.0: sinais.append("⚖️")
                 except: odd_m, odd_v = 0, 0
 
-                vitoria_super_fav = "❌"
-                if odd_m < 1.4 and real['Gols_Mandante_FT'] > real['Gols_Visitante_FT']: vitoria_super_fav = "✅"
-                elif odd_v < 1.4 and real['Gols_Visitante_FT'] > real['Gols_Mandante_FT']: vitoria_super_fav = "✅"
-
-                dupla_chance_fav = "❌"
-                if 1.40 <= odd_m <= 1.80 and real['Gols_Mandante_FT'] >= real['Gols_Visitante_FT']: dupla_chance_fav = "✅"
-                elif 1.40 <= odd_v <= 1.80 and real['Gols_Visitante_FT'] >= real['Gols_Mandante_FT']: dupla_chance_fav = "✅"
+                # Lógica de Resultados
+                v_super = "✅" if ((odd_m < 1.4 and real['Gols_Mandante_FT'] > real['Gols_Visitante_FT']) or (odd_v < 1.4 and real['Gols_Visitante_FT'] > real['Gols_Mandante_FT'])) else "❌"
+                v_fav_dc = "✅" if ((1.40 <= odd_m <= 1.80 and real['Gols_Mandante_FT'] >= real['Gols_Visitante_FT']) or (1.40 <= odd_v <= 1.80 and real['Gols_Visitante_FT'] >= real['Gols_Mandante_FT'])) else "❌"
 
                 if sinais:
                     jogos_auditados.append({
                         "Data": row['dt_comparacao'],
-                        "Liga": row.get('Liga', 'N/A'),
-                        "Mandante": row['Mandante'],
-                        "Visitante": row['Visitante'],
+                        "Liga": str(row.get('Liga', 'Outras')).strip().upper(),
+                        "Mandante": str(row['Mandante']).strip(),
                         "Jogo": f"{row['Mandante']} x {row['Visitante']}",
                         "Sinais": sinais,
                         "RES_HT": "✅" if real['Total_Gols_HT'] >= 1 else "❌",
                         "RES_FT": "✅" if real['Total_Gols_FT'] > 2.5 else "❌",
                         "RES_AMBAS": "✅" if real['BTTS_REAL'] == 1 else "❌",
                         "RES_CNT": "✅" if real['Total_Corners'] > 9.5 else "❌",
-                        "RES_SUPER_V": vitoria_super_fav,
-                        "RES_FAV_DC": dupla_chance_fav,
+                        "RES_SUPER_V": v_super,
+                        "RES_FAV_DC": v_fav_dc,
                         "RES_UNDER_25": "✅" if real['Total_Gols_FT'] < 2.5 else "❌"
                     })
 
@@ -134,9 +128,8 @@ def mostrar_backtest():
     for est in estratogias:
         df_filtrado = df_base[df_base['Sinais'].apply(lambda x: est['emoji'] in x)].copy()
         
-        with st.expander(f"VER BACKTEST: {est['nome']}", expanded=True):
+        with st.expander(f"ANALISAR ESTRATÉGIA: {est['nome']}", expanded=True):
             if not df_filtrado.empty:
-                # Métricas principais
                 acertos = len(df_filtrado[df_filtrado[est['coluna']] == "✅"])
                 total = len(df_filtrado)
                 wr = (acertos / total) * 100
@@ -145,46 +138,41 @@ def mostrar_backtest():
                 c1, c2, c3 = st.columns([1, 1, 2])
                 c1.metric(est['meta'], f"{wr:.1f}%")
                 c2.metric("Odd Justa", f"{odd_j:.2f}")
-                c3.info(f"Analisando {total} jogos com o sinal {est['emoji']}")
+                c3.info(f"Base de Dados: {total} jogos processados.")
 
-                # --- NOVA SEÇÃO DE GRÁFICOS ---
-                st.markdown("### 📊 Análise de Desempenho")
-                col_graf1, col_graf2 = st.columns(2)
+                # --- SEÇÃO DE GRÁFICOS ---
+                st.write("---")
+                g1, g2 = st.columns(2)
 
-                with col_graf1:
-                    # Desempenho por Liga
-                    df_liga = df_filtrado.groupby(['Liga', est['coluna']]).size().unstack(fill_value=0).reset_index()
-                    if '✅' in df_liga.columns:
-                        df_liga = df_liga.sort_values(by='✅', ascending=False).head(8)
-                        fig_liga = px.bar(df_liga, x='Liga', y='✅', title="Top Ligas (Greens)", 
-                                          labels={'✅':'Greens'}, color_discrete_sequence=['#2ecc71'])
-                        fig_liga.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
-                        st.plotly_chart(fig_liga, use_container_width=True)
-                    else: st.write("Aguardando dados de acertos por liga...")
+                # Gráfico de Ligas
+                df_g_liga = df_filtrado.groupby('Liga')[est['coluna']].apply(lambda x: (x == '✅').sum()).reset_index(name='Greens')
+                df_g_liga = df_g_liga.sort_values('Greens', ascending=False).head(10)
+                
+                with g1:
+                    fig_l = px.bar(df_g_liga, x='Greens', y='Liga', orientation='h', 
+                                   title="Top Ligas Lucrativas", color_discrete_sequence=['#27ae60'])
+                    fig_l.update_layout(height=350, yaxis={'categoryorder':'total ascending'})
+                    st.plotly_chart(fig_l, use_container_width=True)
 
-                with col_graf2:
-                    # Desempenho por Time (Mandante)
-                    df_time = df_filtrado.groupby(['Mandante', est['coluna']]).size().unstack(fill_value=0).reset_index()
-                    if '✅' in df_time.columns:
-                        df_time = df_time.sort_values(by='✅', ascending=False).head(8)
-                        fig_time = px.bar(df_time, x='Mandante', y='✅', title="Top Times Mandantes (Greens)", 
-                                          labels={'✅':'Greens'}, color_discrete_sequence=['#3498db'])
-                        fig_time.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
-                        st.plotly_chart(fig_time, use_container_width=True)
-                    else: st.write("Aguardando dados de acertos por time...")
+                # Gráfico de Times
+                df_g_time = df_filtrado.groupby('Mandante')[est['coluna']].apply(lambda x: (x == '✅').sum()).reset_index(name='Greens')
+                df_g_time = df_g_time.sort_values('Greens', ascending=False).head(10)
 
-                # Tabela de Jogos
-                st.markdown("### 📋 Detalhes dos Confrontos")
-                def style_v(val):
-                    if val == "✅": return 'background-color: #d4edda; color: #155724'
-                    if val == "❌": return 'background-color: #f8d7da; color: #721c24'
-                    return ''
+                with g2:
+                    fig_t = px.bar(df_g_time, x='Greens', y='Mandante', orientation='h', 
+                                   title="Top Times (Mandantes)", color_discrete_sequence=['#2980b9'])
+                    fig_t.update_layout(height=350, yaxis={'categoryorder':'total ascending'})
+                    st.plotly_chart(fig_t, use_container_width=True)
 
-                df_view = df_filtrado[["Data", "Liga", "Jogo", est['coluna']]].rename(columns={est['coluna']: "Resultado"})
-                st.dataframe(df_view.style.applymap(style_v, subset=['Resultado']), use_container_width=True, hide_index=True)
+                # Tabela Detalhada
+                st.write("**Histórico Detalhado:**")
+                def color_map(val):
+                    return 'background-color: #d4edda' if val == "✅" else 'background-color: #f8d7da'
+
+                df_final_view = df_filtrado[["Data", "Liga", "Jogo", est['coluna']]].rename(columns={est['coluna']: "Resultado"})
+                st.dataframe(df_final_view.style.applymap(color_map, subset=['Resultado']), use_container_width=True, hide_index=True)
             else:
-                st.write(f"Sem amostras para {est['emoji']} no momento.")
-        st.write("")
+                st.caption(f"Sem dados históricos suficientes para o sinal {est['emoji']}.")
 
 if __name__ == "__main__":
     mostrar_backtest()
