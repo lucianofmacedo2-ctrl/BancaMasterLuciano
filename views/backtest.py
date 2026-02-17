@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import unicodedata
 from datetime import datetime
+import plotly.express as px
 
 # --- CONFIGURAÇÕES DE LINKS ---
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/refs/heads/main/Lista_Jogos.csv"
@@ -34,7 +35,6 @@ def carregar_dados_auditoria():
         df_h['M_NORM'] = df_h['Mandante'].apply(tratar_string_backtest)
         df_h['V_NORM'] = df_h['Visitante'].apply(tratar_string_backtest)
         
-        # Conversão numérica de colunas de gols
         for col in ['Total_Gols_FT', 'Total_Gols_HT', 'Total_Corners', 'Gols_Mandante_FT', 'Gols_Visitante_FT']:
             if col in df_h.columns:
                 df_h[col] = pd.to_numeric(df_h[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
@@ -82,17 +82,14 @@ def mostrar_backtest():
                 if m_b > 0.60: sinais.append("🤝")
                 if m_c > 9.5: sinais.append("🔥🚩")
 
-                # Lógica de Odds
                 try:
                     odd_m = float(str(row.get('Odd Mandante', 0)).replace(',','.'))
                     odd_v = float(str(row.get('Odd Visitante', 0)).replace(',','.'))
-                    
                     if odd_m < 1.4 or odd_v < 1.4: sinais.append("🌟")
                     elif 1.40 <= odd_m <= 1.80 or 1.40 <= odd_v <= 1.80: sinais.append("⭐")
                     if abs(odd_m - odd_v) <= 1.0: sinais.append("⚖️")
                 except: odd_m, odd_v = 0, 0
 
-                # Resultados Reais para cada tipo de aposta
                 vitoria_super_fav = "❌"
                 if odd_m < 1.4 and real['Gols_Mandante_FT'] > real['Gols_Visitante_FT']: vitoria_super_fav = "✅"
                 elif odd_v < 1.4 and real['Gols_Visitante_FT'] > real['Gols_Mandante_FT']: vitoria_super_fav = "✅"
@@ -104,6 +101,9 @@ def mostrar_backtest():
                 if sinais:
                     jogos_auditados.append({
                         "Data": row['dt_comparacao'],
+                        "Liga": row.get('Liga', 'N/A'),
+                        "Mandante": row['Mandante'],
+                        "Visitante": row['Visitante'],
                         "Jogo": f"{row['Mandante']} x {row['Visitante']}",
                         "Sinais": sinais,
                         "RES_HT": "✅" if real['Total_Gols_HT'] >= 1 else "❌",
@@ -121,7 +121,6 @@ def mostrar_backtest():
 
     df_base = pd.DataFrame(jogos_auditados)
 
-    # --- DEFINIÇÃO DAS ESTRATÉGIAS ---
     estratogias = [
         {"nome": "⏱️ Gols HT (0.5 HT)", "emoji": "⏱️", "coluna": "RES_HT", "meta": "Winrate 0.5 HT"},
         {"nome": "🔥⚽ Gols FT (2.5 FT)", "emoji": "🔥⚽", "coluna": "RES_FT", "meta": "Winrate 2.5 FT"},
@@ -137,6 +136,7 @@ def mostrar_backtest():
         
         with st.expander(f"VER BACKTEST: {est['nome']}", expanded=True):
             if not df_filtrado.empty:
+                # Métricas principais
                 acertos = len(df_filtrado[df_filtrado[est['coluna']] == "✅"])
                 total = len(df_filtrado)
                 wr = (acertos / total) * 100
@@ -147,12 +147,40 @@ def mostrar_backtest():
                 c2.metric("Odd Justa", f"{odd_j:.2f}")
                 c3.info(f"Analisando {total} jogos com o sinal {est['emoji']}")
 
+                # --- NOVA SEÇÃO DE GRÁFICOS ---
+                st.markdown("### 📊 Análise de Desempenho")
+                col_graf1, col_graf2 = st.columns(2)
+
+                with col_graf1:
+                    # Desempenho por Liga
+                    df_liga = df_filtrado.groupby(['Liga', est['coluna']]).size().unstack(fill_value=0).reset_index()
+                    if '✅' in df_liga.columns:
+                        df_liga = df_liga.sort_values(by='✅', ascending=False).head(8)
+                        fig_liga = px.bar(df_liga, x='Liga', y='✅', title="Top Ligas (Greens)", 
+                                          labels={'✅':'Greens'}, color_discrete_sequence=['#2ecc71'])
+                        fig_liga.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
+                        st.plotly_chart(fig_liga, use_container_width=True)
+                    else: st.write("Aguardando dados de acertos por liga...")
+
+                with col_graf2:
+                    # Desempenho por Time (Mandante)
+                    df_time = df_filtrado.groupby(['Mandante', est['coluna']]).size().unstack(fill_value=0).reset_index()
+                    if '✅' in df_time.columns:
+                        df_time = df_time.sort_values(by='✅', ascending=False).head(8)
+                        fig_time = px.bar(df_time, x='Mandante', y='✅', title="Top Times Mandantes (Greens)", 
+                                          labels={'✅':'Greens'}, color_discrete_sequence=['#3498db'])
+                        fig_time.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
+                        st.plotly_chart(fig_time, use_container_width=True)
+                    else: st.write("Aguardando dados de acertos por time...")
+
+                # Tabela de Jogos
+                st.markdown("### 📋 Detalhes dos Confrontos")
                 def style_v(val):
                     if val == "✅": return 'background-color: #d4edda; color: #155724'
                     if val == "❌": return 'background-color: #f8d7da; color: #721c24'
                     return ''
 
-                df_view = df_filtrado[["Data", "Jogo", est['coluna']]].rename(columns={est['coluna']: "Resultado"})
+                df_view = df_filtrado[["Data", "Liga", "Jogo", est['coluna']]].rename(columns={est['coluna']: "Resultado"})
                 st.dataframe(df_view.style.applymap(style_v, subset=['Resultado']), use_container_width=True, hide_index=True)
             else:
                 st.write(f"Sem amostras para {est['emoji']} no momento.")
