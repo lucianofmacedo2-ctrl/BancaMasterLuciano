@@ -69,25 +69,15 @@ def calcular_winrate(df, coluna):
     return (len(df[df[coluna] == "✅"]) / len(df)) * 100
 
 def mostrar_backtest():
-    # CSS para forçar a cor cinza escuro nos números das métricas
-    st.markdown("""
-        <style>
-        [data-testid="stMetricValue"] {
-            color: #31333F !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-    st.title("🧪 Auditoria & Backtest de Sinais")
+    st.markdown("<style>[data-testid='stMetricValue'] { color: #31333F !important; }</style>", unsafe_allow_html=True)
+    st.title("🧪 Auditoria Separada por Estratégia")
     
     df_h, df_a = carregar_dados_auditoria()
-    
     if df_h.empty or df_a.empty:
         st.warning("Bases de dados não encontradas.")
         return
 
-    resultados = []
-
+    resultados_lista = []
     for _, row in df_a.iterrows():
         m_trad, v_trad, data_j = row['M_TRADUZ'], row['V_TRADUZ'], row['dt_comparacao']
         match = df_h[(df_h['M_NORM'] == m_trad) & (df_h['V_NORM'] == v_trad) & (df_h['dt_comparacao'] == data_j)]
@@ -103,55 +93,64 @@ def mostrar_backtest():
                 med_cantos = (h_m['Total_Corners'].mean() + h_v['Total_Corners'].mean()) / 2
                 med_btts = (h_m['BTTS_REAL'].mean() + h_v['BTTS_REAL'].mean()) / 2
                 
-                icones = []
-                if med_gols > 2.5: icones.append("🔥⚽")
-                if med_cantos > 9.5: icones.append("🔥🚩")
-                if med_btts > 0.60: icones.append("🤝")
-                if med_ht >= 1.0: icones.append("⏱️")
-                
-                try:
-                    odd_m = float(str(row.get('Odd Mandante', 0)).replace(',','.'))
-                    odd_v = float(str(row.get('Odd Visitante', 0)).replace(',','.'))
-                    if odd_m < 1.4 or odd_v < 1.4: icones.append("🌟")
-                    elif 1.40 <= odd_m <= 1.80 or 1.40 <= odd_v <= 1.80: icones.append("⭐")
-                    if abs(odd_m - odd_v) <= 1.0: icones.append("⚖️")
-                except: pass
+                sinais = []
+                if med_gols > 2.5: sinais.append("🔥⚽")
+                if med_cantos > 9.5: sinais.append("🔥🚩")
+                if med_btts > 0.60: sinais.append("🤝")
+                if med_ht >= 1.0: sinais.append("⏱️")
 
-                if icones:
-                    resultados.append({
+                if sinais:
+                    resultados_lista.append({
                         "Data": data_j,
                         "Jogo": f"{row['Mandante']} x {row['Visitante']}",
-                        "Sinais": " ".join(icones),
+                        "Sinais_Ativos": sinais,
                         "0.5 HT": "✅" if real['Total_Gols_HT'] >= 1 else "❌",
                         "2.5 FT": "✅" if real['Total_Gols_FT'] > 2.5 else "❌",
                         "Ambas Sim": "✅" if real['BTTS_REAL'] == 1 else "❌",
                         "9.5 Cnt": "✅" if real['Total_Corners'] > 9.5 else "❌"
                     })
 
-    if resultados:
-        df_final = pd.DataFrame(resultados)
+    if not resultados_lista:
+        st.info("Nenhum sinal auditável encontrado.")
+        return
+
+    df_geral = pd.DataFrame(resultados_lista)
+
+    def color_result(val):
+        if val == "✅": return 'background-color: #d4edda; color: #155724'
+        if val == "❌": return 'background-color: #f8d7da; color: #721c24'
+        return ''
+
+    # --- SEÇÃO POR ESTRATÉGIA ---
+    config_sinais = [
+        {"emoji": "⏱️", "label": "Estratégia Gols HT (0.5 HT)", "col_res": "0.5 HT"},
+        {"emoji": "🔥⚽", "label": "Estratégia Gols FT (2.5 FT)", "col_res": "2.5 FT"},
+        {"emoji": "🤝", "label": "Estratégia Ambas Marcam (BTTS)", "col_res": "Ambas Sim"},
+        {"emoji": "🔥🚩", "label": "Estratégia Cantos (9.5 Cnt)", "col_res": "9.5 Cnt"}
+    ]
+
+    for config in config_sinais:
+        # Filtra apenas jogos que receberam esse emoji específico
+        df_sinal = df_geral[df_geral['Sinais_Ativos'].apply(lambda x: config['emoji'] in x)].copy()
         
-        # Cálculo de Winrates e Odds Justas
-        wr_ht = calcular_winrate(df_final, '0.5 HT')
-        wr_ft = calcular_winrate(df_final, '2.5 FT')
-        wr_ambas = calcular_winrate(df_final, 'Ambas Sim')
-        wr_cnt = calcular_winrate(df_final, '9.5 Cnt')
+        st.divider()
+        st.subheader(f"{config['emoji']} {config['label']}")
+        
+        if not df_sinal.empty:
+            wr = calcular_winrate(df_sinal, config['col_res'])
+            odd_j = f"{100/wr:.2f}" if wr > 0 else "0.00"
+            
+            c1, c2, c3 = st.columns([1, 1, 2])
+            c1.metric("Winrate", f"{wr:.1f}%")
+            c2.metric("Odd Justa", f"{odd_j}")
+            c3.write(f"Total de jogos analisados para este sinal: **{len(df_sinal)}**")
+            
+            # Mostra a tabela apenas deste sinal
+            st.dataframe(df_sinal.drop(columns=['Sinais_Ativos']).style.applymap(color_result, subset=[config['col_res']]), 
+                         use_container_width=True, hide_index=True)
+        else:
+            st.write("Nenhum jogo encontrado com este sinal no período.")
 
-        def get_odd(wr): return f"{100/wr:.2f}" if wr > 0 else "0.00"
-
-        # Métricas com Odd Justa no label/delta
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Winrate 0.5 HT", f"{wr_ht:.1f}%", f"Odd Justa: {get_odd(wr_ht)}", delta_color="off")
-        c2.metric("Winrate 2.5 FT", f"{wr_ft:.1f}%", f"Odd Justa: {get_odd(wr_ft)}", delta_color="off")
-        c3.metric("Winrate Ambas", f"{wr_ambas:.1f}%", f"Odd Justa: {get_odd(wr_ambas)}", delta_color="off")
-        c4.metric("Winrate 9.5 Cnt", f"{wr_cnt:.1f}%", f"Odd Justa: {get_odd(wr_cnt)}", delta_color="off")
-
-        def color_result(val):
-            if val == "✅": return 'background-color: #d4edda; color: #155724'
-            if val == "❌": return 'background-color: #f8d7da; color: #721c24'
-            return ''
-
-        st.dataframe(df_final.style.applymap(color_result, subset=['0.5 HT', '2.5 FT', 'Ambas Sim', '9.5 Cnt']), 
-                     use_container_width=True, hide_index=True)
-    else:
-        st.info("Nenhum sinal auditável encontrado nos resultados atuais.")
+# Execução
+if __name__ == "__main__":
+    mostrar_backtest()
