@@ -44,7 +44,6 @@ def carregar_dados_auditoria():
             if col in df_h.columns:
                 df_h[col] = pd.to_numeric(df_h[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
         
-        # BTTS Realizado para auditoria
         df_h['BTTS_REAL'] = ((df_h['Gols_Mandante_FT'] > 0) & (df_h['Gols_Visitante_FT'] > 0)).astype(int)
     except:
         df_h = pd.DataFrame()
@@ -70,6 +69,15 @@ def calcular_winrate(df, coluna):
     return (len(df[df[coluna] == "✅"]) / len(df)) * 100
 
 def mostrar_backtest():
+    # CSS para forçar a cor cinza escuro nos números das métricas
+    st.markdown("""
+        <style>
+        [data-testid="stMetricValue"] {
+            color: #31333F !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
     st.title("🧪 Auditoria & Backtest de Sinais")
     
     df_h, df_a = carregar_dados_auditoria()
@@ -82,35 +90,25 @@ def mostrar_backtest():
 
     for _, row in df_a.iterrows():
         m_trad, v_trad, data_j = row['M_TRADUZ'], row['V_TRADUZ'], row['dt_comparacao']
-        
-        # Procura o resultado real
-        match = df_h[(df_h['M_NORM'] == m_trad) & 
-                     (df_h['V_NORM'] == v_trad) & 
-                     (df_h['dt_comparacao'] == data_j)]
+        match = df_h[(df_h['M_NORM'] == m_trad) & (df_h['V_NORM'] == v_trad) & (df_h['dt_comparacao'] == data_j)]
         
         if not match.empty:
             real = match.iloc[0]
-            
-            # Histórico dos times (excluindo o jogo do dia para evitar bias)
             h_m = df_h[((df_h['M_NORM'] == m_trad) | (df_h['V_NORM'] == m_trad)) & (df_h['dt_comparacao'] != data_j)]
             h_v = df_h[((df_h['M_NORM'] == v_trad) | (df_h['V_NORM'] == v_trad)) & (df_h['dt_comparacao'] != data_j)]
             
             if not h_m.empty and not h_v.empty:
-                # 1. Cálculos de Médias (Radar de Valor)
                 med_gols = (h_m['Total_Gols_FT'].mean() + h_v['Total_Gols_FT'].mean()) / 2
                 med_ht = (h_m['Total_Gols_HT'].mean() + h_v['Total_Gols_HT'].mean()) / 2
                 med_cantos = (h_m['Total_Corners'].mean() + h_v['Total_Corners'].mean()) / 2
                 med_btts = (h_m['BTTS_REAL'].mean() + h_v['BTTS_REAL'].mean()) / 2
                 
-                # 2. Lógica de Emojis (Exatamente igual ao jogos.py)
                 icones = []
-                # Gols e Cantos
                 if med_gols > 2.5: icones.append("🔥⚽")
                 if med_cantos > 9.5: icones.append("🔥🚩")
                 if med_btts > 0.60: icones.append("🤝")
                 if med_ht >= 1.0: icones.append("⏱️")
                 
-                # Odds (Favoritos e Equilibrado)
                 try:
                     odd_m = float(str(row.get('Odd Mandante', 0)).replace(',','.'))
                     odd_v = float(str(row.get('Odd Visitante', 0)).replace(',','.'))
@@ -133,12 +131,20 @@ def mostrar_backtest():
     if resultados:
         df_final = pd.DataFrame(resultados)
         
-        # Métricas de Assertividade
+        # Cálculo de Winrates e Odds Justas
+        wr_ht = calcular_winrate(df_final, '0.5 HT')
+        wr_ft = calcular_winrate(df_final, '2.5 FT')
+        wr_ambas = calcular_winrate(df_final, 'Ambas Sim')
+        wr_cnt = calcular_winrate(df_final, '9.5 Cnt')
+
+        def get_odd(wr): return f"{100/wr:.2f}" if wr > 0 else "0.00"
+
+        # Métricas com Odd Justa no label/delta
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Winrate 0.5 HT", f"{calcular_winrate(df_final, '0.5 HT'):.1f}%")
-        c2.metric("Winrate 2.5 FT", f"{calcular_winrate(df_final, '2.5 FT'):.1f}%")
-        c3.metric("Winrate Ambas", f"{calcular_winrate(df_final, 'Ambas Sim'):.1f}%")
-        c4.metric("Winrate 9.5 Cnt", f"{calcular_winrate(df_final, '9.5 Cnt'):.1f}%")
+        c1.metric("Winrate 0.5 HT", f"{wr_ht:.1f}%", f"Odd Justa: {get_odd(wr_ht)}", delta_color="off")
+        c2.metric("Winrate 2.5 FT", f"{wr_ft:.1f}%", f"Odd Justa: {get_odd(wr_ft)}", delta_color="off")
+        c3.metric("Winrate Ambas", f"{wr_ambas:.1f}%", f"Odd Justa: {get_odd(wr_ambas)}", delta_color="off")
+        c4.metric("Winrate 9.5 Cnt", f"{wr_cnt:.1f}%", f"Odd Justa: {get_odd(wr_cnt)}", delta_color="off")
 
         def color_result(val):
             if val == "✅": return 'background-color: #d4edda; color: #155724'
