@@ -21,6 +21,7 @@ def mostrar_jogos(df_hist):
         * 🔥⚽ **Fogo + Gol**: Média combinada > 2.5 gols.
         * 🔥🚩 **Fogo + Canto**: Média combinada > 9.5 escanteios.
         * 🤝 **Ambas Sim**: Incidência de BTTS > 60%.
+        * ⏱️ **Gols HT**: Média combinada >= 1.0 gol no 1º tempo.
         * ⭐ **Favorito**: Odd 1.40 - 1.80 | 🌟 **Super Fav**: Odd < 1.40.
         * ⚖️ **Equilibrado**: Diferença de Odds ≤ 1.0.
         """)
@@ -43,10 +44,14 @@ def mostrar_jogos(df_hist):
 
     if not df_hist.empty:
         # Garante que as colunas numéricas de cantos e gols estão corretas
-        cols_num = ['Corners_H', 'Corners_A', 'Total_Corners', 'Total_Gols_FT', 'Total_Gols_HT']
+        cols_num = ['Corners_H', 'Corners_A', 'Total_Corners', 'Total_Gols_FT', 'Total_Gols_HT', 'Total_Corners_HT']
         for col in cols_num:
             if col in df_hist.columns:
                 df_hist[col] = pd.to_numeric(df_hist[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
+        
+        # Garante coluna BTTS para cálculo
+        if 'BTTS_Realizado' not in df_hist.columns and 'Gols_Mandante_FT' in df_hist.columns:
+            df_hist['BTTS_Realizado'] = ((df_hist['Gols_Mandante_FT'] > 0) & (df_hist['Gols_Visitante_FT'] > 0)).astype(int)
 
     def obter_classificacao(df_input):
         if df_input is None or df_input.empty: return {}, []
@@ -57,14 +62,12 @@ def mostrar_jogos(df_hist):
         df_c['LIGA_TRATADA'] = df_c['Liga'].apply(tratar_string)
         
         # --- LÓGICA DE FILTRO POR TEMPORADA ATUAL ---
-        # Identifica a temporada mais recente para cada liga
         ligas_recentes = {}
         if 'Temporada' in df_c.columns:
             for liga in df_c['LIGA_TRATADA'].unique():
                 temp_max = df_c[df_c['LIGA_TRATADA'] == liga]['Temporada'].max()
                 ligas_recentes[liga] = temp_max
             
-            # Filtra o dataframe para conter apenas jogos da temporada atual de cada liga
             df_c = df_c[df_c.apply(lambda x: x['Temporada'] == ligas_recentes[x['LIGA_TRATADA']], axis=1)]
 
         stats = {}
@@ -106,7 +109,6 @@ def mostrar_jogos(df_hist):
             
         posicoes = {}
         for liga in stats:
-            # Ordenação: Pontos -> Vitórias -> Saldo de Gols -> Gols Pró
             ranking = sorted(stats[liga].items(), 
                             key=lambda x: (x[1]['pts'], x[1]['vitorias'], x[1]['sg'], x[1]['gols']), 
                             reverse=True)
@@ -180,13 +182,21 @@ def mostrar_jogos(df_hist):
                         if m_gols > 3.0: 
                             icones += " 🔥⚽"
                             sugestoes_gols.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_gols})
+                        
+                        # NOVA FUNÇÃO: Emoji para 0.5 HT com média >= 1.0
+                        if m_gols_ht >= 1.0:
+                            icones += " ⏱️"
+                            
                         if m_gols_ht > 1.2:
                             sugestoes_ht.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_gols_ht})
+                            
                         if m_btts > 0.65:
                             icones += " 🤝"
                             sugestoes_btts.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_btts})
+                            
                         if m_cantos_ht > 4.5:
                             sugestoes_cantos_ht.append({"jogo": f"{m_orig} vs {v_orig}", "valor": m_cantos_ht})
+                            
                         if 'Total_Corners' in df_hist.columns:
                             m_cantos = (h_m['Total_Corners'].mean() + h_v['Total_Corners'].mean()) / 2
                             if m_cantos > 11.0: 
