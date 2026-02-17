@@ -57,18 +57,40 @@ def mostrar_scout(df):
         return pd.concat([df_hist[m][col_h], df_hist[v][col_a]])
 
     def calcular_posicoes(df_liga):
+        if df_liga.empty: return pd.DataFrame()
+        
+        # --- CORREÇÃO: Filtrar pela temporada mais atual da liga selecionada ---
+        df_c = df_liga.copy()
+        if 'Temporada' in df_c.columns:
+            temporada_atual = df_c['Temporada'].max()
+            df_c = df_c[df_c['Temporada'] == temporada_atual]
+        
         stats = {}
-        for _, r in df_liga.iterrows():
+        for _, r in df_c.iterrows():
             m, v = r['Mandante'], r['Visitante']
-            gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
+            try:
+                gm = float(str(r['Gols_Mandante_FT']).replace(',', '.'))
+                gv = float(str(r['Gols_Visitante_FT']).replace(',', '.'))
+            except: continue
+                
             for t in [m, v]:
-                if t not in stats: stats[t] = {'P': 0, 'V': 0, 'SG': 0}
-            stats[m]['SG'] += (gm - gv); stats[v]['SG'] += (gv - gm)
-            if gm > gv: stats[m]['P'] += 3; stats[m]['V'] += 1
-            elif gm == gv: stats[m]['P'] += 1; stats[v]['P'] += 1
-            else: stats[v]['P'] += 3; stats[v]['V'] += 1
+                if t not in stats: stats[t] = {'P': 0, 'V': 0, 'SG': 0, 'GP': 0}
+            
+            stats[m]['GP'] += gm
+            stats[v]['GP'] += gv
+            stats[m]['SG'] += (gm - gv)
+            stats[v]['SG'] += (gv - gm)
+            
+            if gm > gv: 
+                stats[m]['P'] += 3; stats[m]['V'] += 1
+            elif gm == gv: 
+                stats[m]['P'] += 1; stats[v]['P'] += 1
+            else: 
+                stats[v]['P'] += 3; stats[v]['V'] += 1
+        
         tab = pd.DataFrame.from_dict(stats, orient='index').reset_index().rename(columns={'index':'Time'})
-        tab = tab.sort_values(by=['P', 'V', 'SG'], ascending=False).reset_index(drop=True)
+        # Ordenação oficial: Pontos -> Vitórias -> Saldo de Gols -> Gols Pró
+        tab = tab.sort_values(by=['P', 'V', 'SG', 'GP'], ascending=False).reset_index(drop=True)
         tab['Pos'] = tab.index + 1
         return tab
 
@@ -80,7 +102,11 @@ def mostrar_scout(df):
         
         resultados = []
         for _, r in df_f.iterrows():
-            gm, gv = r['Gols_Mandante_FT'], r['Gols_Visitante_FT']
+            try:
+                gm = float(str(r['Gols_Mandante_FT']).replace(',', '.'))
+                gv = float(str(r['Gols_Visitante_FT']).replace(',', '.'))
+            except: continue
+                
             if gm == gv: resultados.append("🟡")
             elif (r['Mandante'] == time and gm > gv) or (r['Visitante'] == time and gv > gm): resultados.append("🟢")
             else: resultados.append("🔴")
