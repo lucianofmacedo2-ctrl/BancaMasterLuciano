@@ -20,9 +20,9 @@ def tratar_string_fast(texto):
     return " ".join(texto.replace(".", "").replace("-", " ").split()).strip()
 
 @st.cache_data(ttl=3600)
-def preparar_base_historica(df_hist):
+def preparar_base_e_ranking(df_hist):
     if df_hist is None or df_hist.empty: 
-        return pd.DataFrame(), {}, set()
+        return pd.DataFrame(), {}, {}, set()
     
     df = df_hist.copy()
     # Tratamento de colunas numéricas em bloco para performance
@@ -43,21 +43,35 @@ def preparar_base_historica(df_hist):
 
     df['M_T'] = df['Mandante'].apply(tratar_string_fast)
     df['V_T'] = df['Visitante'].apply(tratar_string_fast)
-    
+    df['L_T'] = df['Liga'].apply(tratar_string_fast)
+
+    # --- LÓGICA DE RANKING (POSIÇÕES) ---
+    dict_posicoes = {}
+    df_rank = df.copy()
+    # Pega apenas a temporada mais recente por liga para o ranking
+    if 'Temporada' in df_rank.columns:
+        df_rank = df_rank[df_rank.groupby('L_T')['Temporada'].transform(max) == df_rank['Temporada']]
+
+    for liga, dados_liga in df_rank.groupby('L_T'):
+        stats_rank = {}
+        for _, r in dados_liga.iterrows():
+            for t, gf, gs in [(r['M_T'], r['Gols_Mandante_FT'], r['Gols_Visitante_FT']), 
+                                (r['V_T'], r['Gols_Visitante_FT'], r['Gols_Mandante_FT'])]:
+                if t not in stats_rank: stats_rank[t] = {'pts': 0, 'v': 0, 'sg': 0, 'gf': 0}
+                stats_rank[t]['gf'] += gf
+                stats_rank[t]['sg'] += (gf - gs)
+                if gf > gs: 
+                    stats_rank[t]['pts'] += 3
+                    stats_rank[t]['v'] += 1
+                elif gf == gs: stats_rank[t]['pts'] += 1
+        
+        ranking = sorted(stats_rank.items(), key=lambda x: (x[1]['pts'], x[1]['v'], x[1]['sg'], x[1]['gf']), reverse=True)
+        for i, (time, _) in enumerate(ranking):
+            dict_posicoes[f"{liga}_{time}"] = i + 1
+
     # Pré-calculando Médias de todos os times (Vetorizado)
-    m_stats = df.groupby('M_T').agg({
-        'Total_Gols_FT':'mean', 'Total_Gols_HT':'mean', 'BTTS_Realizado':'mean', 
-        'Total_Corners':'mean', 'Total_Corners_HT':'mean', 'Gols_Mandante_FT':'mean', 
-        'Gols_Visitante_FT':'mean', 'Gols_Mandante_HT':'mean', 'Gols_Visitante_HT':'mean', 
-        'Corners_H':'mean', 'Corners_A':'mean', 'Corners_H_HT':'mean', 'Corners_A_HT':'mean'
-    })
-    
-    v_stats = df.groupby('V_T').agg({
-        'Total_Gols_FT':'mean', 'Total_Gols_HT':'mean', 'BTTS_Realizado':'mean', 
-        'Total_Corners':'mean', 'Total_Corners_HT':'mean', 'Gols_Mandante_FT':'mean', 
-        'Gols_Visitante_FT':'mean', 'Gols_Mandante_HT':'mean', 'Gols_Visitante_HT':'mean', 
-        'Corners_H':'mean', 'Corners_A':'mean', 'Corners_H_HT':'mean', 'Corners_A_HT':'mean'
-    })
+    m_stats = df.groupby('M_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
+    v_stats = df.groupby('V_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
 
     stats_times = {}
     todos_times = set(df['M_T'].unique()) | set(df['V_T'].unique())
@@ -65,7 +79,6 @@ def preparar_base_historica(df_hist):
     for t in todos_times:
         s_m = m_stats.loc[t] if t in m_stats.index else None
         s_v = v_stats.loc[t] if t in v_stats.index else None
-        
         if s_m is not None and s_v is not None:
             stats_times[t] = (s_m + s_v) / 2
         elif s_m is not None:
@@ -73,20 +86,19 @@ def preparar_base_historica(df_hist):
         else:
             stats_times[t] = s_v
 
-    return df, stats_times, todos_times
+    return df, stats_times, dict_posicoes, todos_times
 
 def mostrar_jogos(df_hist_input):
     st.title("📅 Agenda & Inteligência de Dados")
     
-    # Inicialização segura da variável de estado para evitar o erro AttributeError
     brasil_tz = pytz.timezone('America/Sao_Paulo')
     hoje_dt = datetime.now(brasil_tz).date()
     
     if 'data_ex_jogos' not in st.session_state:
         st.session_state.data_ex_jogos = hoje_dt.strftime('%d/%m/%Y')
 
-    # Preparação da Base
-    df_hist, dict_stats, lista_times_banco = preparar_base_historica(df_hist_input)
+    # Preparação da Base com Ranking
+    df_hist, dict_stats, dict_pos, lista_times_banco = preparar_base_e_ranking(df_hist_input)
 
     with st.expander("💡 Legenda do Radar de Valor"):
         st.markdown("""
@@ -104,7 +116,6 @@ def mostrar_jogos(df_hist_input):
 
     df_agenda = carregar_agenda_fast(URL_AGENDA)
 
-    # Botões de Seleção de Data
     cols_btn = st.columns(3)
     datas_ops = [hoje_dt, hoje_dt + timedelta(days=1), hoje_dt + timedelta(days=2)]
     labels = ["📅 Hoje", "📅 Amanhã", "📅 Depois"]
@@ -114,7 +125,6 @@ def mostrar_jogos(df_hist_input):
             st.session_state.data_ex_jogos = datas_ops[i].strftime('%d/%m/%Y')
             st.rerun()
 
-    # Filtro de jogos do dia selecionado
     data_alvo = st.session_state.data_ex_jogos[0:5]
     df_dia = df_agenda[df_agenda['Data'].str.contains(data_alvo, na=False)] if not df_agenda.empty else pd.DataFrame()
 
@@ -125,16 +135,19 @@ def mostrar_jogos(df_hist_input):
     sugestoes = {"gFT":[], "cFT":[], "gHT":[], "btts":[], "cHT":[]}
     times_do_dia = []
 
-    # Loop de Exibição por Liga
     for liga, df_l in df_dia.groupby('Liga'):
         st.markdown(f"#### 🏆 {liga}")
+        liga_t = tratar_string_fast(liga)
         
         for idx, row in df_l.iterrows():
             m_orig, v_orig = str(row['Mandante']), str(row['Visitante'])
             m_t, v_t = tratar_string_fast(m_orig), tratar_string_fast(v_orig)
             
+            # Recuperando Posições
+            p_m = dict_pos.get(f"{liga_t}_{m_t}", "?")
+            p_v = dict_pos.get(f"{liga_t}_{v_t}", "?")
+            
             icones = ""
-            # Lógica de Odds
             try:
                 om = float(str(row.get('Odd Mandante', 0)).replace(',','.'))
                 ov = float(str(row.get('Odd Visitante', 0)).replace(',','.'))
@@ -143,7 +156,6 @@ def mostrar_jogos(df_hist_input):
                 if abs(om - ov) <= 1.0: icones += " ⚖️"
             except: pass
 
-            # Lógica de Estatísticas Instantânea
             if m_t in dict_stats and v_t in dict_stats:
                 s1, s2 = dict_stats[m_t], dict_stats[v_t]
                 m_gFT = (s1['Total_Gols_FT'] + s2['Total_Gols_FT']) / 2
@@ -169,10 +181,10 @@ def mostrar_jogos(df_hist_input):
                 if m_cHT > 4.5:
                     sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
-            # Layout da Linha do Jogo
-            c1, c2, c3 = st.columns([5, 3, 2])
+            # Layout com Botões Analisar e Simular
+            c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
             with c1:
-                st.write(f"**{row['Hora']}** | {m_orig} vs {v_orig} {icones}")
+                st.write(f"**{row['Hora']}** | ({p_m}º) {m_orig} vs {v_orig} ({p_v}º){icones}")
             with c2:
                 st.caption(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')} | {row.get('Odd Visitante','-')}")
             with c3:
@@ -181,8 +193,13 @@ def mostrar_jogos(df_hist_input):
                     st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
                     st.session_state.menu_ativo = "🔎 Scout"
                     st.rerun()
+            with c4:
+                if st.button("Simular 🎲", key=f"btn_sim_{idx}", use_container_width=True):
+                    st.session_state.liga_simulador = liga
+                    st.session_state.time_casa_simulador, st.session_state.time_fora_simulador = m_orig, v_orig
+                    st.session_state.menu_ativo = "🎲 Simulador"
+                    st.rerun()
 
-    # Seção de Sugestões (Top 3 de cada categoria)
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top Performance)")
     cols = st.columns(5)
@@ -197,7 +214,6 @@ def mostrar_jogos(df_hist_input):
                 val = f"{s['v']*100:.1f}%" if chaves[i] == "btts" else f"{s['v']:.2f}"
                 st.caption(f"✅ {s['j']} ({val})")
 
-    # Tabelas de Performance Final
     if times_do_dia:
         st.divider()
         st.subheader(f"📊 Performance dos Times ({st.session_state.data_ex_jogos})")
