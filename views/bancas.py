@@ -14,8 +14,8 @@ def mostrar_bancas():
     st.title("🏦 Gestão de Bancas")
     st.markdown("Gerencie múltiplas bancas com sincronização em nuvem.")
 
-    # --- 1. CADASTRO (Mantendo seu visual original) ---
-    with st.expander("➕ Cadastrar Nova Banca", expanded=True):
+    # --- 1. CADASTRO ---
+    with st.expander("➕ Cadastrar Nova Banca", expanded=False): # Mudei para False para não ocupar espaço
         with st.form("form_nova_banca", clear_on_submit=True):
             col1, col2, col3 = st.columns([2, 1, 1])
             nome = col1.text_input("Nome da Banca")
@@ -30,7 +30,7 @@ def mostrar_bancas():
                     dados = {"nome": nome, "saldo_inicial": float(saldo)}
                     supabase.table("bancas").insert(dados).execute()
                     
-                    # Backup local para manter seu CSV histórico
+                    # Backup local
                     if not os.path.exists("data"): os.makedirs("data")
                     df_local = pd.read_csv(CAMINHO_BANCAS_LOCAL) if os.path.exists(CAMINHO_BANCAS_LOCAL) else pd.DataFrame()
                     nova = pd.DataFrame([{"Nome da Banca": nome, "Saldo Inicial": saldo, "Moeda": moeda}])
@@ -53,25 +53,43 @@ def mostrar_bancas():
         res_mov = supabase.table("movimentacoes").select("*").execute()
         df_mov = pd.DataFrame(res_mov.data)
 
+        # SE VOCÊ TIVER UMA TABELA DE APOSTAS, BUSQUE ELA AQUI TAMBÉM
+        # res_apostas = supabase.table("apostas").select("*").execute()
+        # df_apostas = pd.DataFrame(res_apostas.data)
+
         if not df_b.empty:
-            # --- CÁLCULO DE SALDO REAL ---
-            # Unimos as movimentações para calcular o saldo atualizado de cada banca
+            # --- CÁLCULO DE SALDO REAL (CORRIGIDO) ---
             def calcular_saldo_atual(row):
-                if df_mov.empty: return row['saldo_inicial']
-                movs = df_mov[df_mov['banca_id'] == row['id']]
-                aportes = movs[movs['tipo'] == 'Aporte']['valor'].sum()
-                saques = movs[movs['tipo'] == 'Saque']['valor'].sum()
-                return row['saldo_inicial'] + aportes - saques
+                saldo_calculado = float(row['saldo_inicial'])
+                
+                # 1. Somar Aportes e subtrair Saques
+                if not df_mov.empty:
+                    movs = df_mov[df_mov['banca_id'] == row['id']]
+                    # Convertendo para float para garantir o cálculo matemático
+                    aportes = pd.to_numeric(movs[movs['tipo'] == 'Aporte']['valor']).sum()
+                    saques = pd.to_numeric(movs[movs['tipo'] == 'Saque']['valor']).sum()
+                    saldo_calculado += (aportes - saques)
+                
+                # 2. SE VOCÊ TIVER LUCRO DE APOSTAS, SOME AQUI:
+                # if not df_apostas.empty:
+                #     lucro = df_apostas[df_apostas['banca_id'] == row['id']]['lucro_perda'].sum()
+                #     saldo_calculado += lucro
+
+                return saldo_calculado
 
             df_b['saldo_atual'] = df_b.apply(calcular_saldo_atual, axis=1)
 
             st.subheader("📋 Bancas Ativas")
-            df_display = df_b[['nome', 'saldo_inicial', 'saldo_atual']].rename(
-                columns={"nome": "Nome da Banca", "saldo_inicial": "Saldo Inicial", "saldo_atual": "Saldo Atual (Real)"}
-            )
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            df_display = df_b[['nome', 'saldo_inicial', 'saldo_atual']].copy()
+            df_display.columns = ["Nome da Banca", "Saldo Inicial", "Saldo Atual (Real)"]
+            
+            # Formatação para exibir como dinheiro
+            st.dataframe(df_display.style.format({
+                "Saldo Inicial": "R$ {:.2f}",
+                "Saldo Atual (Real)": "R$ {:.2f}"
+            }), use_container_width=True, hide_index=True)
 
-            # --- NOVO: SEÇÃO DE APORTES E SAQUES ---
+            # --- SEÇÃO DE APORTES E SAQUES ---
             st.subheader("💸 Movimentação Financeira")
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
@@ -80,17 +98,21 @@ def mostrar_bancas():
                 valor_mov = c3.number_input("Valor", min_value=0.0, step=50.0)
                 
                 if c4.button("Registrar", use_container_width=True):
-                    id_banca = df_b[df_b['nome'] == banca_escolhida]['id'].values[0]
+                    # Localiza o ID da banca pelo nome
+                    banca_row = df_b[df_b['nome'] == banca_escolhida].iloc[0]
+                    id_banca = banca_row['id']
+                    
                     mov_dados = {
                         "banca_id": int(id_banca),
                         "tipo": tipo_mov,
                         "valor": float(valor_mov)
                     }
+                    
                     supabase.table("movimentacoes").insert(mov_dados).execute()
-                    st.toast(f"{tipo_mov} de R${valor_mov} realizado!")
+                    st.toast(f"{tipo_mov} de R${valor_mov} realizado com sucesso!")
                     st.rerun()
 
-            # Exclusão (Mantida)
+            # Exclusão
             with st.expander("🗑️ Excluir uma Banca"):
                 b_del = st.selectbox("Selecione para remover", df_b["nome"].tolist(), key="del_sel")
                 if st.button("Confirmar Exclusão Definitiva", type="primary"):
@@ -102,12 +124,15 @@ def mostrar_bancas():
             st.subheader("💰 Resumo Total")
             total_inicial = df_b['saldo_inicial'].sum()
             total_atual = df_b['saldo_atual'].sum()
-            lucro_aportes = total_atual - total_inicial
+            diferenca = total_atual - total_inicial
 
             c1, c2, c3 = st.columns(3)
             c1.metric("Total de Bancas", len(df_b))
             c2.metric("Saldo Inicial Total", f"R$ {total_inicial:,.2f}")
-            c3.metric("Saldo Real (Com Aportes)", f"R$ {total_atual:,.2f}", delta=f"{lucro_aportes:,.2f}")
+            c3.metric("Saldo Real (Geral)", f"R$ {total_atual:,.2f}", delta=f"R$ {diferenca:,.2f}")
             
     except Exception as e:
-        st.info(f"Aguardando cadastro de bancas ou erro de conexão: {e}")
+        st.error(f"Erro ao carregar dados: {e}")
+
+if __name__ == "__main__":
+    mostrar_bancas()
