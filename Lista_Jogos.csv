@@ -722,18 +722,18 @@
 21/02/2026;12:00;;ENGLAND 2;Southampton;Charlton Athletic;1.57;4.05;5.44
 21/02/2026;12:00;;ENGLAND 2;Watford;Derby County;2.15;3.28;3.36
 21/02/2026;12:00;;ENGLAND 2;Wrexham;Ipswich Town;3.48;3.34;2.08
-21/02/2026;09:30;;League One (ENG);Plymouth Argyle;Cardiff City;2.96;3.58;2.22
-21/02/2026;09:30;;League One (ENG);Rotherham United;Doncaster Rovers;2.66;3.40;2.49
-21/02/2026;09:30;;League One (ENG);Wycombe Wanderers;Stevenage;1.95;3.18;4.19
-21/02/2026;12:00;;League One (ENG);AFC Wimbledon;Bradford City;2.99;3.24;2.36
-21/02/2026;12:00;;League One (ENG);Bolton Wanderers;Blackpool;1.50;4.20;6.16
-21/02/2026;12:00;;League One (ENG);Huddersfield Town;Barnsley;1.80;3.68;4.18
-21/02/2026;12:00;;League One (ENG);Luton Town;Burton Albion;1.83;3.68;4.03
-21/02/2026;12:00;;League One (ENG);Mansfield Town;Lincoln City;3.45;3.42;2.06
-21/02/2026;12:00;;League One (ENG);Northampton Town;Leyton Orient;2.94;3.25;2.38
-21/02/2026;12:00;;League One (ENG);Peterborough United;Exeter City;2.22;3.64;2.92
-21/02/2026;12:00;;League One (ENG);Port Vale;Reading;2.84;3.32;2.42
-21/02/2026;12:00;;League One (ENG);Stockport County;Wigan Athletic;1.65;3.80;5.03
+21/02/2026;09:30;;ENGLAND 3;Plymouth Argyle;Cardiff City;2.96;3.58;2.22
+21/02/2026;09:30;;ENGLAND 3;Rotherham United;Doncaster Rovers;2.66;3.40;2.49
+21/02/2026;09:30;;ENGLAND 3;Wycombe Wanderers;Stevenage;1.95;3.18;4.19
+21/02/2026;12:00;;ENGLAND 3;AFC Wimbledon;Bradford City;2.99;3.24;2.36
+21/02/2026;12:00;;ENGLAND 3;Bolton Wanderers;Blackpool;1.50;4.20;6.16
+21/02/2026;12:00;;ENGLAND 3;Huddersfield Town;Barnsley;1.80;3.68;4.18
+21/02/2026;12:00;;ENGLAND 3;Luton Town;Burton Albion;1.83;3.68;4.03
+21/02/2026;12:00;;ENGLAND 3;Mansfield Town;Lincoln City;3.45;3.42;2.06
+21/02/2026;12:00;;ENGLAND 3;Northampton Town;Leyton Orient;2.94;3.25;2.38
+21/02/2026;12:00;;ENGLAND 3;Peterborough United;Exeter City;2.22;3.64;2.92
+21/02/2026;12:00;;ENGLAND 3;Port Vale;Reading;2.84;3.32;2.42
+21/02/2026;12:00;;ENGLAND 3;Stockport County;Wigan Athletic;1.65;3.80;5.03
 21/02/2026;09:30;;ENGLAND 4;Fleetwood Town;Barrow;1.98;3.52;3.53
 21/02/2026;09:30;;ENGLAND 4;Swindon Town;Crewe Alexandra;2.00;3.52;3.46
 21/02/2026;12:00;;ENGLAND 4;Accrington Stanley;Shrewsbury Town;2.22;3.10;3.34
@@ -1143,3 +1143,56 @@
 23/02/2026;07:30;;TURKEY 2;Sivasspor;Sakaryaspor;1.61;3.80;5.39
 23/02/2026;10:00;;TURKEY 2;Pendikspor;Keciorengucu;1.92;3.48;3.44
 23/02/2026;14:00;;TURKEY 2;Amed;Van BB;1.55;3.92;5.01
+24/02/2026;14:30;;AUSTRIA 2;Admira;Austria Wien II;1.49;4.20;6.09
+24/02/2026;16:30;;EGYPT 1;Ceramica Cleopatra;Kahraba Ismailia;1.48;3.48;7.32
+24/02/2026;16:30;;EGYPT 1;Ghazl El Mehalla;Pyramids FC;7.26;3.74;1.44
+24/02/2026;16:30;;EGYPT 1;Haras El Hodood;ENPPI;3.89;2.80;2.06
+24/02/2026;16:30;;EGYPT 1;Masr;Zamalek;3.67;2.67;2.21
+24/02/2026;16:45;;ENGLAND 2;Blackburn Rovers;Bristol City;2.47;3.16;2.89
+24/02/2026;16:45;;ENGLAND 2;Hull City;Derby County;2.38;3.20;2.98
+24/02/2026;16:45;;ENGLAND 2;Middlesbrough;Leicester City;1.55;4.20;5.44
+24/02/2026;16:45;;ENGLAND 2;Swansea City;Preston North End;1.76;3.66;4.42
+24/02/2026;16:45;;ENGLAND 2;Watford;Ipswich Town;3.25;3.38;2.16
+24/02/2026;16:45;;ENGLAND 2;West Bromwich Albion;Charlton Athletic;2.00;3.26;3.84
+24/02/2026;16:45;;ENGLAND 2;Wrexham;Portsmouth;2.04;3.32;3.62
+24/02/2026;17:00;;ENGLAND 2;Southampton;Queens Park Rangers;1.77;3.72;4.27
+24/02/2026;16:45;;ENGLAND 3;Bradford City;Rotherham United;1.68;3.52;5.33
+24/02/2026;16:45;;ENGLAND 3;Burton Albion;Stockport County;3.13;3.36;2.22
+24/02/2026;16:45;;ENGLAND 3;Northampton Town;Port Vale;2.36;3.08;3.14
+24/02/2026;16:45;;ENGLAND 4;Accrington Stanley;Barnet;3.55;3.38;2.02
+24/02/2026;16:45;;ENGLAND 4;Salford City;Shrewsbury Town;1.65;3.80;4.91
+24/02/2026;16:00;;NETHERLANDS 2;Cambuur;Eindhoven;1.39;5.00;6.47
+24/02/2026;16:00;;NETHERLANDS 2;Willem II;ADO Den Haag;3.46;3.76;1.93
+24/02/2026;16:45;;NORTHERN IRELAND 1;Ballymena United;Glenavon;1.69;3.52;4.52
+24/02/2026;16:45;;NORTHERN IRELAND 1;Cliftonville;Glentoran;3.49;3.22;1.99
+24/02/2026;16:45;;NORTHERN IRELAND 1;Larne;Linfield;2.42;3.10;2.67
+24/02/2026;16:00;;SAUDI ARABIA 1;Al Hazm;Al Ittihad;6.11;4.40;1.41
+24/02/2026;16:00;;SAUDI ARABIA 1;Al Khaleej;Al Kholood;1.82;3.54;3.75
+24/02/2026;16:00;;SAUDI ARABIA 1;Al Taawon;Al Hilal;7.03;5.40;1.30
+24/02/2026;16:45;;SCOTLAND 1;Dundee United;Aberdeen;2.15;3.32;3.33
+24/02/2026;16:45;;SCOTLAND 2;Dunfermline Athletic;Partick Thistle;3.09;3.02;2.25
+24/02/2026;16:45;;SCOTLAND 2;Queen's Park;St. Johnstone;7.27;4.60;1.34
+24/02/2026;14:30;;SOUTH AFRICA 1;AmaZulu;Mamelodi Sundowns;5.85;3.30;1.60
+24/02/2026;14:30;;SOUTH AFRICA 1;Kaizer Chiefs;Stellenbosch;1.63;3.22;5.70
+25/02/2026;19:00;;BRAZIL 1;Bragantino;Atletico PR;1.83;3.54;4.68
+25/02/2026;19:00;;BRAZIL 1;Remo;Internacional;3.13;3.36;2.36
+25/02/2026;19:30;;BRAZIL 1;Coritiba;Sao Paulo;3.02;3.19;2.52
+25/02/2026;20:00;;BRAZIL 1;Cruzeiro;Corinthians;1.87;3.52;4.46
+25/02/2026;21:30;;BRAZIL 1;Gremio;Atletico Mineiro;2.22;3.48;3.29
+25/02/2026;21:30;;BRAZIL 1;Palmeiras;Fluminense;1.94;3.54;4.12
+25/02/2026;16:30;;EGYPT 1;Al Masry;Coca-Cola;2.28;2.70;3.44
+25/02/2026;16:30;;EGYPT 1;Nat. Bank Egypt;Pharco;1.56;3.30;6.45
+25/02/2026;16:30;;EGYPT 1;Petrojet;Al Ittihad;2.21;2.70;3.61
+25/02/2026;16:45;;ENGLAND 2;Millwall;Birmingham City;2.47;3.18;2.87
+25/02/2026;16:45;;ENGLAND 2;Norwich City;Sheffield Wednesday;1.18;6.65;14.20
+25/02/2026;16:45;;ENGLAND 2;Sheffield United;Coventry City;2.45;3.40;2.71
+25/02/2026;17:00;;ENGLAND 2;Stoke City;Oxford United;1.82;3.40;4.47
+25/02/2026;16:00;;SAUDI ARABIA 1;Al Feiha;Neom SC;2.64;3.10;2.45
+25/02/2026;16:00;;SAUDI ARABIA 1;Al Najma;Al Nassr;11.00;8.90;1.10
+25/02/2026;15:00;;SPAIN 2;Ceuta;Cordoba;2.91;3.03;2.72
+25/02/2026;15:00;;SPAIN 4;Torremolinos;Teruel;2.41;2.71;3.17
+25/02/2026;16:00;;SPAIN 4;FC Cartagena;Sevilla FC B;1.69;3.22;5.10
+25/02/2026;13:30;;SPAIN 4;Castellon II;Barcelona II;4.14;4.10;1.64
+25/02/2026;15:00;;SPAIN 4;Aguilas FC;Recr. Huelva;2.40;2.73;3.17
+25/02/2026;15:30;;SPAIN 4;Xerez Deportivo;Real Jaen CF;2.38;2.79;3.20
+25/02/2026;15:00;;SWITZERLAND 1;Winterthur;Thun;6.62;5.50;1.36
