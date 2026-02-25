@@ -34,11 +34,23 @@ def mostrar_historico():
         st.info("Nenhuma aposta encontrada no banco de dados.")
         return
 
+    # --- FUNÇÃO PARA FORMATAR MERCADO (SIMPLES OU DUPLO) ---
+    def formatar_mercado_v2(row):
+        # Mercado 1
+        m1 = f"{row.get('mercado', '?')} ({row.get('linha', '?')})"
+        # Verifica se existe mercado 2 (não é nulo, nem vazio, nem a string 'None')
+        m2_nome = row.get('mercado_2')
+        l2_nome = row.get('linha_2')
+        
+        if m2_nome and m2_nome != "None" and m2_nome != "nan":
+            return f"DUPLA: {m1} + {m2_nome} ({l2_nome})"
+        return m1
+
     # Criamos a coluna de busca para os selects de Update e Delete
     df['Busca'] = (
         df['id'].astype(str) + " | " + 
         df['mandante'].fillna('?') + " x " + df['visitante'].fillna('?') + " | " + 
-        df['mercado'].fillna('?') + " | " + 
+        df.apply(formatar_mercado_v2, axis=1) + " | " + 
         df['data'].astype(str)
     )
 
@@ -102,13 +114,16 @@ def mostrar_historico():
         if data_filtro:
             st.info(f"Exibindo apenas apostas de: **{data_filtro.strftime('%d/%m/%Y')}**")
 
-    # Colunas para exibir (Incluído 'operador')
+    # Criamos uma coluna visual para a tabela facilitar a leitura de duplas
+    df['Mercado/Linha'] = df.apply(formatar_mercado_v2, axis=1)
+
+    # Colunas para exibir (Ajustado para mostrar a nova coluna formatada)
     colunas_exibir = [
-        'id', 'data', 'liga', 'mandante', 'visitante', 'mercado', 
-        'linha', 'metodo', 'stake', 'odd', 'status', 'lucro', 'banca_nome', 'operador'
+        'id', 'data', 'liga', 'mandante', 'visitante', 'Mercado/Linha', 
+        'metodo', 'stake', 'odd', 'status', 'lucro', 'banca_nome', 'operador'
     ]
     
-    # Exibimos apenas as colunas que existem no banco
+    # Exibimos apenas as colunas que existem no banco ou que criamos
     cols_existentes = [c for c in colunas_exibir if c in df.columns]
     
     # Aplicação do filtro de data no DataFrame
@@ -139,3 +154,6 @@ def mostrar_historico():
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao deletar: {e}")
+
+if __name__ == "__main__":
+    mostrar_historico()
