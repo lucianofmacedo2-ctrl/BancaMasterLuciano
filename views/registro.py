@@ -38,7 +38,7 @@ def carregar_paises():
 def mostrar_registro(df_csv):
     st.title("📝 Registro de Aposta")
     
-    # 1. SEÇÃO: CONFIGURAÇÕES (CADASTRO E EXCLUSÃO)
+    # 1. SEÇÃO: CONFIGURAÇÕES (CADASTRO E EXCLUSÃO) - MANTIDA INTEGRALMENTE
     st.subheader("⚙️ Configurações do Sistema")
     tab_cad, tab_exc = st.tabs(["➕ Adicionar Novo", "🗑️ Excluir Existente"])
     
@@ -96,8 +96,12 @@ def mostrar_registro(df_csv):
     # 2. SEÇÃO: REGISTRO INDIVIDUAL (MANUAL)
     st.subheader("🎯 Registro Individual")
     
-    # Checkbox para habilitar modo manual (Fora da base)
-    fora_da_base = st.checkbox("🚩 Jogo fora da Base de Dados (Digitação Livre)")
+    c_m1, c_m2 = st.columns(2)
+    with c_m1:
+        fora_da_base = st.checkbox("🚩 Jogo fora da Base de Dados (Digitação Livre)")
+    with c_m2:
+        # NOVA OPÇÃO SOLICITADA
+        aposta_dupla = st.checkbox("👯 Aposta com Duas Seleções (Combinada)")
 
     # Carregamento das listas
     lista_paises = carregar_paises()
@@ -115,12 +119,11 @@ def mostrar_registro(df_csv):
         nomes_ligas = [item['nome'] for item in ligas_filtradas]
         liga_selecionada = st.selectbox("Liga", nomes_ligas if nomes_ligas else ["-"])
 
-    # Lógica de extração de times da base CSV baseado na Liga
+    # Lógica de extração de times
     times_mandantes = []
     times_visitantes = []
     
     if not fora_da_base and liga_selecionada != "-":
-        # Filtra o CSV pela liga selecionada para pegar os times reais
         df_filtrado = df_csv[df_csv['Liga'] == liga_selecionada]
         if not df_filtrado.empty:
             times_mandantes = sorted(df_filtrado['Mandante'].unique().tolist())
@@ -133,37 +136,45 @@ def mostrar_registro(df_csv):
                 mandante_m = st.text_input("Time Mandante")
             else:
                 mandante_m = st.selectbox("Time Mandante", ["-"] + times_mandantes)
-                
         with l2_c2: 
             if fora_da_base:
                 visitante_m = st.text_input("Time Visitante")
             else:
                 visitante_m = st.selectbox("Time Visitante", ["-"] + times_visitantes)
-                
         with l2_c3: entrada_m = st.text_input("Entrada (Minuto)", placeholder="Ex: 25'")
 
-        l3_c1, l3_c2, l3_c3 = st.columns(3)
-        with l3_c1: mercado_m = st.selectbox("Mercado", lista_mercados if lista_mercados else ["-"])
-        with l3_c2: linha_m = st.text_input("Linha / Seleção")
-        with l3_c3: metodo_m = st.selectbox("Método", lista_metodos if lista_metodos else ["-"])
+        # --- LÓGICA DE MERCADOS (DUPLOS OU SIMPLES) ---
+        if aposta_dupla:
+            l3_c1, l3_c2 = st.columns(2)
+            with l3_c1: mercado_m = st.selectbox("Mercado 1", lista_mercados if lista_mercados else ["-"])
+            with l3_c2: linha_m = st.text_input("Linha / Seleção 1")
+            
+            l3_c3, l3_c4 = st.columns(2)
+            with l3_c3: mercado_2 = st.selectbox("Mercado 2", lista_mercados if lista_mercados else ["-"])
+            with l3_c4: linha_2 = st.text_input("Linha / Seleção 2")
+        else:
+            l3_c1, l3_c2 = st.columns(2)
+            with l3_c1: mercado_m = st.selectbox("Mercado", lista_mercados if lista_mercados else ["-"])
+            with l3_c2: linha_m = st.text_input("Linha / Seleção")
+            mercado_2, linha_2 = None, None
 
         l4_c1, l4_c2, l4_c3 = st.columns(3)
-        with l4_c1: stake_m = st.number_input("Valor Apostado (R$)", min_value=0.0, step=1.0, format="%.2f")
-        with l4_c2: odd_m = st.number_input("Odd", min_value=1.01, step=0.01, format="%.2f")
-        with l4_c3: operador_m = st.selectbox("Operador", lista_operadores if lista_operadores else ["-"])
+        with l4_c1: metodo_m = st.selectbox("Método", lista_metodos if lista_metodos else ["-"])
+        with l4_c2: stake_m = st.number_input("Valor Apostado (R$)", min_value=0.0, step=1.0, format="%.2f")
+        with l4_c3: odd_m = st.number_input("Odd Total", min_value=1.01, step=0.01, format="%.2f")
 
         l5_c1, l5_c2, l5_c3 = st.columns(3)
+        with l5_c1: operador_m = st.selectbox("Operador", lista_operadores if lista_operadores else ["-"])
         try:
             res_b = supabase.table("bancas").select("nome").execute()
             lista_bancas = [str(b['nome']) for b in res_b.data]
         except: lista_bancas = ["-"]
-        
-        with l5_c1: banca_m = st.selectbox("Banca", lista_bancas)
-        with l5_c2: status_m = st.selectbox("Status Inicial", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
-        with l5_c3: obs_m = st.text_input("Observações")
+        with l5_c2: banca_m = st.selectbox("Banca", lista_bancas)
+        with l5_c3: status_m = st.selectbox("Status Inicial", ["Aberta", "Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
+
+        obs_m = st.text_input("Observações")
 
         if st.form_submit_button("🚀 Salvar Aposta Individual"):
-            # Validação básica
             if (not fora_da_base and (mandante_m == "-" or visitante_m == "-")) or (fora_da_base and (not mandante_m or not visitante_m)):
                 st.warning("⚠️ Preencha os nomes dos times.")
             elif liga_selecionada == "-":
@@ -178,18 +189,19 @@ def mostrar_registro(df_csv):
                 dados = {
                     "data": str(data_m), "banca_nome": banca_m, "liga": liga_selecionada, "pais": pais_selecionado,
                     "mandante": mandante_m, "visitante": visitante_m, "mercado": mercado_m,
-                    "linha": linha_m, "metodo": metodo_m, "stake": float(stake_m),
+                    "linha": linha_m, "mercado_2": mercado_2, "linha_2": linha_2, # Novos campos
+                    "metodo": metodo_m, "stake": float(stake_m),
                     "odd": float(odd_m), "status": status_m, "lucro": float(lucro_calc),
                     "obs": obs_m, "entrada": entrada_m, "operador": operador_m
                 }
                 try:
                     supabase.table("apostas").insert(dados).execute()
                     st.success("✅ Aposta salva!"); time.sleep(1); st.rerun()
-                except Exception as e: st.error(f"Erro: {e}")
+                except Exception as e: st.error(f"Erro ao salvar: {e}. Verifique se as colunas mercado_2 e linha_2 existem no banco.")
 
     st.markdown("---")
 
-    # 3. SEÇÃO: REGISTRO EM MASSA (CSV)
+    # 3. SEÇÃO: REGISTRO EM MASSA (CSV) - MANTIDA INTEGRALMENTE
     with st.expander("📤 REGISTRO EM MASSA (CSV)"):
         arquivo_massa = st.file_uploader("Arquivo CSV", type=["csv"])
         if arquivo_massa:
@@ -219,3 +231,6 @@ def mostrar_registro(df_csv):
                         supabase.table("apostas").insert(d).execute()
                     st.success("Importação concluída!"); st.rerun()
             except Exception as e: st.error(f"Erro no CSV: {e}")
+
+if __name__ == "__main__":
+    pass
