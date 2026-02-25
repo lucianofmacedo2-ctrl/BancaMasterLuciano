@@ -15,7 +15,7 @@ def carregar_dados():
         res = supabase.table("apostas").select("*").execute()
         df = pd.DataFrame(res.data)
         if not df.empty:
-            # Limpa espaços em branco que podem vir do CSV ou do input
+            # Limpa espaços em branco
             for col in df.select_dtypes(['object']).columns:
                 df[col] = df[col].astype(str).str.strip()
             # Garante que a coluna data seja datetime para o filtro funcionar
@@ -34,16 +34,17 @@ def mostrar_historico():
         st.info("Nenhuma aposta encontrada no banco de dados.")
         return
 
-    # --- FUNÇÃO PARA FORMATAR MERCADO (SIMPLES OU DUPLO) ---
+    # --- FUNÇÕES AUXILIARES ---
+    def eh_dupla(row):
+        """Verifica se a linha possui uma segunda seleção válida"""
+        m2 = str(row.get('mercado_2', 'None'))
+        return m2 != "None" and m2 != "nan" and m2 != ""
+
     def formatar_mercado_v2(row):
-        # Mercado 1
+        """Formata o nome do mercado para exibição em listas e tabelas"""
         m1 = f"{row.get('mercado', '?')} ({row.get('linha', '?')})"
-        # Verifica se existe mercado 2 (não é nulo, nem vazio, nem a string 'None')
-        m2_nome = row.get('mercado_2')
-        l2_nome = row.get('linha_2')
-        
-        if m2_nome and m2_nome != "None" and m2_nome != "nan":
-            return f"DUPLA: {m1} + {m2_nome} ({l2_nome})"
+        if eh_dupla(row):
+            return f"DUPLA: {m1} + {row.get('mercado_2')} ({row.get('linha_2')})"
         return m1
 
     # Criamos a coluna de busca para os selects de Update e Delete
@@ -57,42 +58,73 @@ def mostrar_historico():
     # --- 1. RESOLVER APOSTAS ABERTAS ---
     st.subheader("🔄 Atualizar Resultado da Aposta")
     
-    # Filtro inteligente: ignora se é maiúsculo ou minúsculo
+    # Filtro inteligente para apostas com status 'Aberta'
     df_abertas = df[df['status'].str.lower() == "aberta"]
 
     if not df_abertas.empty:
         with st.expander(f"📝 {len(df_abertas)} apostas pendentes encontradas", expanded=True):
             escolha = st.selectbox("Selecione a aposta para dar o resultado:", df_abertas['Busca'].tolist())
             
-            c1, c2 = st.columns(2)
-            with c1:
-                novo_status = st.selectbox("Resultado Final:", ["Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
-            with c2:
-                st.write(" ") # Espaçador
-                btn_confirmar = st.button("Confirmar Resultado", use_container_width=True)
+            id_sel = escolha.split(" | ")[0]
+            # Localizamos os dados da linha selecionada
+            dados_aposta = df[df['id'].astype(str) == id_sel].iloc[0]
             
-            if btn_confirmar:
-                id_sel = escolha.split(" | ")[0]
+            is_dupla = eh_dupla(dados_aposta)
+
+            # LÓGICA PARA APOSTA DUPLA
+            if is_dupla:
+                st.info(f"📍 **Aposta Combinada detectada.**")
+                c_sel1, c_sel2 = st.columns(2)
                 
-                # Localizamos os dados da linha selecionada para o cálculo
-                dados_aposta = df[df['id'].astype(str) == id_sel].iloc[0]
+                with c_sel1:
+                    st.markdown(f"**Seleção 1:**\n{dados_aposta['mercado']} - {dados_aposta['linha']}")
+                    res_sel1 = st.selectbox("Resultado Sel. 1", ["Green", "Red", "Devolvida"], key="res_1")
+                
+                with c_sel2:
+                    st.markdown(f"**Seleção 2:**\n{dados_aposta['mercado_2']} - {dados_aposta['linha_2']}")
+                    res_sel2 = st.selectbox("Resultado Sel. 2", ["Green", "Red", "Devolvida"], key="res_2")
+
+                # Definição automática do status do bilhete
+                if res_sel1 == "Green" and res_sel2 == "Green":
+                    status_final = "Green"
+                elif res_sel1 == "Red" or res_sel2 == "Red":
+                    status_final = "Red"
+                elif res_sel1 == "Devolvida" and res_sel2 == "Devolvida":
+                    status_final = "Devolvida"
+                else:
+                    # Casos mistos com Devolvida (ex: Green + Devolvida geralmente vira odd 1 na perna devolvida)
+                    # Para simplificar seu sistema, trataremos como Green parcial ou Devolvida conforme sua preferência
+                    status_final = "Green" if (res_sel1 == "Green" or res_sel2 == "Green") else "Devolvida"
+
+                st.warning(f"O status final do bilhete será: **{status_final}**")
+                st1_save, st2_save = res_sel1, res_sel2
+
+            # LÓGICA PARA APOSTA SIMPLES
+            else:
+                status_final = st.selectbox("Resultado Final:", ["Green", "Meio Green", "Red", "Meio Red", "Devolvida"])
+                st1_save, st2_save = None, None
+
+            if st.button("Confirmar Resultado", use_container_width=True):
                 stake = float(dados_aposta['stake'])
                 odd = float(dados_aposta['odd'])
                 
                 # Recálculo do Lucro
                 lucro_final = 0.0
-                if novo_status == "Green": lucro_final = stake * (odd - 1)
-                elif novo_status == "Meio Green": lucro_final = (stake * (odd - 1)) / 2
-                elif novo_status == "Red": lucro_final = -stake
-                elif novo_status == "Meio Red": lucro_final = -stake / 2
+                if status_final == "Green": lucro_final = stake * (odd - 1)
+                elif status_final == "Meio Green": lucro_final = (stake * (odd - 1)) / 2
+                elif status_final == "Red": lucro_final = -stake
+                elif status_final == "Meio Red": lucro_final = -stake / 2
 
                 try:
-                    supabase.table("apostas").update({
-                        "status": novo_status,
-                        "lucro": float(lucro_final)
-                    }).eq("id", id_sel).execute()
+                    payload = {
+                        "status": status_final,
+                        "lucro": float(lucro_final),
+                        "status_1": st1_save,
+                        "status_2": st2_save
+                    }
+                    supabase.table("apostas").update(payload).eq("id", id_sel).execute()
                     
-                    st.success(f"✅ Aposta {id_sel} atualizada!")
+                    st.success(f"✅ Aposta {id_sel} atualizada com sucesso!")
                     time.sleep(1)
                     st.rerun()
                 except Exception as e:
@@ -105,36 +137,26 @@ def mostrar_historico():
     # --- 2. LISTA GERAL COM FILTRO ---
     st.subheader("📋 Lista Geral de Registros")
     
-    # Filtro de Data
     col_f1, col_f2 = st.columns([1, 2])
     with col_f1:
         data_filtro = st.date_input("📅 Filtrar por dia específica", value=None)
-    with col_f2:
-        st.write("") # Alinhamento visual
-        if data_filtro:
-            st.info(f"Exibindo apenas apostas de: **{data_filtro.strftime('%d/%m/%Y')}**")
-
-    # Criamos uma coluna visual para a tabela facilitar a leitura de duplas
+    
+    # Criamos a coluna visual para a tabela
     df['Mercado/Linha'] = df.apply(formatar_mercado_v2, axis=1)
 
-    # Colunas para exibir (Ajustado para mostrar a nova coluna formatada)
     colunas_exibir = [
         'id', 'data', 'liga', 'mandante', 'visitante', 'Mercado/Linha', 
-        'metodo', 'stake', 'odd', 'status', 'lucro', 'banca_nome', 'operador'
+        'status_1', 'status_2', 'status', 'lucro', 'banca_nome', 'operador'
     ]
     
-    # Exibimos apenas as colunas que existem no banco ou que criamos
     cols_existentes = [c for c in colunas_exibir if c in df.columns]
     
-    # Aplicação do filtro de data no DataFrame
     df_filtrado = df.copy()
     if data_filtro:
         df_filtrado = df_filtrado[df_filtrado['data'] == data_filtro]
 
-    # Ordenação: Mais recentes primeiro (Data e ID)
     df_exibicao = df_filtrado[cols_existentes].sort_values(by=['data', 'id'], ascending=[False, False])
     
-    # Exibição da Tabela
     st.dataframe(
         df_exibicao,
         use_container_width=True,
