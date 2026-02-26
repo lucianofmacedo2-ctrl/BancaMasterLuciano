@@ -40,15 +40,6 @@ def carregar_paises_s2():
 def mostrar_registro(df_csv):
     st.title("📝 Registro de Aposta (S2)")
 
-    # --- DIAGNÓSTICO (DEBUG) ---
-    # Isso ajuda a saber se o CSV de jogos chegou no Sistema 2
-    if df_csv is None or df_csv.empty:
-        st.error("⚠️ Atenção: A base de dados de jogos (CSV) não foi carregada na Main.")
-    else:
-        with st.expander("🔍 Diagnóstico de Dados (Clique para ver se as colunas batem)"):
-            st.write("Colunas encontradas no seu CSV:", df_csv.columns.tolist())
-            st.write("Total de jogos carregados:", len(df_csv))
-
     # 1. SEÇÃO: CONFIGURAÇÕES
     st.subheader("⚙️ Configurações do Sistema 2")
     tab_cad, tab_exc = st.tabs(["➕ Adicionar Novo", "🗑️ Excluir Existente"])
@@ -58,9 +49,9 @@ def mostrar_registro(df_csv):
         with col_c1:
             tipo_novo = st.selectbox("Tipo", ["LIGA", "MERCADO", "METODO", "OPERADOR"], key="tipo_cad_v2")
         with col_c2:
-            nome_novo = st.text_input("Nome (Ex: LIGA PROFISSIONAL)", key="nome_cad_v2").strip().upper()
+            nome_novo = st.text_input("Nome (Ex: AUSTRALIA 1)", key="nome_cad_v2").strip().upper()
         with col_c3:
-            pais_v = st.text_input("País Vinculado (Ex: ARGENTINA)", key="pais_cad_v2").strip().upper() if tipo_novo == "LIGA" else None
+            pais_v = st.text_input("País Vinculado (Ex: AUSTRALIA)", key="pais_cad_v2").strip().upper() if tipo_novo == "LIGA" else None
         
         if st.button("➕ Confirmar Cadastro", key="btn_cad_v2"):
             if nome_novo:
@@ -71,10 +62,8 @@ def mostrar_registro(df_csv):
                         payload = {"nome": nome_novo, "tipo": tipo_novo, "pais_vinculo": pais_v if pais_v else None}
                         supabase.table("config_auxiliares_2").insert(payload).execute()
                     st.success(f"{tipo_novo} cadastrado no S2!")
-                    time.sleep(1)
-                    st.rerun()
+                    time.sleep(1); st.rerun()
                 except Exception as e: st.error(f"Erro: {e}")
-            else: st.warning("Preencha o nome!")
 
     with tab_exc:
         col_e1, col_e2 = st.columns(2)
@@ -97,9 +86,7 @@ def mostrar_registro(df_csv):
                         supabase.table("operadores_2").delete().eq("nome", nome_real).execute()
                     else:
                         supabase.table("config_auxiliares_2").delete().eq("nome", nome_real).eq("tipo", tipo_exc).execute()
-                    st.success("Excluído!")
-                    time.sleep(1)
-                    st.rerun()
+                    st.success("Excluído!"); time.sleep(1); st.rerun()
                 except Exception as e: st.error(f"Erro: {e}")
 
     st.markdown("---")
@@ -109,7 +96,7 @@ def mostrar_registro(df_csv):
     
     c_m1, c_m2 = st.columns(2)
     with c_m1:
-        fora_da_base = st.checkbox("🚩 Jogo fora da Base de Dados", key="fora_base_v2")
+        fora_base = st.checkbox("🚩 Jogo fora da Base de Dados", key="fora_base_v2")
     with c_m2:
         aposta_dupla = st.checkbox("👯 Aposta Combinada", key="dupla_v2")
 
@@ -122,29 +109,31 @@ def mostrar_registro(df_csv):
     with col_p1:
         data_m = st.date_input("Data", datetime.now(), key="data_reg_v2")
     with col_p2:
-        # Se lista_paises estiver vazia, o selectbox só terá o "-"
-        pais_selecionado = st.selectbox("Selecione o País", ["-"] + lista_paises, key="pais_reg_v2")
+        pais_sel = st.selectbox("Selecione o País", ["-"] + lista_paises, key="pais_reg_v2")
     with col_p3:
-        ligas_filtradas = carregar_aux_s2("LIGA", filtro_pais=pais_selecionado) if pais_selecionado != "-" else []
+        ligas_filtradas = carregar_aux_s2("LIGA", filtro_pais=pais_sel) if pais_sel != "-" else []
         nomes_ligas = [item['nome'] for item in ligas_filtradas]
-        liga_selecionada = st.selectbox("Liga", nomes_ligas if nomes_ligas else ["-"], key="liga_reg_v2")
+        liga_sel = st.selectbox("Liga", nomes_ligas if nomes_ligas else ["-"], key="liga_reg_v2")
 
-    # Lógica de extração de times
-    times_m, times_v = [], []
-    if not fora_da_base and liga_selecionada != "-" and df_csv is not None:
-        # Filtro insensível a maiúsculas/minúsculas para evitar erros de digitação
-        df_f = df_csv[df_csv['Liga'].str.upper() == liga_selecionada.upper()]
-        if not df_f.empty:
-            times_m = sorted(df_f['Mandante'].unique().tolist())
-            times_v = sorted(df_f['Visitante'].unique().tolist())
+    # --- NOVA LÓGICA PARA O SEU CSV ESPECÍFICO ---
+    lista_times = []
+    if not fora_base and liga_sel != "-" and df_csv is not None:
+        if liga_sel in df_csv.columns:
+            # Pega a coluna da liga, remove valores vazios e ordena
+            lista_times = df_csv[liga_sel].dropna().sort_values().unique().tolist()
+        else:
+            # Tenta busca aproximada se o nome não for exato
+            colunas_lib = [c for c in df_csv.columns if c.upper() == liga_sel.upper()]
+            if colunas_lib:
+                lista_times = df_csv[colunas_lib[0]].dropna().sort_values().unique().tolist()
 
     with st.form("form_reg_v2", clear_on_submit=True):
         l2_c1, l2_c2, l2_c3 = st.columns(3)
-        with l2_c1: 
-            mandante = st.text_input("Mandante") if fora_da_base else st.selectbox("Mandante", ["-"] + times_m)
-        with l2_c2: 
-            visitante = st.text_input("Visitante") if fora_da_base else st.selectbox("Visitante", ["-"] + times_v)
-        with l2_c3: 
+        with l2_c1:
+            mandante = st.text_input("Mandante") if fora_base else st.selectbox("Mandante", ["-"] + lista_times)
+        with l2_c2:
+            visitante = st.text_input("Visitante") if fora_base else st.selectbox("Visitante", ["-"] + lista_times)
+        with l2_c3:
             entrada = st.text_input("Minuto", placeholder="Ex: 25'")
 
         if aposta_dupla:
@@ -179,10 +168,10 @@ def mostrar_registro(df_csv):
         obs = st.text_input("Observações")
 
         if st.form_submit_button("🚀 Salvar Aposta S2"):
-            if (not fora_da_base and (mandante == "-" or visitante == "-")) or (fora_da_base and (not mandante or not visitante)):
-                st.warning("⚠️ Preencha os nomes dos times.")
-            elif liga_selecionada == "-":
-                st.warning("⚠️ Selecione uma Liga.")
+            if (not fora_base and (mandante == "-" or visitante == "-")) or (fora_base and (not mandante or not visitante)):
+                st.warning("⚠️ Selecione os times.")
+            elif liga_sel == "-":
+                st.warning("⚠️ Selecione a Liga.")
             else:
                 lucro = 0.0
                 if status == "Green": lucro = stake * (odd - 1)
@@ -190,8 +179,8 @@ def mostrar_registro(df_csv):
                 elif status == "Red": lucro = -stake
                 elif status == "Meio Red": lucro = -stake / 2
 
-                dados_v2 = {
-                    "data": str(data_m), "banca_nome": banca, "liga": liga_selecionada, "pais": pais_selecionado,
+                d_v2 = {
+                    "data": str(data_m), "banca_nome": banca, "liga": liga_sel, "pais": pais_sel,
                     "mandante": mandante, "visitante": visitante, "mercado": merc1,
                     "linha": lin1, "mercado_2": merc2, "linha_2": lin2,
                     "metodo": metodo, "stake": float(stake), "odd": float(odd), 
@@ -199,39 +188,6 @@ def mostrar_registro(df_csv):
                     "entrada": entrada, "operador": operador
                 }
                 try:
-                    supabase.table("apostas_2").insert(dados_v2).execute()
-                    st.success("✅ Aposta salva no S2!"); time.sleep(1); st.rerun()
-                except Exception as e: st.error(f"Erro ao salvar: {e}")
-
-    st.markdown("---")
-    
-    # 3. SEÇÃO: REGISTRO EM MASSA
-    with st.expander("📤 REGISTRO EM MASSA (CSV) - S2"):
-        arquivo_massa = st.file_uploader("Arquivo CSV", type=["csv"], key="csv_v2_import")
-        if arquivo_massa:
-            try:
-                df_m = pd.read_csv(arquivo_massa, sep=None, engine='python', encoding='utf-8-sig')
-                df_m.columns = [str(c).strip().lower() for c in df_m.columns]
-                if st.button("🚀 Confirmar Importação CSV S2", key="btn_massa_v2"):
-                    for _, row in df_m.iterrows():
-                        stt = str(row.get('status', 'Aberta'))
-                        stk = float(str(row.get('stake', '0')).replace(',', '.'))
-                        od = float(str(row.get('odd', '1')).replace(',', '.'))
-                        luc = 0.0
-                        if stt == "Green": luc = stk * (od - 1)
-                        elif stt == "Red": luc = -stk
-                        
-                        d = {
-                            "data": str(row.get('data', datetime.now().strftime('%Y-%m-%d'))),
-                            "pais": str(row.get('pais', '')).strip().upper(),
-                            "liga": str(row.get('liga', '')).strip().upper(),
-                            "mandante": str(row.get('mandante', '')), "visitante": str(row.get('visitante', '')),
-                            "entrada": str(row.get('entrada', '')), "mercado": str(row.get('mercado', '')).strip().upper(),
-                            "linha": str(row.get('linha', '')), "metodo": str(row.get('metodo', '')).strip().upper(),
-                            "stake": stk, "odd": od, "status": stt, "lucro": float(luc),
-                            "operador": str(row.get('operador', '')).strip().upper(),
-                            "banca_nome": str(row.get('banca_nome', '')), "obs": str(row.get('obs', ''))
-                        }
-                        supabase.table("apostas_2").insert(d).execute()
-                    st.success("Importação concluída no S2!"); st.rerun()
-            except Exception as e: st.error(f"Erro no CSV: {e}")
+                    supabase.table("apostas_2").insert(d_v2).execute()
+                    st.success("✅ Salvo no Banco S2!"); time.sleep(1); st.rerun()
+                except Exception as e: st.error(f"Erro: {e}")
