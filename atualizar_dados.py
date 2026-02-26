@@ -66,6 +66,7 @@ def atualizar_base():
 
         for m in lista_minutos:
             m_str = str(m)
+            # Trata acréscimos como 45+2 ou 90+5
             base = int(m_str.split('+')[0]) if '+' in m_str else None
             try:
                 if base is None: base = int(float(m_str))
