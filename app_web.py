@@ -36,14 +36,14 @@ def carregar_dados_csv():
 
 df_csv = carregar_dados_csv()
 
-# --- SIDEBAR E NAVEGAÇÃO (IDÊNTICO À IMAGEM ENVIADA) ---
-st.sidebar.title("🏆 Master Luciano S2")
+# --- SIDEBAR E NAVEGAÇÃO (IGUAL À IMAGEM DO SISTEMA 1) ---
+st.sidebar.title("🏆 Master Luciano")
 
 if st.sidebar.button("🔄 Atualizar Dados"):
     st.cache_data.clear()
     st.rerun()
 
-# Lista de opções exatamente igual à sua imagem
+# Lista de opções EXATAMENTE como na sua imagem
 opcoes_menu = [
     "📊 Dashboard", 
     "📅 Jogos", 
@@ -53,9 +53,9 @@ opcoes_menu = [
     "🧪 Backtest", 
     "📝 Registro", 
     "📂 Histórico", 
-    "🏦 Bancas", 
+    "🏢 Bancas", 
     "🎯 Metas",
-    "📈 Tabelas Dinâmicas"
+    "📈 Tabelas S2"
 ]
 
 if 'menu_ativo_2' not in st.session_state:
@@ -66,8 +66,9 @@ st.session_state.menu_ativo_2 = menu
 
 # --- RENDERIZAÇÃO DAS PÁGINAS ---
 if df_csv.empty:
-    st.error("Erro ao carregar os dados.")
+    st.error("Erro ao carregar os dados. Verifique o arquivo CSV.")
 else:
+    # Mapeamento das funções
     if st.session_state.menu_ativo_2 == "📊 Dashboard":
         dashboard.mostrar_dashboard()
     elif st.session_state.menu_ativo_2 == "📅 Jogos":
@@ -84,9 +85,9 @@ else:
         registro.mostrar_registro(df_csv)
     elif st.session_state.menu_ativo_2 == "📂 Histórico":
         historico.mostrar_historico()
-    elif st.session_state.menu_ativo_2 == "🏦 Bancas":
+    elif st.session_state.menu_ativo_2 == "🏢 Bancas":
         bancas.mostrar_bancas()
     elif st.session_state.menu_ativo_2 == "🎯 Metas":
         metas.mostrar_metas()
-    elif st.session_state.menu_ativo_2 == "📈 Tabelas Dinâmicas":
+    elif st.session_state.menu_ativo_2 == "📈 Tabelas S2":
         tabelas.mostrar_tabelas(df_csv)
