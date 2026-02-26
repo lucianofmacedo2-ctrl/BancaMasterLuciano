@@ -5,19 +5,19 @@ import requests
 from io import BytesIO
 import time
 # Importando as views da pasta views2 (Sistema 2)
-from views2 import scout, simulador, tabelas
+from views2 import dashboard, jogos, scout, ranking, simulador, backtest, registro, historico, bancas, metas, tabelas
 import styles
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Master Luciano - Sistema 2", layout="wide", page_icon="🧪")
+st.set_page_config(page_title="Master Luciano - Sistema 2", layout="wide", page_icon="⚽")
 
-# Aplicando estilos (reutilizando o styles.py da raiz)
+# Aplicando estilos originais
 try:
     styles.apply_styles()
 except:
     pass
 
-# --- FUNÇÃO DE CARREGAMENTO DE DADOS (Mesma base do Sistema 1) ---
+# --- FUNÇÃO DE CARREGAMENTO DE DADOS ---
 @st.cache_data(ttl=60)
 def carregar_dados_csv():
     url = f"https://github.com/lucianofmacedo2-ctrl/BancaMasterLuciano/raw/main/dados_25_26.csv?v={time.time()}"
@@ -36,40 +36,67 @@ def carregar_dados_csv():
 
 df_csv = carregar_dados_csv()
 
-# --- SIDEBAR E NAVEGAÇÃO DO SISTEMA 2 ---
-st.sidebar.title("🧪 Sistema de Análise 2")
-st.sidebar.markdown("---")
+# --- SIDEBAR E NAVEGAÇÃO (IDÊNTICO À IMAGEM) ---
+st.sidebar.title("🏆 Master Luciano")
 
-if st.sidebar.button("🔄 Atualizar Base de Dados"):
+if st.sidebar.button("🔄 Atualizar Dados"):
     st.cache_data.clear()
     st.rerun()
 
-# Menu específico do Sistema 2
-opcoes_menu_2 = [
-    "📈 Tabelas Dinâmicas",
-    "🔎 Scout Avançado",
-    "🎲 Simulador Poisson"
+# Lista de opções exatamente como no Sistema 1
+opcoes_menu = [
+    "📊 Dashboard", 
+    "📅 Jogos", 
+    "🔎 Scout", 
+    "🏆 Ranking", 
+    "🎲 Simulador", 
+    "🧪 Backtest", 
+    "📝 Registro", 
+    "📂 Histórico", 
+    "🏦 Bancas", 
+    "🎯 Metas",
+    "📈 Tabelas S2" # Adicionado apenas para diferenciar que este é o sistema novo
 ]
 
 if 'menu_ativo_2' not in st.session_state:
-    st.session_state.menu_ativo_2 = "📈 Tabelas Dinâmicas"
+    st.session_state.menu_ativo_2 = "📊 Dashboard"
 
-menu = st.sidebar.radio("Navegação S2", opcoes_menu_2, index=opcoes_menu_2.index(st.session_state.menu_ativo_2))
+menu = st.sidebar.radio("Navegação", opcoes_menu, index=opcoes_menu.index(st.session_state.menu_ativo_2))
 st.session_state.menu_ativo_2 = menu
 
-# --- RENDERIZAÇÃO DAS PÁGINAS DO SISTEMA 2 ---
+# --- RENDERIZAÇÃO DAS PÁGINAS NO SISTEMA 2 ---
 if df_csv.empty:
-    st.error("Erro ao carregar a base de dados. Verifique a conexão ou o arquivo CSV.")
+    st.error("Erro ao carregar os dados.")
 else:
-    if st.session_state.menu_ativo_2 == "🔎 Scout Avançado":
+    if st.session_state.menu_ativo_2 == "📊 Dashboard":
+        dashboard.mostrar_dashboard()
+
+    elif st.session_state.menu_ativo_2 == "📅 Jogos":
+        jogos.mostrar_jogos(df_csv)
+
+    elif st.session_state.menu_ativo_2 == "🔎 Scout":
         scout.mostrar_scout(df_csv)
 
-    elif st.session_state.menu_ativo_2 == "🎲 Simulador Poisson":
+    elif st.session_state.menu_ativo_2 == "🏆 Ranking":
+        ranking.mostrar_ranking(df_csv)
+
+    elif st.session_state.menu_ativo_2 == "🎲 Simulador":
         simulador.mostrar_simulador(df_csv)
 
-    elif st.session_state.menu_ativo_2 == "📈 Tabelas Dinâmicas":
-        tabelas.mostrar_tabelas(df_csv)
+    elif st.session_state.menu_ativo_2 == "🧪 Backtest":
+        backtest.mostrar_backtest()
 
-# Rodapé lateral para diferenciar os sistemas
-st.sidebar.markdown("---")
-st.sidebar.caption("Modo: Sistema 2 (Independente)")
+    elif st.session_state.menu_ativo_2 == "📝 Registro":
+        registro.mostrar_registro(df_csv)
+
+    elif st.session_state.menu_ativo_2 == "📂 Histórico":
+        historico.mostrar_historico()
+
+    elif st.session_state.menu_ativo_2 == "🏦 Bancas":
+        bancas.mostrar_bancas()
+
+    elif st.session_state.menu_ativo_2 == "🎯 Metas":
+        metas.mostrar_metas()
+    
+    elif st.session_state.menu_ativo_2 == "📈 Tabelas S2":
+        tabelas.mostrar_tabelas(df_csv)
