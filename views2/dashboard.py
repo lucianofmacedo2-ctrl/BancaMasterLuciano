@@ -1,0 +1,239 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from supabase import create_client
+from datetime import datetime, date, timedelta
+import pytz
+
+# --- CONFIGURAÇÃO SUPABASE ---
+URL = "https://suhpdrqviuzrvygyhxhl.supabase.co"
+KEY = "sb_publishable_pM5xDBpqZzo7h5SQqiFcfQ_ixbbydIB"
+supabase = create_client(URL, KEY)
+
+def carregar_tudo():
+    try:
+        # Alterado para tabelas do Sistema 2
+        res_a = supabase.table("apostas_2").select("*").execute()
+        res_b = supabase.table("bancas_2").select("*").execute()
+        res_m = supabase.table("movimentacoes_2").select("*").execute()
+        return pd.DataFrame(res_a.data), pd.DataFrame(res_b.data), pd.DataFrame(res_m.data)
+    except:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
+def mostrar_dashboard():
+    st.markdown("""
+        <style>
+            [data-testid="stMetricValue"] { color: #002b5c !important; font-weight: bold; font-size: 28px; }
+            [data-testid="stMetricLabel"] { color: #1a1a1a !important; font-weight: 500; }
+            .stSubheader { color: #002b5c !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.title("📊 Dashboard de Performance - Sistema 2")
+    df_ap, df_ba, df_mov = carregar_tudo()
+
+    if df_ba.empty:
+        st.warning("Cadastre uma banca no Sistema 2 para ver os gráficos.")
+        return
+
+    if not df_ap.empty:
+        df_ap['data'] = pd.to_datetime(df_ap['data']).dt.tz_localize(None)
+
+    # --- FILTROS ---
+    c_f1, c_f2 = st.columns(2)
+    with c_f1:
+        banca_sel = st.selectbox("Filtrar por Banca", ["Todas"] + df_ba["nome"].tolist(), key="sb_banca_2")
+    
+    with c_f2:
+        tipo_filtro = st.radio("Tipo de Filtro de Data:", ["Intervalo", "Dia Único"], horizontal=True, key="rb_data_2")
+        if not df_ap.empty:
+            d_min, d_max = df_ap['data'].min().date(), df_ap['data'].max().date()
+        else:
+            d_min, d_max = date.today(), date.today()
+
+        if tipo_filtro == "Intervalo":
+            periodo = st.date_input("Selecione o Período", value=(d_min, d_max), key="di_periodo_2")
+        else:
+            periodo = st.date_input("Selecione o Dia", value=d_max, key="di_dia_2")
+
+    # Aplicar Filtro de Data
+    df_f = df_ap.copy()
+    if tipo_filtro == "Intervalo" and isinstance(periodo, tuple) and len(periodo) == 2:
+        df_f = df_f[(df_f['data'].dt.date >= periodo[0]) & (df_f['data'].dt.date <= periodo[1])]
+    elif tipo_filtro == "Dia Único":
+        df_f = df_f[df_f['data'].dt.date == periodo]
+
+    # --- LÓGICA DE SALDO ---
+    if banca_sel != "Todas":
+        row_banca = df_ba[df_ba["nome"] == banca_sel]
+        id_banca = row_banca["id"].iloc[0]
+        s_base = row_banca["saldo_inicial"].iloc[0]
+        df_f = df_f[df_f['banca_nome'] == banca_sel]
+        
+        if not df_mov.empty:
+            movs = df_mov[df_mov['banca_id'] == id_banca]
+            s_ini = s_base + movs[movs['tipo'] == 'Aporte']['valor'].sum() - movs[movs['tipo'] == 'Saque']['valor'].sum()
+        else:
+            s_ini = s_base
+    else:
+        s_base_total = df_ba["saldo_inicial"].sum()
+        s_ini = s_base_total + (df_mov[df_mov['tipo'] == 'Aporte']['valor'].sum() if not df_mov.empty else 0) - (df_mov[df_mov['tipo'] == 'Saque']['valor'].sum() if not df_mov.empty else 0)
+
+    # --- CÁLCULOS ---
+    lucro_total = df_f['lucro'].sum() if not df_f.empty else 0
+    greens_df = df_f[df_f['status'].str.contains('Green', na=False)]
+    reds_df = df_f[df_f['status'].str.contains('Red', na=False)]
+    
+    total_apostas = len(df_f)
+    win_rate = (len(greens_df) / total_apostas * 100) if total_apostas > 0 else 0
+    odd_media_greens = greens_df['odd'].mean() if not greens_df.empty else 0
+
+    # --- MÉTRICAS DE TOPO ---
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Saldo Atualizado", f"R$ {s_ini + lucro_total:.2f}")
+    c2.metric("Lucro Líquido", f"R$ {lucro_total:.2f}")
+    c3.metric("Win Rate", f"{win_rate:.1f}%")
+
+    st.divider()
+    st.subheader(f"📋 Resumo do Período")
+    r1, r2, r3, r4 = st.columns(4)
+    r1.metric("Entradas", total_apostas)
+    r2.metric("Greens ✅", len(greens_df))
+    r3.metric("Reds ❌", len(reds_df))
+    r4.metric("Odd Média (Greens)", f"{odd_media_greens:.2f}")
+
+    # --- RELATÓRIO DE LUCRO DIÁRIO ---
+    st.divider()
+    st.subheader("📅 Relatório Diário de Lucro")
+    if not df_f.empty:
+        df_diario = df_f.copy()
+        df_diario['apenas_data'] = df_diario['data'].dt.date
+        resumo_diario = df_diario.groupby('apenas_data')['lucro'].sum().reset_index()
+        resumo_diario.columns = ['Data', 'Lucro/Prejuízo']
+        resumo_diario = resumo_diario.sort_values('Data', ascending=False)
+
+        def color_positivo_negativo(val):
+            color = '#d4edda' if val >= 0 else '#f8d7da'
+            text_color = '#155724' if val >= 0 else '#721c24'
+            return f'background-color: {color}; color: {text_color}'
+
+        st.dataframe(
+            resumo_diario.style.format({'Lucro/Prejuízo': 'R$ {:.2f}'})
+            .applymap(color_positivo_negativo, subset=['Lucro/Prejuízo']),
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("Sem dados para gerar o relatório diário.")
+
+    # --- RELATÓRIO POR OPERADOR ---
+    st.divider()
+    st.subheader("👤 Performance por Operador")
+    
+    operadores_alvo = ["DOUGLAS", "FÁBIO", "FERNANDO", "LUCIANO"]
+    
+    if not df_f.empty and 'operador' in df_f.columns:
+        df_f['operador'] = df_f['operador'].astype(str).str.upper()
+        
+        stats_op = []
+        for op in operadores_alvo:
+            df_o = df_f[df_f['operador'] == op]
+            if not df_o.empty:
+                g_op = df_o[df_o['status'].str.contains('Green', na=False)]
+                r_op = df_o[df_o['status'].str.contains('Red', na=False)]
+                wr_op = (len(g_op) / len(df_o) * 100)
+                om_op = g_op['odd'].mean() if not g_op.empty else 0
+                stats_op.append({
+                    "Operador": op,
+                    "Entradas": len(df_o),
+                    "Greens ✅": len(g_op),
+                    "Reds ❌": len(r_op),
+                    "Win Rate %": f"{wr_op:.1f}%",
+                    "Odd Média (G)": f"{om_op:.2f}",
+                    "Lucro": f"R$ {df_o['lucro'].sum():.2f}"
+                })
+        
+        if stats_op:
+            st.dataframe(pd.DataFrame(stats_op), use_container_width=True, hide_index=True)
+        
+        # --- ANÁLISE INDIVIDUAL DETALHADA ---
+        st.divider()
+        st.subheader("🔍 Análise Individual Detalhada")
+        op_individual = st.selectbox("Selecione o Operador para ver detalhes", operadores_alvo, key="sel_op_detalhe_2")
+        
+        df_ind = df_f[df_f['operador'] == op_individual]
+        
+        if not df_ind.empty:
+            i1, i2, i3, i4 = st.columns(4)
+            lucro_ind = df_ind['lucro'].sum()
+            g_ind = df_ind[df_ind['status'].str.contains('Green', na=False)]
+            wr_ind = (len(g_ind) / len(df_ind) * 100)
+            stake_ind = df_ind['stake'].sum()
+            roi_ind = (lucro_ind / stake_ind * 100) if stake_ind > 0 else 0
+            
+            i1.metric("Lucro do Operador", f"R$ {lucro_ind:.2f}")
+            i2.metric("Win Rate", f"{wr_ind:.1f}%")
+            i3.metric("ROI %", f"{roi_ind:.1f}%")
+            i4.metric("Stake Total", f"R$ {stake_ind:.2f}")
+            
+            ci1, ci2 = st.columns(2)
+            with ci1:
+                df_met_ind = df_ind.groupby('metodo')['lucro'].sum().reset_index()
+                fig_met_ind = px.bar(df_met_ind, x='metodo', y='lucro', title=f"Lucro por Método: {op_individual}", color='lucro', color_continuous_scale="RdYlGn")
+                st.plotly_chart(fig_met_ind, use_container_width=True, key="fig_met_op_2")
+            
+            with ci2:
+                df_ev_ind = df_ind.sort_values('data').copy()
+                df_ev_ind['Evolução'] = df_ev_ind['lucro'].cumsum()
+                fig_ev_ind = px.line(df_ev_ind, x='data', y='Evolução', title=f"Curva de Lucro: {op_individual}", markers=True)
+                st.plotly_chart(fig_ev_ind, use_container_width=True, key="fig_ev_op_2")
+                
+            with st.expander(f"📄 Ver últimas 30 entradas de {op_individual}"):
+                df_hist = df_ind.sort_values('data', ascending=False).head(30).copy()
+                
+                def color_status(row):
+                    if 'Green' in str(row.status):
+                        return ['background-color: #d4edda; color: #155724'] * len(row)
+                    elif 'Red' in str(row.status):
+                        return ['background-color: #f8d7da; color: #721c24'] * len(row)
+                    return [''] * len(row)
+
+                df_hist['data'] = df_hist['data'].dt.strftime('%d/%m/%Y %H:%M')
+                
+                st.dataframe(
+                    df_hist[['data', 'liga', 'mandante', 'visitante', 'metodo', 'odd', 'status', 'lucro']].style.apply(color_status, axis=1),
+                    use_container_width=True,
+                    hide_index=True
+                )
+        else:
+            st.info(f"O operador {op_individual} não possui entradas no período selecionado.")
+            
+    else:
+        st.warning("Coluna 'operador' não encontrada ou filtros retornaram vazio.")
+
+    # --- GRÁFICOS GERAIS ---
+    if not df_f.empty:
+        st.divider()
+        st.subheader("📈 Gráficos Gerais")
+        
+        df_ev = df_f.sort_values('data')
+        df_ev['Evolução'] = s_ini + df_ev['lucro'].cumsum()
+        st.plotly_chart(px.line(df_ev, x='data', y='Evolução', title="Curva de Património", markers=True), use_container_width=True, key="fig_patrimonio_2")
+
+        st.subheader("🏆 Performance por Método (Top 5 Melhores vs Piores)")
+        df_met = df_f.groupby('metodo').agg({'lucro': 'sum', 'stake': 'sum'}).reset_index()
+        df_met['ROI %'] = (df_met['lucro'] / df_met['stake']) * 100
+        melhores = df_met.nlargest(5, 'lucro')
+        piores = df_met.nsmallest(5, 'lucro')
+        df_top10 = pd.concat([melhores, piores]).drop_duplicates().sort_values(by="lucro", ascending=False)
+        
+        fig_met = px.bar(df_top10, x='metodo', y='lucro', color='ROI %', text=df_top10['ROI %'].apply(lambda x: f"ROI: {x:.1f}%"), title="Lucro por Método e ROI %", color_continuous_scale="RdYlGn")
+        st.plotly_chart(fig_met, use_container_width=True, key="fig_top_metodos_2")
+
+        st.divider()
+        st.subheader("🎯 Distribuição de Odds dos Greens")
+        fig_odd = px.histogram(greens_df, x="odd", nbins=15, title="Onde estão seus acertos?", color_discrete_sequence=['#002b5c'])
+        st.plotly_chart(fig_odd, use_container_width=True, key="fig_hist_odds_2")
+
+    else:
+        st.info("Nenhuma aposta encontrada para este filtro.")
