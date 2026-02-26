@@ -29,7 +29,6 @@ def carregar_operadores_s2():
 
 def carregar_paises_s2():
     try:
-        # Busca todas as entradas do tipo LIGA para extrair os países cadastrados no S2
         res = supabase.table("config_auxiliares_2").select("pais_vinculo").eq("tipo", "LIGA").execute()
         if res.data:
             paises = set([str(item['pais_vinculo']).strip().upper() for item in res.data if item.get('pais_vinculo')])
@@ -40,11 +39,18 @@ def carregar_paises_s2():
 
 def mostrar_registro(df_csv):
     st.title("📝 Registro de Aposta (S2)")
-    
+
+    # --- DIAGNÓSTICO (DEBUG) ---
+    # Isso ajuda a saber se o CSV de jogos chegou no Sistema 2
+    if df_csv is None or df_csv.empty:
+        st.error("⚠️ Atenção: A base de dados de jogos (CSV) não foi carregada na Main.")
+    else:
+        with st.expander("🔍 Diagnóstico de Dados (Clique para ver se as colunas batem)"):
+            st.write("Colunas encontradas no seu CSV:", df_csv.columns.tolist())
+            st.write("Total de jogos carregados:", len(df_csv))
+
     # 1. SEÇÃO: CONFIGURAÇÕES
     st.subheader("⚙️ Configurações do Sistema 2")
-    st.markdown("⚠️ *Cadastre as Ligas e Países abaixo para que apareçam no formulário de registro.*")
-    
     tab_cad, tab_exc = st.tabs(["➕ Adicionar Novo", "🗑️ Excluir Existente"])
     
     with tab_cad:
@@ -52,10 +58,9 @@ def mostrar_registro(df_csv):
         with col_c1:
             tipo_novo = st.selectbox("Tipo", ["LIGA", "MERCADO", "METODO", "OPERADOR"], key="tipo_cad_v2")
         with col_c2:
-            nome_novo = st.text_input("Nome (Ex: COLOMBIA 1)", key="nome_cad_v2").strip().upper()
+            nome_novo = st.text_input("Nome (Ex: LIGA PROFISSIONAL)", key="nome_cad_v2").strip().upper()
         with col_c3:
-            # Importante: O País Vinculado aqui alimenta a lista de países do registro
-            pais_v = st.text_input("País Vinculado (Ex: COLOMBIA)", key="pais_cad_v2").strip().upper() if tipo_novo == "LIGA" else None
+            pais_v = st.text_input("País Vinculado (Ex: ARGENTINA)", key="pais_cad_v2").strip().upper() if tipo_novo == "LIGA" else None
         
         if st.button("➕ Confirmar Cadastro", key="btn_cad_v2"):
             if nome_novo:
@@ -92,7 +97,7 @@ def mostrar_registro(df_csv):
                         supabase.table("operadores_2").delete().eq("nome", nome_real).execute()
                     else:
                         supabase.table("config_auxiliares_2").delete().eq("nome", nome_real).eq("tipo", tipo_exc).execute()
-                    st.success("Excluído do S2!")
+                    st.success("Excluído!")
                     time.sleep(1)
                     st.rerun()
                 except Exception as e: st.error(f"Erro: {e}")
@@ -108,42 +113,39 @@ def mostrar_registro(df_csv):
     with c_m2:
         aposta_dupla = st.checkbox("👯 Aposta Combinada", key="dupla_v2")
 
-    # Carregando dados das tabelas _2
     lista_paises = carregar_paises_s2()
     lista_mercados = [item['nome'] for item in carregar_aux_s2("MERCADO")]
     lista_metodos = [item['nome'] for item in carregar_aux_s2("METODO")]
     lista_operadores = [item['nome'] for item in carregar_operadores_s2()]
 
-    if not lista_paises and not fora_da_base:
-        st.info("💡 Nenhuma Liga cadastrada no Sistema 2. Use a seção 'Configurações' acima para cadastrar.")
-
     col_p1, col_p2, col_p3 = st.columns(3)
     with col_p1:
         data_m = st.date_input("Data", datetime.now(), key="data_reg_v2")
     with col_p2:
+        # Se lista_paises estiver vazia, o selectbox só terá o "-"
         pais_selecionado = st.selectbox("Selecione o País", ["-"] + lista_paises, key="pais_reg_v2")
     with col_p3:
         ligas_filtradas = carregar_aux_s2("LIGA", filtro_pais=pais_selecionado) if pais_selecionado != "-" else []
         nomes_ligas = [item['nome'] for item in ligas_filtradas]
         liga_selecionada = st.selectbox("Liga", nomes_ligas if nomes_ligas else ["-"], key="liga_reg_v2")
 
-    # Busca times do CSV com base na liga selecionada
+    # Lógica de extração de times
     times_m, times_v = [], []
-    if not fora_da_base and liga_selecionada != "-":
-        # Importante: O nome da Liga no CSV deve ser IGUAL ao nome cadastrado na config_auxiliares_2
+    if not fora_da_base and liga_selecionada != "-" and df_csv is not None:
+        # Filtro insensível a maiúsculas/minúsculas para evitar erros de digitação
         df_f = df_csv[df_csv['Liga'].str.upper() == liga_selecionada.upper()]
         if not df_f.empty:
             times_m = sorted(df_f['Mandante'].unique().tolist())
             times_v = sorted(df_f['Visitante'].unique().tolist())
 
-    with st.form("form_registro_s2", clear_on_submit=True):
+    with st.form("form_reg_v2", clear_on_submit=True):
         l2_c1, l2_c2, l2_c3 = st.columns(3)
         with l2_c1: 
-            mandante = st.text_input("Mandante") if fora_da_base else st.selectbox("Time Mandante", ["-"] + times_m)
+            mandante = st.text_input("Mandante") if fora_da_base else st.selectbox("Mandante", ["-"] + times_m)
         with l2_c2: 
-            visitante = st.text_input("Visitante") if fora_da_base else st.selectbox("Time Visitante", ["-"] + times_v)
+            visitante = st.text_input("Visitante") if fora_da_base else st.selectbox("Visitante", ["-"] + times_v)
         with l2_c3: 
-            entrada = st.text_input("Entrada (Minuto)", placeholder="Ex: 25'")
+            entrada = st.text_input("Minuto", placeholder="Ex: 25'")
 
         if aposta_dupla:
             l3_c1, l3_c2 = st.columns(2)
@@ -155,7 +157,7 @@ def mostrar_registro(df_csv):
         else:
             l3_c1, l3_c2 = st.columns(2)
             with l3_c1: merc1 = st.selectbox("Mercado", lista_mercados if lista_mercados else ["-"])
-            with l3_c2: lin1 = st.text_input("Linha / Seleção")
+            with l3_c2: lin1 = st.text_input("Linha")
             merc2, lin2 = None, None
 
         l4_c1, l4_c2, l4_c3 = st.columns(3)
@@ -166,7 +168,6 @@ def mostrar_registro(df_csv):
         l5_c1, l5_c2, l5_c3 = st.columns(3)
         with l5_c1: operador = st.selectbox("Operador", lista_operadores if lista_operadores else ["-"])
         
-        # Puxa bancas da tabela do S2
         try:
             res_b = supabase.table("bancas_2").select("nome").execute()
             lista_b = [str(b['nome']) for b in res_b.data]
@@ -203,4 +204,34 @@ def mostrar_registro(df_csv):
                 except Exception as e: st.error(f"Erro ao salvar: {e}")
 
     st.markdown("---")
-    # (Seção de importação CSV omitida para brevidade, mas mantida no seu arquivo real)
+    
+    # 3. SEÇÃO: REGISTRO EM MASSA
+    with st.expander("📤 REGISTRO EM MASSA (CSV) - S2"):
+        arquivo_massa = st.file_uploader("Arquivo CSV", type=["csv"], key="csv_v2_import")
+        if arquivo_massa:
+            try:
+                df_m = pd.read_csv(arquivo_massa, sep=None, engine='python', encoding='utf-8-sig')
+                df_m.columns = [str(c).strip().lower() for c in df_m.columns]
+                if st.button("🚀 Confirmar Importação CSV S2", key="btn_massa_v2"):
+                    for _, row in df_m.iterrows():
+                        stt = str(row.get('status', 'Aberta'))
+                        stk = float(str(row.get('stake', '0')).replace(',', '.'))
+                        od = float(str(row.get('odd', '1')).replace(',', '.'))
+                        luc = 0.0
+                        if stt == "Green": luc = stk * (od - 1)
+                        elif stt == "Red": luc = -stk
+                        
+                        d = {
+                            "data": str(row.get('data', datetime.now().strftime('%Y-%m-%d'))),
+                            "pais": str(row.get('pais', '')).strip().upper(),
+                            "liga": str(row.get('liga', '')).strip().upper(),
+                            "mandante": str(row.get('mandante', '')), "visitante": str(row.get('visitante', '')),
+                            "entrada": str(row.get('entrada', '')), "mercado": str(row.get('mercado', '')).strip().upper(),
+                            "linha": str(row.get('linha', '')), "metodo": str(row.get('metodo', '')).strip().upper(),
+                            "stake": stk, "odd": od, "status": stt, "lucro": float(luc),
+                            "operador": str(row.get('operador', '')).strip().upper(),
+                            "banca_nome": str(row.get('banca_nome', '')), "obs": str(row.get('obs', ''))
+                        }
+                        supabase.table("apostas_2").insert(d).execute()
+                    st.success("Importação concluída no S2!"); st.rerun()
+            except Exception as e: st.error(f"Erro no CSV: {e}")
