@@ -4,6 +4,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import pytz
 import unicodedata
+from difflib import get_close_matches
+from scipy.stats import poisson
 
 # Links dos arquivos
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
@@ -11,7 +13,6 @@ URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMaster
 def tratar_string_fast(texto):
     if not texto or pd.isna(texto): return ""
     texto = str(texto).upper()
-    # Limpeza rápida de caracteres comuns em CSVs de futebol
     mapa = {"Ã³": "O", "Ã©": "E", "Ã¡": "A", "Ã£": "A", "Ãª": "E", "Ã­": "I", "Ã§": "C", "Ã": "A", "Ã²": "O", "Ã¹": "U"}
     for erro, correto in mapa.items():
         texto = texto.replace(erro, correto)
@@ -25,7 +26,6 @@ def preparar_base_e_ranking(df_hist):
         return pd.DataFrame(), {}, {}, set()
     
     df = df_hist.copy()
-    # Tratamento de colunas numéricas em bloco para performance
     cols_num = [
         'Corners_H', 'Corners_A', 'Total_Corners', 'Total_Gols_FT', 
         'Total_Gols_HT', 'Total_Corners_HT', 'Gols_Mandante_FT', 
@@ -45,10 +45,8 @@ def preparar_base_e_ranking(df_hist):
     df['V_T'] = df['Visitante'].apply(tratar_string_fast)
     df['L_T'] = df['Liga'].apply(tratar_string_fast)
 
-    # --- LÓGICA DE RANKING (POSIÇÕES) ---
     dict_posicoes = {}
     df_rank = df.copy()
-    # Pega apenas a temporada mais recente por liga para o ranking
     if 'Temporada' in df_rank.columns:
         df_rank = df_rank[df_rank.groupby('L_T')['Temporada'].transform(max) == df_rank['Temporada']]
 
@@ -69,7 +67,6 @@ def preparar_base_e_ranking(df_hist):
         for i, (time, _) in enumerate(ranking):
             dict_posicoes[f"{liga}_{time}"] = i + 1
 
-    # Pré-calculando Médias de todos os times (Vetorizado)
     m_stats = df.groupby('M_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
     v_stats = df.groupby('V_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
 
@@ -89,7 +86,7 @@ def preparar_base_e_ranking(df_hist):
     return df, stats_times, dict_posicoes, todos_times
 
 def mostrar_jogos(df_hist_input):
-    st.title("📅 Agenda & Inteligência de Dados")
+    st.title("📅 Agenda & Inteligência de Dados (S2)")
     
     brasil_tz = pytz.timezone('America/Sao_Paulo')
     hoje_dt = datetime.now(brasil_tz).date()
@@ -97,7 +94,6 @@ def mostrar_jogos(df_hist_input):
     if 'data_ex_jogos' not in st.session_state:
         st.session_state.data_ex_jogos = hoje_dt.strftime('%d/%m/%Y')
 
-    # Preparação da Base com Ranking
     df_hist, dict_stats, dict_pos, lista_times_banco = preparar_base_e_ranking(df_hist_input)
 
     with st.expander("💡 Legenda do Radar de Valor"):
@@ -143,7 +139,6 @@ def mostrar_jogos(df_hist_input):
             m_orig, v_orig = str(row['Mandante']), str(row['Visitante'])
             m_t, v_t = tratar_string_fast(m_orig), tratar_string_fast(v_orig)
             
-            # Recuperando Posições
             p_m = dict_pos.get(f"{liga_t}_{m_t}", "?")
             p_v = dict_pos.get(f"{liga_t}_{v_t}", "?")
             
@@ -181,7 +176,6 @@ def mostrar_jogos(df_hist_input):
                 if m_cHT > 4.5:
                     sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
-            # Layout com Botões Analisar e Simular
             c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
             with c1:
                 st.write(f"**{row['Hora']}** | ({p_m}º) {m_orig} vs {v_orig} ({p_v}º){icones}")
@@ -189,14 +183,18 @@ def mostrar_jogos(df_hist_input):
                 st.caption(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')} | {row.get('Odd Visitante','-')}")
             with c3:
                 if st.button("Analisar 🔍", key=f"btn_ana_{idx}", use_container_width=True):
-                    st.session_state.liga_scout = liga
-                    st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
+                    # CORREÇÃO PARA O SISTEMA 2
+                    st.session_state.liga_scout_2 = liga
+                    st.session_state.time_casa_scout_2 = m_orig
+                    st.session_state.time_fora_scout_2 = v_orig
                     st.session_state.menu_ativo = "🔎 Scout"
                     st.rerun()
             with c4:
                 if st.button("Simular 🎲", key=f"btn_sim_{idx}", use_container_width=True):
-                    st.session_state.liga_simulador = liga
-                    st.session_state.time_casa_simulador, st.session_state.time_fora_simulador = m_orig, v_orig
+                    # CORREÇÃO PARA O SISTEMA 2
+                    st.session_state.liga_simulador_2 = liga
+                    st.session_state.time_casa_simulador_2 = m_orig
+                    st.session_state.time_fora_simulador_2 = v_orig
                     st.session_state.menu_ativo = "🎲 Simulador"
                     st.rerun()
 
@@ -217,22 +215,59 @@ def mostrar_jogos(df_hist_input):
     if times_do_dia:
         st.divider()
         st.subheader(f"📊 Performance dos Times ({st.session_state.data_ex_jogos})")
-        df_rank = pd.DataFrame([dict_stats[t] for t in set(times_do_dia) if t in dict_stats])
-        df_rank["Time"] = [t for t in set(times_do_dia) if t in dict_stats]
+        df_rank_perf = pd.DataFrame([dict_stats[t] for t in set(times_do_dia) if t in dict_stats])
+        df_rank_perf["Time"] = [t for t in set(times_do_dia) if t in dict_stats]
         
         r1, r2, r3, r4 = st.columns(4)
         with r1:
             st.write("⚽ Marcam + (FT)")
-            st.dataframe(df_rank.sort_values("Gols_Mandante_FT", ascending=False)[["Time", "Gols_Mandante_FT"]].head(5), hide_index=True)
+            st.dataframe(df_rank_perf.sort_values("Gols_Mandante_FT", ascending=False)[["Time", "Gols_Mandante_FT"]].head(5), hide_index=True)
         with r2:
             st.write("⏱️ Marcam + HT")
-            st.dataframe(df_rank.sort_values("Gols_Mandante_HT", ascending=False)[["Time", "Gols_Mandante_HT"]].head(5), hide_index=True)
+            st.dataframe(df_rank_perf.sort_values("Gols_Mandante_HT", ascending=False)[["Time", "Gols_Mandante_HT"]].head(5), hide_index=True)
         with r3:
             st.write("🚩 Cantos + (FT)")
-            st.dataframe(df_rank.sort_values("Corners_H", ascending=False)[["Time", "Corners_H"]].head(5), hide_index=True)
+            st.dataframe(df_rank_perf.sort_values("Corners_H", ascending=False)[["Time", "Corners_H"]].head(5), hide_index=True)
         with r4:
             st.write("🚩 Cantos + HT")
-            st.dataframe(df_rank.sort_values("Corners_H_HT", ascending=False)[["Time", "Corners_H_HT"]].head(5), hide_index=True)
+            st.dataframe(df_rank_perf.sort_values("Corners_H_HT", ascending=False)[["Time", "Corners_H_HT"]].head(5), hide_index=True)
 
-if __name__ == "__main__":
-    pass
+# --- FUNÇÕES SCOUT E SIMULADOR COM SUPORTE A AUTOMAÇÃO ---
+
+def mostrar_scout(df_csv):
+    st.title("🔎 Scout de Times (S2)")
+    if df_csv is None: return
+    lista_ligas = sorted([str(c) for c in df_csv.columns if "UNNAMED" not in str(c).upper()])
+    idx_liga = 0
+    if 'liga_scout_2' in st.session_state:
+        m = get_close_matches(st.session_state.liga_scout_2, lista_ligas, n=1, cutoff=0.5)
+        if m: idx_liga = lista_ligas.index(m[0])
+    
+    col1, col2 = st.columns(2)
+    with col1: liga_sel = st.selectbox("Selecione a Liga", lista_ligas, index=idx_liga)
+    times_liga = sorted(df_csv[liga_sel].dropna().unique().tolist())
+    idx_m = 0
+    if 'time_casa_scout_2' in st.session_state:
+        m = get_close_matches(st.session_state.time_casa_scout_2, times_liga, n=1, cutoff=0.5)
+        if m: idx_m = times_liga.index(m[0])
+    with col2: time_sel = st.selectbox("Selecione o Time", times_liga, index=idx_m)
+    st.info(f"Análise de **{time_sel}** em **{liga_sel}**")
+
+def mostrar_simulador(df_csv):
+    st.title("🎲 Simulador (S2)")
+    if df_csv is None: return
+    lista_ligas = sorted([str(c) for c in df_csv.columns if "UNNAMED" not in str(c).upper()])
+    idx_l = 0
+    if 'liga_simulador_2' in st.session_state:
+        m = get_close_matches(st.session_state.liga_simulador_2, lista_ligas, n=1, cutoff=0.5)
+        if m: idx_l = lista_ligas.index(m[0])
+    liga_sim = st.selectbox("Liga", lista_ligas, index=idx_l)
+    times_sim = sorted(df_csv[liga_sim].dropna().unique().tolist())
+    idx_m, idx_v = 0, 1
+    if 'time_casa_simulador_2' in st.session_state:
+        m = get_close_matches(st.session_state.time_casa_simulador_2, times_sim, n=1, cutoff=0.5)
+        if m: idx_m = times_sim.index(m[0])
+    if 'time_fora_simulador_2' in st.session_state:
+        v = get_close_matches(st.session_state.time_fora_simulador_2, times_sim, n=1, cutoff=0.5)
+        if v: idx_v = times_sim.index(v[0])
+    st.write(f"Confronto: {times_sim[idx_m]} x {times_sim[idx_v]}")
