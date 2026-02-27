@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 import unicodedata
 
-# Link do arquivo de agenda (compartilhado entre os sistemas)
+# Links dos arquivos
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
 
 def tratar_string_fast(texto):
@@ -48,6 +48,7 @@ def preparar_base_e_ranking(df_hist):
     # --- LÓGICA DE RANKING (POSIÇÕES) ---
     dict_posicoes = {}
     df_rank = df.copy()
+    # Pega apenas a temporada mais recente por liga para o ranking
     if 'Temporada' in df_rank.columns:
         df_rank = df_rank[df_rank.groupby('L_T')['Temporada'].transform(max) == df_rank['Temporada']]
 
@@ -88,14 +89,13 @@ def preparar_base_e_ranking(df_hist):
     return df, stats_times, dict_posicoes, todos_times
 
 def mostrar_jogos(df_hist_input):
-    st.title("📅 Agenda & Inteligência de Dados (S2)")
+    st.title("📅 Agenda & Inteligência de Dados")
     
     brasil_tz = pytz.timezone('America/Sao_Paulo')
     hoje_dt = datetime.now(brasil_tz).date()
     
-    # CHAVE ÚNICA PARA O SISTEMA 2
-    if 'data_ex_jogos_s2' not in st.session_state:
-        st.session_state.data_ex_jogos_s2 = hoje_dt.strftime('%d/%m/%Y')
+    if 'data_ex_jogos' not in st.session_state:
+        st.session_state.data_ex_jogos = hoje_dt.strftime('%d/%m/%Y')
 
     # Preparação da Base com Ranking
     df_hist, dict_stats, dict_pos, lista_times_banco = preparar_base_e_ranking(df_hist_input)
@@ -109,9 +109,7 @@ def mostrar_jogos(df_hist_input):
     @st.cache_data(ttl=300)
     def carregar_agenda_fast(url):
         try:
-            # Bypass cache do GitHub
-            import time
-            df = pd.read_csv(f"{url}?v={time.time()}", sep=None, engine='python', encoding='utf-8-sig')
+            df = pd.read_csv(url, sep=None, engine='python', encoding='utf-8-sig')
             df.columns = [c.strip() for c in df.columns]
             return df
         except: return pd.DataFrame()
@@ -123,16 +121,15 @@ def mostrar_jogos(df_hist_input):
     labels = ["📅 Hoje", "📅 Amanhã", "📅 Depois"]
     
     for i in range(3):
-        # CHAVE ÚNICA PARA O BOTÃO NO SISTEMA 2
-        if cols_btn[i].button(labels[i], key=f"btn_nav_s2_{i}", use_container_width=True):
-            st.session_state.data_ex_jogos_s2 = datas_ops[i].strftime('%d/%m/%Y')
+        if cols_btn[i].button(labels[i], key=f"btn_nav_{i}", use_container_width=True):
+            st.session_state.data_ex_jogos = datas_ops[i].strftime('%d/%m/%Y')
             st.rerun()
 
-    data_alvo = st.session_state.data_ex_jogos_s2[0:5]
+    data_alvo = st.session_state.data_ex_jogos[0:5]
     df_dia = df_agenda[df_agenda['Data'].str.contains(data_alvo, na=False)] if not df_agenda.empty else pd.DataFrame()
 
     if df_dia.empty:
-        st.warning(f"Sem jogos mapeados para {st.session_state.data_ex_jogos_s2}. Verifique se o arquivo Lista_Jogos.csv foi atualizado.")
+        st.warning(f"Sem jogos mapeados para {st.session_state.data_ex_jogos}.")
         return
 
     sugestoes = {"gFT":[], "cFT":[], "gHT":[], "btts":[], "cHT":[]}
@@ -146,6 +143,7 @@ def mostrar_jogos(df_hist_input):
             m_orig, v_orig = str(row['Mandante']), str(row['Visitante'])
             m_t, v_t = tratar_string_fast(m_orig), tratar_string_fast(v_orig)
             
+            # Recuperando Posições
             p_m = dict_pos.get(f"{liga_t}_{m_t}", "?")
             p_v = dict_pos.get(f"{liga_t}_{v_t}", "?")
             
@@ -183,24 +181,23 @@ def mostrar_jogos(df_hist_input):
                 if m_cHT > 4.5:
                     sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
+            # Layout com Botões Analisar e Simular
             c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
             with c1:
                 st.write(f"**{row['Hora']}** | ({p_m}º) {m_orig} vs {v_orig} ({p_v}º){icones}")
             with c2:
                 st.caption(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')} | {row.get('Odd Visitante','-')}")
             with c3:
-                # REDIRECIONAMENTO EXCLUSIVO S2
-                if st.button("Analisar 🔍", key=f"btn_ana_s2_{idx}", use_container_width=True):
+                if st.button("Analisar 🔍", key=f"btn_ana_{idx}", use_container_width=True):
                     st.session_state.liga_scout = liga
                     st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
-                    st.session_state.menu_ativo_2 = "🔎 Scout"
+                    st.session_state.menu_ativo = "🔎 Scout"
                     st.rerun()
             with c4:
-                # REDIRECIONAMENTO EXCLUSIVO S2
-                if st.button("Simular 🎲", key=f"btn_sim_s2_{idx}", use_container_width=True):
+                if st.button("Simular 🎲", key=f"btn_sim_{idx}", use_container_width=True):
                     st.session_state.liga_simulador = liga
                     st.session_state.time_casa_simulador, st.session_state.time_fora_simulador = m_orig, v_orig
-                    st.session_state.menu_ativo_2 = "🎲 Simulador"
+                    st.session_state.menu_ativo = "🎲 Simulador"
                     st.rerun()
 
     st.divider()
@@ -219,20 +216,23 @@ def mostrar_jogos(df_hist_input):
 
     if times_do_dia:
         st.divider()
-        st.subheader(f"📊 Performance dos Times ({st.session_state.data_ex_jogos_s2})")
-        df_rank_perf = pd.DataFrame([dict_stats[t] for t in set(times_do_dia) if t in dict_stats])
-        df_rank_perf["Time"] = [t for t in set(times_do_dia) if t in dict_stats]
+        st.subheader(f"📊 Performance dos Times ({st.session_state.data_ex_jogos})")
+        df_rank = pd.DataFrame([dict_stats[t] for t in set(times_do_dia) if t in dict_stats])
+        df_rank["Time"] = [t for t in set(times_do_dia) if t in dict_stats]
         
         r1, r2, r3, r4 = st.columns(4)
         with r1:
             st.write("⚽ Marcam + (FT)")
-            st.dataframe(df_rank_perf.sort_values("Gols_Mandante_FT", ascending=False)[["Time", "Gols_Mandante_FT"]].head(5), hide_index=True)
+            st.dataframe(df_rank.sort_values("Gols_Mandante_FT", ascending=False)[["Time", "Gols_Mandante_FT"]].head(5), hide_index=True)
         with r2:
             st.write("⏱️ Marcam + HT")
-            st.dataframe(df_rank_perf.sort_values("Gols_Mandante_HT", ascending=False)[["Time", "Gols_Mandante_HT"]].head(5), hide_index=True)
+            st.dataframe(df_rank.sort_values("Gols_Mandante_HT", ascending=False)[["Time", "Gols_Mandante_HT"]].head(5), hide_index=True)
         with r3:
             st.write("🚩 Cantos + (FT)")
-            st.dataframe(df_rank_perf.sort_values("Corners_H", ascending=False)[["Time", "Corners_H"]].head(5), hide_index=True)
+            st.dataframe(df_rank.sort_values("Corners_H", ascending=False)[["Time", "Corners_H"]].head(5), hide_index=True)
         with r4:
             st.write("🚩 Cantos + HT")
-            st.dataframe(df_rank_perf.sort_values("Corners_H_HT", ascending=False)[["Time", "Corners_H_HT"]].head(5), hide_index=True)
+            st.dataframe(df_rank.sort_values("Corners_H_HT", ascending=False)[["Time", "Corners_H_HT"]].head(5), hide_index=True)
+
+if __name__ == "__main__":
+    pass
