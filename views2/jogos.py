@@ -165,23 +165,23 @@ def mostrar_jogos(df_hist_input):
                     st.session_state.id_simular = idx if st.session_state.id_simular != idx else None
                     st.session_state.id_analisar = None
 
-            # --- QUADROS PREMIUM DE ANÁLISE (CENTRALIZADOS) ---
+            # --- QUADROS PREMIUM DE ANÁLISE (NOMES DE COLUNAS EXATOS) ---
             if st.session_state.id_analisar == idx:
                 with st.container(border=True):
-                    # Configuração para centralizar e nomear as colunas exatamente como pedido
+                    # Configuração para nomes de colunas exatos (o Streamlit já centraliza números por padrão)
                     config_p = {
-                        "Jogos": st.column_config.TextColumn("Jogos", width="small", alignment="center"),
-                        "Data": st.column_config.TextColumn("Data", alignment="center"),
-                        "Odd Casa": st.column_config.NumberColumn("Odd Casa", format="%.2f", alignment="center"),
-                        "Odd Fora": st.column_config.NumberColumn("Odd Fora", format="%.2f", alignment="center"),
-                        "Gols FT Feitos": st.column_config.NumberColumn("Gols FT Feitos", format="%d", alignment="center"),
-                        "Gols FT Sofridos": st.column_config.NumberColumn("Gols FT Sofridos", format="%d", alignment="center"),
-                        "Gols HT Feitos": st.column_config.NumberColumn("Gols HT Feitos", format="%d", alignment="center"),
-                        "Gols HT Sofridos": st.column_config.NumberColumn("Gols HT Sofridos", format="%d", alignment="center"),
-                        "Cantos FT Feitos": st.column_config.NumberColumn("Cantos FT Feitos", format="%d", alignment="center"),
-                        "Cantos FT Sofridos": st.column_config.NumberColumn("Cantos FT Sofridos", format="%d", alignment="center"),
-                        "Cantos HT Feitos": st.column_config.NumberColumn("Cantos HT Feitos", format="%d", alignment="center"),
-                        "Cantos HT Sofridos": st.column_config.NumberColumn("Cantos HT Sofridos", format="%d", alignment="center"),
+                        "Jogos": st.column_config.TextColumn("Jogos", width="small"),
+                        "Data": st.column_config.TextColumn("Data"),
+                        "Odd Casa": st.column_config.NumberColumn("Odd Casa", format="%.2f"),
+                        "Odd Fora": st.column_config.NumberColumn("Odd Fora", format="%.2f"),
+                        "Gols FT Feitos": st.column_config.NumberColumn("Gols FT Feitos", format="%d"),
+                        "Gols FT Sofridos": st.column_config.NumberColumn("Gols FT Sofridos", format="%d"),
+                        "Gols HT Feitos": st.column_config.NumberColumn("Gols HT Feitos", format="%d"),
+                        "Gols HT Sofridos": st.column_config.NumberColumn("Gols HT Sofridos", format="%d"),
+                        "Cantos FT Feitos": st.column_config.NumberColumn("Cantos FT Feitos", format="%d"),
+                        "Cantos FT Sofridos": st.column_config.NumberColumn("Cantos FT Sofridos", format="%d"),
+                        "Cantos HT Feitos": st.column_config.NumberColumn("Cantos HT Feitos", format="%d"),
+                        "Cantos HT Sofridos": st.column_config.NumberColumn("Cantos HT Sofridos", format="%d"),
                     }
 
                     # QUADRO MANDANTE
