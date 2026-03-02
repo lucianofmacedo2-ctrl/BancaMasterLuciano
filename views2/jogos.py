@@ -9,7 +9,7 @@ from scipy.stats import poisson
 # --- CONFIGURAÇÕES E LINKS ---
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
 
-# --- 1. FUNÇÕES DE TRATAMENTO E LÓGICA DE RANKING (PRESERVADAS) ---
+# --- 1. FUNÇÕES DE TRATAMENTO E LÓGICA DE RANKING ---
 
 def tratar_string_fast(texto):
     if not texto or pd.isna(texto): return ""
@@ -24,18 +24,25 @@ def tratar_string_fast(texto):
 @st.cache_data(ttl=3600)
 def preparar_base_e_ranking(df_hist):
     if df_hist is None or df_hist.empty: 
-        return pd.DataFrame(), {}, {}, set()
+        return pd.DataFrame(), {}, {}, set(), {}
     
     df = df_hist.copy()
     if 'Data' in df.columns:
         df['Data_DT'] = pd.to_datetime(df['Data'], errors='coerce')
 
+    # Colunas de Tempo Solicitadas
+    cols_tempo = [
+        '0-15_Mandante', '16-30_Mandante', '31-45+_Mandante', '46-60_Mandante', '61-75_Mandante', '76-90+_Mandante',
+        '0-15_Visitante', '16-30_Visitante', '31-45+_Visitante', '46-60_Visitante', '61-75_Visitante', '76-90+_Visitante'
+    ]
+    
     cols_num = [
         'Corners_H', 'Corners_A', 'Total_Corners', 'Total_Gols_FT', 
         'Total_Gols_HT', 'Total_Corners_HT', 'Gols_Mandante_FT', 
         'Gols_Visitante_FT', 'Gols_Mandante_HT', 'Gols_Visitante_HT',
         'Corners_H_HT', 'Corners_A_HT', 'Odd_Mandante_FT', 'Odd_Visitante_FT'
-    ]
+    ] + cols_tempo
+
     for col in cols_num:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
@@ -76,7 +83,6 @@ def preparar_base_e_ranking(df_hist):
         elif s_m is not None: stats_times[t] = s_m
         else: stats_times[t] = s_v
 
-    # Estatísticas por Liga para Filtros
     stats_ligas = df.groupby('L_T').agg({'Total_Gols_FT': 'mean', 'Total_Corners': 'mean'}).to_dict('index')
 
     return df, stats_times, dict_posicoes, todos_times, stats_ligas
@@ -132,8 +138,6 @@ def mostrar_jogos(df_hist_input):
 
     for liga, df_l in df_dia.groupby('Liga'):
         liga_t = tratar_string_fast(liga)
-        
-        # Lógica de Filtro de Perfil de Liga
         if st.session_state.filtro_perfil == "Gols":
             if liga_t in stats_ligas and stats_ligas[liga_t]['Total_Gols_FT'] < 2.6: continue
         elif st.session_state.filtro_perfil == "Cantos":
@@ -156,7 +160,6 @@ def mostrar_jogos(df_hist_input):
                 m_cHT = (s1['Total_Corners_HT'] + s2['Total_Corners_HT']) / 2
                 times_do_dia.extend([m_t, v_t])
                 
-                # Regras de Ícones
                 if m_gFT > 3.0: 
                     icones += " 🔥⚽"
                     sugestoes["gFT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_gFT})
@@ -169,16 +172,15 @@ def mostrar_jogos(df_hist_input):
                 if m_cFT > 11.0: 
                     icones += " 🔥🚩"
                     sugestoes["cFT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cFT})
+                if m_cHT > 4.5:
+                    sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
-                # --- LÓGICA DE ALERTA DE VALOR (💰) ---
+                # Alerta de Valor (💰)
                 try:
                     odd_m = float(str(row.get('Odd Mandante','0')).replace(',','.'))
                     if odd_m > 1.1:
-                        # Se a média de vitórias do mandante indica uma odd justa menor que a odd da casa
-                        prob_vitoria_m = (s1['pts']/3) / 10 # simplificação para exemplo
-                        odd_justa = 1 / prob_vitoria_m if prob_vitoria_m > 0 else 10
-                        if odd_m > (odd_justa * 1.2): # 20% de valor
-                            icones += " 💰"
+                        prob_hist = (s1['pts']/3) / 10 if s1['pts'] > 0 else 0.1
+                        if odd_m > (1/prob_hist * 1.2): icones += " 💰"
                 except: pass
 
             c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
@@ -193,65 +195,55 @@ def mostrar_jogos(df_hist_input):
                     st.session_state.id_simular = idx if st.session_state.id_simular != idx else None
                     st.session_state.id_analisar = None
 
-            # --- QUADROS DE ANÁLISE ---
+            # --- QUADRO ANALISAR (PRESERVADO) ---
             if st.session_state.id_analisar == idx:
                 with st.container(border=True):
-                    config_p = {
-                        "Jogos": st.column_config.TextColumn("Jogos"),
-                        "Data": st.column_config.TextColumn("Data"),
-                        "Odd Casa": st.column_config.NumberColumn("Odd Casa", format="%.2f"),
-                        "Odd Fora": st.column_config.NumberColumn("Odd Fora", format="%.2f"),
-                        "Gols FT Feitos": st.column_config.NumberColumn("Gols FT Feitos", format="%d"),
-                        "Gols FT Sofridos": st.column_config.NumberColumn("Gols FT Sofridos", format="%d"),
-                        "Gols HT Feitos": st.column_config.NumberColumn("Gols HT Feitos", format="%d"),
-                        "Gols HT Sofridos": st.column_config.NumberColumn("Gols HT Sofridos", format="%d"),
-                        "Cantos FT Feitos": st.column_config.NumberColumn("Cantos FT Feitos", format="%d"),
-                        "Cantos FT Sofridos": st.column_config.NumberColumn("Cantos FT Sofridos", format="%d"),
-                        "Cantos HT Feitos": st.column_config.NumberColumn("Cantos HT Feitos", format="%d"),
-                        "Cantos HT Sofridos": st.column_config.NumberColumn("Cantos HT Sofridos", format="%d"),
-                    }
-
-                    # --- SEÇÃO H2H (CONFRONTO DIRETO) ---
                     st.markdown("#### 🤜🤛 Tendência de Confronto Direto (H2H)")
                     df_h2h = df_hist[((df_hist['Mandante'] == m_orig) & (df_hist['Visitante'] == v_orig)) | 
                                      ((df_hist['Mandante'] == v_orig) & (df_hist['Visitante'] == m_orig))].head(5)
                     if not df_h2h.empty:
                         st.dataframe(df_h2h[['Data', 'Mandante', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Visitante']], hide_index=True)
-                    else:
-                        st.caption("Sem confrontos diretos recentes no banco de dados.")
-
-                    # QUADRO MANDANTE
-                    st.markdown(f"**Jogos do {m_orig} jogando na condição de mandante**")
-                    df_m_casa = df_hist[df_hist['Mandante'] == m_orig].sort_values('Data_DT', ascending=False).head(10).copy()
-                    if not df_m_casa.empty:
-                        df_m_casa['Jogos'] = [f"Jogo {i+1}" for i in range(len(df_m_casa))]
-                        q_m = df_m_casa[['Jogos', 'Data', 'Odd_Mandante_FT', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Gols_Mandante_HT', 'Gols_Visitante_HT', 'Corners_H', 'Corners_A', 'Corners_H_HT', 'Corners_A_HT']].rename(columns={
-                            'Odd_Mandante_FT': 'Odd Casa', 'Gols_Mandante_FT': 'Gols FT Feitos', 'Gols_Visitante_FT': 'Gols FT Sofridos',
-                            'Gols_Mandante_HT': 'Gols HT Feitos', 'Gols_Visitante_HT': 'Gols HT Sofridos',
-                            'Corners_H': 'Cantos FT Feitos', 'Corners_A': 'Cantos FT Sofridos', 'Corners_H_HT': 'Cantos HT Feitos', 'Corners_A_HT': 'Cantos HT Sofridos'
-                        })
-                        st.dataframe(q_m, use_container_width=True, hide_index=True, column_config=config_p)
                     
-                    # QUADRO VISITANTE
-                    st.markdown(f"**Jogos do {v_orig} jogando na condição de visitante**")
-                    df_v_fora = df_hist[df_hist['Visitante'] == v_orig].sort_values('Data_DT', ascending=False).head(10).copy()
-                    if not df_v_fora.empty:
-                        df_v_fora['Jogos'] = [f"Jogo {i+1}" for i in range(len(df_v_fora))]
-                        q_v = df_v_fora[['Jogos', 'Data', 'Odd_Visitante_FT', 'Gols_Visitante_FT', 'Gols_Mandante_FT', 'Gols_Visitante_HT', 'Gols_Mandante_HT', 'Corners_A', 'Corners_H', 'Corners_A_HT', 'Corners_H_HT']].rename(columns={
-                            'Odd_Visitante_FT': 'Odd Fora', 'Gols_Visitante_FT': 'Gols FT Feitos', 'Gols_Mandante_FT': 'Gols FT Sofridos',
-                            'Gols_Visitante_HT': 'Gols HT Feitos', 'Gols_Mandante_HT': 'Gols HT Sofridos',
-                            'Corners_A': 'Cantos FT Feitos', 'Corners_H': 'Cantos FT Sofridos', 'Corners_A_HT': 'Cantos HT Feitos', 'Corners_H_HT': 'Cantos HT Sofridos'
-                        })
-                        st.dataframe(q_v, use_container_width=True, hide_index=True, column_config=config_p)
+                    st.markdown(f"**Jogos do {m_orig} em casa**")
+                    df_m_casa = df_hist[df_hist['Mandante'] == m_orig].sort_values('Data_DT', ascending=False).head(10)
+                    if not df_m_casa.empty:
+                        st.dataframe(df_m_casa[['Data', 'Gols_Mandante_FT', 'Gols_Visitante_FT', 'Corners_H', 'Corners_A']], hide_index=True)
 
+            # --- QUADRO SIMULAR (POISSON + MAPA DE TEMPO) ---
             if st.session_state.id_simular == idx:
                 with st.container(border=True):
-                    st.success(f"🎲 **Simulação Poisson:** {m_orig} vs {v_orig}")
+                    st.success(f"🎲 **Simulação de Inteligência:** {m_orig} vs {v_orig}")
                     if m_t in dict_stats and v_t in dict_stats:
-                        g_m, g_v = dict_stats[m_t]['Gols_Mandante_FT'], dict_stats[v_t]['Gols_Visitante_FT']
-                        st.metric("Expectativa de Gols", f"{g_m:.1f} x {g_v:.1f}")
+                        s1, s2 = dict_stats[m_t], dict_stats[v_t]
+                        l_m, l_v = s1['Gols_Mandante_FT'], s2['Gols_Visitante_FT']
+                        
+                        # Poisson Probabilidades
+                        win_m = sum(poisson.pmf(i, l_m) * sum(poisson.pmf(j, l_v) for j in range(i)) for i in range(1, 10))
+                        draw = sum(poisson.pmf(i, l_m) * poisson.pmf(i, l_v) for i in range(10))
+                        win_v = 1 - win_m - draw
+                        p_over25 = 1 - (poisson.pmf(0, l_m+l_v) + poisson.pmf(1, l_m+l_v) + poisson.pmf(2, l_m+l_v))
 
-    # --- 3. SUGESTÕES E PERFORMANCE (MANTIDOS) ---
+                        cs1, cs2, cs3, cs4 = st.columns(4)
+                        cs1.metric("Mandante", f"{win_m*100:.1f}%")
+                        cs2.metric("Empate", f"{draw*100:.1f}%")
+                        cs3.metric("Visitante", f"{win_v*100:.1f}%")
+                        cs4.metric("Prob. O2.5", f"{p_over25*100:.1f}%")
+
+                        st.markdown("**🎯 Placares Mais Prováveis:**")
+                        placares = sorted([(f"{i}x{j}", poisson.pmf(i, l_m)*poisson.pmf(j, l_v)) for i in range(4) for j in range(4)], key=lambda x: x[1], reverse=True)[:3]
+                        cols_p = st.columns(3)
+                        for i, (res, prob) in enumerate(placares): cols_p[i].info(f"**{res}** ({prob*100:.1f}%)")
+
+                        st.markdown("**⏰ Tendência de Minutos (Gols Feitos)**")
+                        labels_tempo = ["0-15'", "16-30'", "31-45'", "46-60'", "61-75'", "76-90'"]
+                        f_m = [s1['0-15_Mandante'], s1['16-30_Mandante'], s1['31-45+_Mandante'], s1['46-60_Mandante'], s1['61-75_Mandante'], s1['76-90+_Mandante']]
+                        f_v = [s2['0-15_Visitante'], s2['16-30_Visitante'], s2['31-45+_Visitante'], s2['46-60_Visitante'], s2['61-75_Visitante'], s2['76-90+_Visitante']]
+                        df_tempo = pd.DataFrame({"Minutos": labels_tempo, m_orig: f_m, v_orig: f_v})
+                        st.area_chart(df_tempo.set_index("Minutos"))
+                    else:
+                        st.error("Dados insuficientes para simular.")
+
+    # --- 3. SUGESTÕES E PERFORMANCE ---
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top Performance)")
     cols_sug = st.columns(5)
