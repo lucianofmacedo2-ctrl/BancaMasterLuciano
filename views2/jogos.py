@@ -9,7 +9,7 @@ from scipy.stats import poisson
 # --- CONFIGURAÇÕES E LINKS ---
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
 
-# --- FUNÇÕES DE TRATAMENTO (SISTEMA 2) ---
+# --- FUNÇÕES DE SUPORTE ---
 
 def tratar_string_fast(texto):
     if not texto or pd.isna(texto): return ""
@@ -27,11 +27,15 @@ def preparar_base_e_ranking(df_hist):
         return pd.DataFrame(), {}, {}, set()
     
     df = df_hist.copy()
+    # Garantir que a coluna Data seja datetime para ordenação
+    if 'Data' in df.columns:
+        df['Data_DT'] = pd.to_datetime(df['Data'], errors='coerce')
+
     cols_num = [
         'Corners_H', 'Corners_A', 'Total_Corners', 'Total_Gols_FT', 
         'Total_Gols_HT', 'Total_Corners_HT', 'Gols_Mandante_FT', 
         'Gols_Visitante_FT', 'Gols_Mandante_HT', 'Gols_Visitante_HT',
-        'Corners_H_HT', 'Corners_A_HT'
+        'Corners_H_HT', 'Corners_A_HT', 'Odd_Mandante_FT', 'Odd_Visitante_FT'
     ]
     for col in cols_num:
         if col in df.columns:
@@ -47,9 +51,6 @@ def preparar_base_e_ranking(df_hist):
 
     dict_posicoes = {}
     df_rank = df.copy()
-    if 'Temporada' in df_rank.columns:
-        df_rank = df_rank[df_rank.groupby('L_T')['Temporada'].transform(max) == df_rank['Temporada']]
-
     for liga, dados_liga in df_rank.groupby('L_T'):
         stats_rank = {}
         for _, r in dados_liga.iterrows():
@@ -58,11 +59,8 @@ def preparar_base_e_ranking(df_hist):
                 if t not in stats_rank: stats_rank[t] = {'pts': 0, 'v': 0, 'sg': 0, 'gf': 0}
                 stats_rank[t]['gf'] += gf
                 stats_rank[t]['sg'] += (gf - gs)
-                if gf > gs: 
-                    stats_rank[t]['pts'] += 3
-                    stats_rank[t]['v'] += 1
+                if gf > gs: stats_rank[t]['pts'] += 3; stats_rank[t]['v'] += 1
                 elif gf == gs: stats_rank[t]['pts'] += 1
-        
         ranking = sorted(stats_rank.items(), key=lambda x: (x[1]['pts'], x[1]['v'], x[1]['sg'], x[1]['gf']), reverse=True)
         for i, (time, _) in enumerate(ranking):
             dict_posicoes[f"{liga}_{time}"] = i + 1
@@ -81,32 +79,18 @@ def preparar_base_e_ranking(df_hist):
 
     return df, stats_times, dict_posicoes, todos_times
 
-def calc_frequencias(df_h):
-    if df_h.empty: return pd.DataFrame()
-    m = {
-        'O 0.5 HT': (df_h['Total_Gols_HT']>0.5).mean()*100, 
-        'O 1.5 FT': (df_h['Total_Gols_FT']>1.5).mean()*100, 
-        'O 2.5 FT': (df_h['Total_Gols_FT']>2.5).mean()*100,
-        'BTTS Sim': ((df_h['Gols_Mandante_FT']>0)&(df_h['Gols_Visitante_FT']>0)).mean()*100,
-        'O 9.5 Cnt': (df_h['Total_Corners']>9.5).mean()*100
-    }
-    return pd.DataFrame([{'Mercado': k, 'Frequência': f"{v:.1f}%"} for k, v in m.items()])
-
 # --- FUNÇÃO PRINCIPAL ---
 
 def mostrar_jogos(df_hist_input):
     st.title("📅 Agenda & Inteligência de Dados")
     
-    # Estados para expandir dados na mesma página
     if "id_analisar" not in st.session_state: st.session_state.id_analisar = None
     if "id_simular" not in st.session_state: st.session_state.id_simular = None
 
     brasil_tz = pytz.timezone('America/Sao_Paulo')
     hoje_dt = datetime.now(brasil_tz).date()
-    if 'data_ex_jogos' not in st.session_state:
-        st.session_state.data_ex_jogos = hoje_dt.strftime('%d/%m/%Y')
+    if 'data_ex_jogos' not in st.session_state: st.session_state.data_ex_jogos = hoje_dt.strftime('%d/%m/%Y')
 
-    # CHAMADA DA FUNÇÃO (CORRIGINDO O ERRO)
     df_hist, dict_stats, dict_pos, _ = preparar_base_e_ranking(df_hist_input)
 
     @st.cache_data(ttl=300)
@@ -119,7 +103,6 @@ def mostrar_jogos(df_hist_input):
 
     df_agenda = carregar_agenda_fast(URL_AGENDA)
     
-    # Filtros de data
     c_data = st.columns(3)
     datas_ops = [hoje_dt, hoje_dt + timedelta(days=1), hoje_dt + timedelta(days=2)]
     labels = ["📅 Hoje", "📅 Amanhã", "📅 Depois"]
@@ -181,17 +164,50 @@ def mostrar_jogos(df_hist_input):
                     st.session_state.id_simular = idx if st.session_state.id_simular != idx else None
                     st.session_state.id_analisar = None
 
-            # --- ÁREA DE EXPANSÃO NA MESMA PÁGINA ---
+            # --- ÁREA DE ANÁLISE PREMIUM (DENTRO DA MESMA PÁGINA) ---
             if st.session_state.id_analisar == idx:
                 with st.container(border=True):
-                    st.info(f"📊 **Scout Detalhado:** {m_orig} vs {v_orig}")
-                    df_m = df_hist[(df_hist['M_T']==m_t)|(df_hist['V_T']==m_t)].head(10)
-                    df_v = df_hist[(df_hist['M_T']==v_t)|(df_hist['V_T']==v_t)].head(10)
-                    col_a, col_b = st.columns(2)
-                    col_a.write(f"**Últimos 10 jogos: {m_orig}**")
-                    col_a.table(calc_frequencias(df_m))
-                    col_b.write(f"**Últimos 10 jogos: {v_orig}**")
-                    col_b.table(calc_frequencias(df_v))
+                    # QUADRO MANDANTE (SÓ EM CASA)
+                    st.subheader(f"🏟️ Jogos do {m_orig} jogando na condição de mandante")
+                    df_m_casa = df_hist[df_hist['Mandante'] == m_orig].sort_values('Data_DT', ascending=False).head(10).copy()
+                    if not df_m_casa.empty:
+                        df_m_casa['Jogos'] = [f"Jogo {i+1}" for i in range(len(df_m_casa))]
+                        quadro_m = df_m_casa[[
+                            'Jogos', 'Data', 'Odd_Mandante_FT', 
+                            'Gols_Mandante_FT', 'Gols_Visitante_FT', 
+                            'Gols_Mandante_HT', 'Gols_Visitante_HT',
+                            'Corners_H', 'Corners_A', 'Corners_H_HT', 'Corners_A_HT'
+                        ]].rename(columns={
+                            'Odd_Mandante_FT': 'Odd Casa',
+                            'Gols_Mandante_FT': 'Gols FT Feitos', 'Gols_Visitante_FT': 'Gols FT Sofridos',
+                            'Gols_Mandante_HT': 'Gols HT Feitos', 'Gols_Visitante_HT': 'Gols HT Sofridos',
+                            'Corners_H': 'Cantos FT Feitos', 'Corners_A': 'Cantos FT Sofridos',
+                            'Corners_H_HT': 'Cantos HT Feitos', 'Corners_A_HT': 'Cantos HT Sofridos'
+                        })
+                        st.dataframe(quadro_m, use_container_width=True, hide_index=True)
+                    else: st.info("Sem dados recentes deste mandante em casa.")
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # QUADRO VISITANTE (SÓ FORA)
+                    st.subheader(f"✈️ Jogos do {v_orig} jogando na condição de visitante")
+                    df_v_fora = df_hist[df_hist['Visitante'] == v_orig].sort_values('Data_DT', ascending=False).head(10).copy()
+                    if not df_v_fora.empty:
+                        df_v_fora['Jogos'] = [f"Jogo {i+1}" for i in range(len(df_v_fora))]
+                        quadro_v = df_v_fora[[
+                            'Jogos', 'Data', 'Odd_Visitante_FT', 
+                            'Gols_Visitante_FT', 'Gols_Mandante_FT', 
+                            'Gols_Visitante_HT', 'Gols_Mandante_HT',
+                            'Corners_A', 'Corners_H', 'Corners_A_HT', 'Corners_H_HT'
+                        ]].rename(columns={
+                            'Odd_Visitante_FT': 'Odd Fora',
+                            'Gols_Visitante_FT': 'Gols FT Feitos', 'Gols_Mandante_FT': 'Gols FT Sofridos',
+                            'Gols_Visitante_HT': 'Gols HT Feitos', 'Gols_Mandante_HT': 'Gols HT Sofridos',
+                            'Corners_A': 'Cantos FT Feitos', 'Corners_H': 'Cantos FT Sofridos',
+                            'Corners_A_HT': 'Cantos HT Feitos', 'Corners_H_HT': 'Cantos HT Sofridos'
+                        })
+                        st.dataframe(quadro_v, use_container_width=True, hide_index=True)
+                    else: st.info("Sem dados recentes deste visitante fora.")
 
             if st.session_state.id_simular == idx:
                 with st.container(border=True):
@@ -200,7 +216,6 @@ def mostrar_jogos(df_hist_input):
                     g_v = dict_stats[v_t]['Gols_Visitante_FT'] if v_t in dict_stats else 1.0
                     prob_btts = (1 - poisson.pmf(0, g_m)) * (1 - poisson.pmf(0, g_v)) * 100
                     st.metric("Probabilidade de BTTS", f"{prob_btts:.1f}%")
-                    st.write(f"Expectativa de Placar: **{g_m:.1f} x {g_v:.1f}**")
 
     # --- SUGESTÕES DO DIA (RESTAURADAS) ---
     st.divider()
