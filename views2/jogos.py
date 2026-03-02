@@ -165,23 +165,23 @@ def mostrar_jogos(df_hist_input):
                     st.session_state.id_simular = idx if st.session_state.id_simular != idx else None
                     st.session_state.id_analisar = None
 
-            # --- QUADROS PREMIUM DE ANÁLISE (CENTRALIZAÇÃO ABSOLUTA) ---
+            # --- QUADROS PREMIUM DE ANÁLISE ---
             if st.session_state.id_analisar == idx:
                 with st.container(border=True):
-                    # Configuração para forçar alinhamento central em cada tipo de coluna
+                    # Configuração de Colunas (sem o argumento alignment que causa erro)
                     config_p = {
-                        "Jogos": st.column_config.TextColumn("Jogos", alignment="center"),
-                        "Data": st.column_config.TextColumn("Data", alignment="center"),
-                        "Odd Casa": st.column_config.NumberColumn("Odd Casa", format="%.2f", alignment="center"),
-                        "Odd Fora": st.column_config.NumberColumn("Odd Fora", format="%.2f", alignment="center"),
-                        "Gols FT Feitos": st.column_config.NumberColumn("Gols FT Feitos", format="%d", alignment="center"),
-                        "Gols FT Sofridos": st.column_config.NumberColumn("Gols FT Sofridos", format="%d", alignment="center"),
-                        "Gols HT Feitos": st.column_config.NumberColumn("Gols HT Feitos", format="%d", alignment="center"),
-                        "Gols HT Sofridos": st.column_config.NumberColumn("Gols HT Sofridos", format="%d", alignment="center"),
-                        "Cantos FT Feitos": st.column_config.NumberColumn("Cantos FT Feitos", format="%d", alignment="center"),
-                        "Cantos FT Sofridos": st.column_config.NumberColumn("Cantos FT Sofridos", format="%d", alignment="center"),
-                        "Cantos HT Feitos": st.column_config.NumberColumn("Cantos HT Feitos", format="%d", alignment="center"),
-                        "Cantos HT Sofridos": st.column_config.NumberColumn("Cantos HT Sofridos", format="%d", alignment="center"),
+                        "Jogos": st.column_config.TextColumn("Jogos"),
+                        "Data": st.column_config.TextColumn("Data"),
+                        "Odd Casa": st.column_config.NumberColumn("Odd Casa", format="%.2f"),
+                        "Odd Fora": st.column_config.NumberColumn("Odd Fora", format="%.2f"),
+                        "Gols FT Feitos": st.column_config.NumberColumn("Gols FT Feitos"),
+                        "Gols FT Sofridos": st.column_config.NumberColumn("Gols FT Sofridos"),
+                        "Gols HT Feitos": st.column_config.NumberColumn("Gols HT Feitos"),
+                        "Gols HT Sofridos": st.column_config.NumberColumn("Gols HT Sofridos"),
+                        "Cantos FT Feitos": st.column_config.NumberColumn("Cantos FT Feitos"),
+                        "Cantos FT Sofridos": st.column_config.NumberColumn("Cantos FT Sofridos"),
+                        "Cantos HT Feitos": st.column_config.NumberColumn("Cantos HT Feitos"),
+                        "Cantos HT Sofridos": st.column_config.NumberColumn("Cantos HT Sofridos"),
                     }
 
                     # QUADRO MANDANTE
@@ -194,7 +194,8 @@ def mostrar_jogos(df_hist_input):
                             'Gols_Mandante_HT': 'Gols HT Feitos', 'Gols_Visitante_HT': 'Gols HT Sofridos',
                             'Corners_H': 'Cantos FT Feitos', 'Corners_A': 'Cantos FT Sofridos', 'Corners_H_HT': 'Cantos HT Feitos', 'Corners_A_HT': 'Cantos HT Sofridos'
                         })
-                        st.dataframe(q_m, use_container_width=True, hide_index=True, column_config=config_p)
+                        # Centralização via Styler (Funciona em todas as versões)
+                        st.dataframe(q_m.style.set_properties(**{'text-align': 'center'}), use_container_width=True, hide_index=True, column_config=config_p)
                     
                     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -208,7 +209,8 @@ def mostrar_jogos(df_hist_input):
                             'Gols_Visitante_HT': 'Gols HT Feitos', 'Gols_Mandante_HT': 'Gols HT Sofridos',
                             'Corners_A': 'Cantos FT Feitos', 'Corners_H': 'Cantos FT Sofridos', 'Corners_A_HT': 'Cantos HT Feitos', 'Corners_H_HT': 'Cantos HT Sofridos'
                         })
-                        st.dataframe(q_v, use_container_width=True, hide_index=True, column_config=config_p)
+                        # Centralização via Styler (Funciona em todas as versões)
+                        st.dataframe(q_v.style.set_properties(**{'text-align': 'center'}), use_container_width=True, hide_index=True, column_config=config_p)
 
             if st.session_state.id_simular == idx:
                 with st.container(border=True):
@@ -217,7 +219,7 @@ def mostrar_jogos(df_hist_input):
                         g_m, g_v = dict_stats[m_t]['Gols_Mandante_FT'], dict_stats[v_t]['Gols_Visitante_FT']
                         st.metric("Expectativa de Gols", f"{g_m:.1f} x {g_v:.1f}")
 
-    # --- 3. SUGESTÕES E PERFORMANCE (MANTIDOS INTEGRALMENTE) ---
+    # --- 3. SUGESTÕES E PERFORMANCE (MANTIDOS) ---
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top Performance)")
     cols_sug = st.columns(5)
