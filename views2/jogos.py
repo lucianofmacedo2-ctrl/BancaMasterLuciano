@@ -9,7 +9,7 @@ from scipy.stats import poisson
 # --- CONFIGURAÇÕES E LINKS ---
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
 
-# --- 1. FUNÇÕES DE TRATAMENTO E LÓGICA DE RANKING (PRESVERVADAS) ---
+# --- 1. FUNÇÕES DE TRATAMENTO E LÓGICA DE RANKING (PRESERVADAS) ---
 
 def tratar_string_fast(texto):
     if not texto or pd.isna(texto): return ""
@@ -78,7 +78,7 @@ def preparar_base_e_ranking(df_hist):
 
     return df, stats_times, dict_posicoes, todos_times
 
-# --- 2. FUNÇÃO PRINCIPAL DE EXIBIÇÃO ---
+# --- 2. FUNÇÃO PRINCIPAL ---
 
 def mostrar_jogos(df_hist_input):
     st.title("📅 Agenda & Inteligência de Dados")
@@ -102,7 +102,6 @@ def mostrar_jogos(df_hist_input):
 
     df_agenda = carregar_agenda_fast(URL_AGENDA)
     
-    # Navegação por data
     c_data = st.columns(3)
     datas_ops = [hoje_dt, hoje_dt + timedelta(days=1), hoje_dt + timedelta(days=2)]
     labels = ["📅 Hoje", "📅 Amanhã", "📅 Depois"]
@@ -132,7 +131,6 @@ def mostrar_jogos(df_hist_input):
             icones = ""
             if m_t in dict_stats and v_t in dict_stats:
                 s1, s2 = dict_stats[m_t], dict_stats[v_t]
-                # Médias para ícones e sugestões
                 m_gFT = (s1['Total_Gols_FT'] + s2['Total_Gols_FT']) / 2
                 m_gHT = (s1['Total_Gols_HT'] + s2['Total_Gols_HT']) / 2
                 m_btts = (s1['BTTS_Realizado'] + s2['BTTS_Realizado']) / 2
@@ -155,7 +153,6 @@ def mostrar_jogos(df_hist_input):
                 if m_cHT > 4.5:
                     sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
-            # Linha do Jogo
             c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
             with c1: st.write(f"**{row['Hora']}** | ({p_m}º) {m_orig} vs {v_orig} ({p_v}º){icones}")
             with c2: st.caption(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Visitante','-')}")
@@ -168,26 +165,27 @@ def mostrar_jogos(df_hist_input):
                     st.session_state.id_simular = idx if st.session_state.id_simular != idx else None
                     st.session_state.id_analisar = None
 
-            # --- ÁREA DE ANÁLISE PREMIUM (EXPANSÍVEL) ---
+            # --- QUADROS PREMIUM DE ANÁLISE (CENTRALIZADOS) ---
             if st.session_state.id_analisar == idx:
                 with st.container(border=True):
+                    # Configuração para centralizar e nomear as colunas exatamente como pedido
                     config_p = {
-                        "Jogos": st.column_config.TextColumn("Jogos", width="small"),
-                        "Data": st.column_config.TextColumn("Data"),
-                        "Odd Casa": st.column_config.NumberColumn("Odd", format="%.2f"),
-                        "Odd Fora": st.column_config.NumberColumn("Odd", format="%.2f"),
-                        "Gols FT Feitos": st.column_config.NumberColumn("⚽ F", format="%d"),
-                        "Gols FT Sofridos": st.column_config.NumberColumn("⚽ S", format="%d"),
-                        "Gols HT Feitos": st.column_config.NumberColumn("HT F", format="%d"),
-                        "Gols HT Sofridos": st.column_config.NumberColumn("HT S", format="%d"),
-                        "Cantos FT Feitos": st.column_config.NumberColumn("🚩 F", format="%d"),
-                        "Cantos FT Sofridos": st.column_config.NumberColumn("🚩 S", format="%d"),
-                        "Cantos HT Feitos": st.column_config.NumberColumn("🚩HT F", format="%d"),
-                        "Cantos HT Sofridos": st.column_config.NumberColumn("🚩HT S", format="%d"),
+                        "Jogos": st.column_config.TextColumn("Jogos", width="small", alignment="center"),
+                        "Data": st.column_config.TextColumn("Data", alignment="center"),
+                        "Odd Casa": st.column_config.NumberColumn("Odd Casa", format="%.2f", alignment="center"),
+                        "Odd Fora": st.column_config.NumberColumn("Odd Fora", format="%.2f", alignment="center"),
+                        "Gols FT Feitos": st.column_config.NumberColumn("Gols FT Feitos", format="%d", alignment="center"),
+                        "Gols FT Sofridos": st.column_config.NumberColumn("Gols FT Sofridos", format="%d", alignment="center"),
+                        "Gols HT Feitos": st.column_config.NumberColumn("Gols HT Feitos", format="%d", alignment="center"),
+                        "Gols HT Sofridos": st.column_config.NumberColumn("Gols HT Sofridos", format="%d", alignment="center"),
+                        "Cantos FT Feitos": st.column_config.NumberColumn("Cantos FT Feitos", format="%d", alignment="center"),
+                        "Cantos FT Sofridos": st.column_config.NumberColumn("Cantos FT Sofridos", format="%d", alignment="center"),
+                        "Cantos HT Feitos": st.column_config.NumberColumn("Cantos HT Feitos", format="%d", alignment="center"),
+                        "Cantos HT Sofridos": st.column_config.NumberColumn("Cantos HT Sofridos", format="%d", alignment="center"),
                     }
 
-                    # QUADRO MANDANTE (SÓ EM CASA)
-                    st.markdown(f"### 🏟️ Jogos do **{m_orig}** jogando na condição de mandante")
+                    # QUADRO MANDANTE
+                    st.markdown(f"**Jogos do {m_orig} jogando na condição de mandante**")
                     df_m_casa = df_hist[df_hist['Mandante'] == m_orig].sort_values('Data_DT', ascending=False).head(10).copy()
                     if not df_m_casa.empty:
                         df_m_casa['Jogos'] = [f"Jogo {i+1}" for i in range(len(df_m_casa))]
@@ -200,8 +198,8 @@ def mostrar_jogos(df_hist_input):
                     
                     st.markdown("<br>", unsafe_allow_html=True)
 
-                    # QUADRO VISITANTE (SÓ FORA)
-                    st.markdown(f"### ✈️ Jogos do **{v_orig}** jogando na condição de visitante")
+                    # QUADRO VISITANTE
+                    st.markdown(f"**Jogos do {v_orig} jogando na condição de visitante**")
                     df_v_fora = df_hist[df_hist['Visitante'] == v_orig].sort_values('Data_DT', ascending=False).head(10).copy()
                     if not df_v_fora.empty:
                         df_v_fora['Jogos'] = [f"Jogo {i+1}" for i in range(len(df_v_fora))]
@@ -216,11 +214,8 @@ def mostrar_jogos(df_hist_input):
                 with st.container(border=True):
                     st.success(f"🎲 **Simulação Poisson:** {m_orig} vs {v_orig}")
                     if m_t in dict_stats and v_t in dict_stats:
-                        g_m = dict_stats[m_t]['Gols_Mandante_FT']
-                        g_v = dict_stats[v_t]['Gols_Visitante_FT']
-                        prob_btts = (1 - poisson.pmf(0, g_m)) * (1 - poisson.pmf(0, g_v)) * 100
+                        g_m, g_v = dict_stats[m_t]['Gols_Mandante_FT'], dict_stats[v_t]['Gols_Visitante_FT']
                         st.metric("Expectativa de Gols", f"{g_m:.1f} x {g_v:.1f}")
-                        st.metric("Probabilidade BTTS", f"{prob_btts:.1f}%")
 
     # --- 3. SUGESTÕES E PERFORMANCE (PRESERVADOS INTEGRALMENTE NO FINAL) ---
     st.divider()
@@ -241,7 +236,6 @@ def mostrar_jogos(df_hist_input):
         st.subheader(f"📊 Performance dos Times ({st.session_state.data_ex_jogos})")
         df_perf = pd.DataFrame([dict_stats[t] for t in set(times_do_dia) if t in dict_stats])
         df_perf["Time"] = [t for t in set(times_do_dia) if t in dict_stats]
-        
         r1, r2, r3, r4 = st.columns(4)
         with r1:
             st.write("⚽ Marcam + (FT)")
