@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from difflib import get_close_matches
 
 def mostrar_scout(df):
-    st.markdown("## 🔎 Painel de Análise Profissional Ultra V4 - Inteligência Ativa")
+    st.markdown("## 🔎 Painel de Análise Profissional Ultra V5 - Full Intelligence")
     
     # 1. Ajuste e Limpeza de Colunas
     df.columns = [c.strip() for c in df.columns]
@@ -47,7 +47,6 @@ def mostrar_scout(df):
             idx_fora = visitantes_disp.index(matches_v[0])
 
     v_sel = st.selectbox("🚌 Time de Fora", visitantes_disp, index=idx_fora)
-
     n_jogos = st.sidebar.slider("Amostragem (Últimos Jogos)", 5, 50, 10)
 
     # --- FUNÇÕES DE APOIO (PRESERVADAS INTEGRALMENTE) ---
@@ -154,7 +153,6 @@ def mostrar_scout(df):
         st.metric("Odd Justa", f"{oj_m:.2f}")
         if odd_atual_m > oj_m:
             st.success(f"💎 VALOR: Casa paga {odd_atual_m:.2f} (Justa: {oj_m:.2f})")
-        
         cc1, cc2 = st.columns(2)
         cc1.metric("Pos. Geral", f"{t_geral[t_geral['Time']==m_sel]['Pos'].iloc[0]}º")
         cc2.metric("Pos. Casa", f"{t_casa[t_casa['Time']==m_sel]['Pos'].iloc[0] if m_sel in t_casa['Time'].values else '?'}º")
@@ -164,15 +162,61 @@ def mostrar_scout(df):
         st.markdown(f"### 🚌 {v_sel}")
         st.error(f"**Índice de Força: {cf_v:.2f}**")
         st.metric("Odd Justa", f"{oj_v:.2f}")
-        
         cv1, cv2 = st.columns(2)
         cv1.metric("Pos. Geral", f"{t_geral[t_geral['Time']==v_sel]['Pos'].iloc[0]}º")
         cv2.metric("Pos. Fora", f"{t_fora[t_fora['Time']==v_sel]['Pos'].iloc[0] if v_sel in t_fora['Time'].values else '?'}º")
         st.write(f"**Forma Geral:** {get_forma_lista(df_temp, v_sel)}")
 
-    # --- 2. FILTRO DE CONSISTÊNCIA DETALHADO (NOVA FUNCIONALIDADE) ---
+    # --- NOVO: 2. MÉTRICAS PROFISSIONAIS (AS 5 SUGESTÕES) ---
     st.divider()
-    st.subheader("🛡️ Checklist de Previsibilidade por Categoria")
+    st.subheader("🚀 Análise Quantitativa Avançada")
+    
+    def extrair_profissa(time, df_h, mando_sel):
+        # Sugestão 1: Índice de Massacre (Pressão)
+        atq_per = extrair_metrica(df_h, time, 'DangerousAttacks_H', 'DangerousAttacks_A').mean()
+        chutes = extrair_metrica(df_h, time, 'Shots_H', 'Shots_A').mean()
+        cantos = extrair_metrica(df_h, time, 'Corners_H', 'Corners_A').mean()
+        idx_massacre = (atq_per * 0.5) + (chutes * 0.3) + (cantos * 0.2)
+        
+        # Sugestão 4: Clean Sheet e Failed to Score
+        g_marcados = extrair_metrica(df_h, time, 'Gols_Mandante_FT', 'Gols_Visitante_FT')
+        g_sofridos = extrair_metrica(df_h, time, 'Gols_Visitante_FT', 'Gols_Mandante_FT')
+        cs = (g_sofridos == 0).mean() * 100
+        fts = (g_marcados == 0).mean() * 100
+        
+        # Sugestão 5: xG vs Gols Reais (Regressão)
+        xg_medio = extrair_metrica(df_h, time, 'xG_Mandante', 'xG_Visitante').mean()
+        g_medio = g_marcados.mean()
+        dif_xg = g_medio - xg_medio
+
+        return idx_massacre, cs, fts, dif_xg
+
+    df_m_last = df_l[(df_l['Mandante']==m_sel)|(df_l['Visitante']==m_sel)].sort_values('Data', ascending=False).head(n_jogos)
+    df_v_last = df_l[(df_l['Mandante']==v_sel)|(df_l['Visitante']==v_sel)].sort_values('Data', ascending=False).head(n_jogos)
+    
+    im1, cs1, fts1, dxg1 = extrair_profissa(m_sel, df_m_last, 'Casa')
+    im2, cs2, fts2, dxg2 = extrair_profissa(v_sel, df_v_last, 'Fora')
+
+    # Sugestão 3: Matriz de Faltas vs Cartões
+    faltas_m = extrair_metrica(df_m_last, m_sel, 'Fouls_H', 'Fouls_A').mean()
+    faltas_v = extrair_metrica(df_v_last, v_sel, 'Fouls_H', 'Fouls_A').mean()
+    
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("Índice de Massacre", f"{im1:.1f}", f"{im1-im2:.1f}")
+    col_a.caption("Volume de Pressão Ofensiva")
+    
+    col_b.metric("Clean Sheet %", f"{cs1:.0f}%", f"{cs1-cs2:.0f}%")
+    col_b.caption("Jogos sem sofrer gols")
+    
+    col_c.metric("xG Diff", f"{dxg1:.2f}", delta_color="inverse")
+    col_c.caption("Se negativo, o gol está 'maduro'")
+
+    if faltas_m + faltas_v > 24:
+        st.warning(f"⚠️ **ALERTA DE CARTÕES:** Média de {faltas_m + faltas_v:.1f} faltas/jogo. Tendência de Jogo Pegado!")
+
+    # --- 3. CHECKLIST DE CONSISTÊNCIA DETALHADO (PRESERVADO) ---
+    st.divider()
+    st.subheader("🛡️ Checklist de Previsibilidade (CV Home/Away Bias)")
     
     def check_detalhado(time, df_h):
         metricas = {
@@ -195,13 +239,10 @@ def mostrar_scout(df):
             if estaveis: st.success(f"✅ Estáveis: {', '.join(estaveis)}")
             if irregulares: st.warning(f"⚠️ Irregulares: {', '.join(irregulares)}")
 
-    df_m_last = df_l[(df_l['Mandante']==m_sel)|(df_l['Visitante']==m_sel)].sort_values('Data', ascending=False).head(n_jogos)
-    df_v_last = df_l[(df_l['Mandante']==v_sel)|(df_l['Visitante']==v_sel)].sort_values('Data', ascending=False).head(n_jogos)
-    
     check_detalhado(m_sel, df_m_last)
     check_detalhado(v_sel, df_v_last)
 
-    # --- 3. RADAR E CONCLUSÃO DE ESTILO ---
+    # --- 4. RADAR E CONCLUSÃO DE ESTILO ---
     st.divider()
     st.subheader("🕸️ Radar e Conclusão de Estilos")
     
@@ -220,7 +261,7 @@ def mostrar_scout(df):
         if posse_m > 55 and chutes_v_levados > 10:
             st.info(f"📝 **Cenário de Pressão:** {t1} domina a posse e {t2} permite muitas finalizações.")
         elif d1['xG_Mandante'].mean() > 1.6 and d2['xG_Visitante'].mean() > 1.6:
-            st.info(f"📝 **Cenário de BTTS:** Ambos com alto volume de xG (Gols Esperados).")
+            st.info(f"📝 **Cenário de BTTS:** Ambos com alto volume de xG.")
 
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(r=get_vals(t1), theta=metrics, fill='toself', name=t1))
@@ -230,7 +271,7 @@ def mostrar_scout(df):
 
     criar_radar_e_conclusao(m_sel, v_sel, df_temp, df_m_last, df_v_last)
 
-    # --- 4. GOLS POR FAIXA DE TEMPO (GRÁFICO DE ÁREA) ---
+    # --- 5. GOLS POR FAIXA DE TEMPO (GRÁFICO DE ÁREA) ---
     st.subheader("⏰ Distribuição de Gols (Ideal para Live)")
     labels_tempo = ["0-15'", "16-30'", "31-45'", "46-60'", "61-75'", "76-90'"]
     def get_f(time, df_h):
@@ -241,13 +282,12 @@ def mostrar_scout(df):
     
     f_m = get_f(m_sel, df_m_last)
     f_v = get_f(v_sel, df_v_last)
-    
     fig_area = go.Figure()
     fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_m, fill='tozeroy', name=m_sel, line_color='blue'))
     fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_v, fill='tozeroy', name=v_sel, line_color='red'))
     st.plotly_chart(fig_area, use_container_width=True)
 
-    # --- 5. ESTATÍSTICAS DETALHADAS (DISPERSÃO DP/CV) ---
+    # --- 6. ESTATÍSTICAS DETALHADAS (DISPERSÃO DP/CV) ---
     st.divider()
     st.subheader("📉 Performance Detalhada (Média, DP e CV)")
     def color_stats(val):
@@ -272,7 +312,7 @@ def mostrar_scout(df):
     st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🎯 Finalizações", {"No Gol":('ShotsOnTarget_H','ShotsOnTarget_A'), "Total":('Shots_H','Shots_A'), "Fora":('ShotsOffTarget_H','ShotsOffTarget_A')})
     st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "⚖️ Disciplina", {"Faltas":('Fouls_H','Fouls_A'), "Amarelos":('Yellow_Cards_H','Yellow_Cards_A'), "Total Cartões":('Total_Cards_H','Total_Cards_A')})
 
-    # --- 6. CALCULADORA DE INCIDÊNCIA (PRESERVADA) ---
+    # --- 7. CALCULADORA DE INCIDÊNCIA (PRESERVADA) ---
     st.divider()
     st.subheader("💎 Calculadora de Incidência e Odds")
     def calc_inc_full(df_h):
@@ -286,7 +326,7 @@ def mostrar_scout(df):
     ci1.write(f"**{m_sel}**"); ci1.table(calc_inc_full(df_m_last))
     ci2.write(f"**{v_sel}**"); ci2.table(calc_inc_full(df_v_last))
 
-    # --- 7. HISTÓRICO (PRESERVADO) ---
+    # --- 8. HISTÓRICO (PRESERVADO) ---
     st.divider()
     st.subheader("📝 Histórico Recente")
     def hist_final(df_h, time):
