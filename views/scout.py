@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from difflib import get_close_matches
 
 def mostrar_scout(df):
-    st.markdown("## 🔎 Painel de Análise Profissional Ultra V3 - Inteligência Ativa")
+    st.markdown("## 🔎 Painel de Análise Profissional Ultra V4 - Inteligência Ativa")
     
     # 1. Ajuste e Limpeza de Colunas
     df.columns = [c.strip() for c in df.columns]
@@ -50,7 +50,7 @@ def mostrar_scout(df):
 
     n_jogos = st.sidebar.slider("Amostragem (Últimos Jogos)", 5, 50, 10)
 
-    # --- FUNÇÕES DE APOIO (PRESERVADAS) ---
+    # --- FUNÇÕES DE APOIO (PRESERVADAS INTEGRALMENTE) ---
     def extrair_metrica(df_hist, time, col_h, col_a):
         m = df_hist[df_hist['Mandante'] == time][col_h]
         v = df_hist[df_hist['Visitante'] == time][col_a]
@@ -145,7 +145,6 @@ def mostrar_scout(df):
         oj_m, oj_v = 1/prob_m, 1/prob_v
     else: oj_m, oj_v = 2.0, 2.0
 
-    # Busca a odd atual do mercado no DF para comparar valor
     odd_atual_m = df_temp[df_temp['Mandante']==m_sel]['Odd_Mandante_FT'].iloc[0] if 'Odd_Mandante_FT' in df_temp.columns else 0
 
     c1, c2 = st.columns(2)
@@ -171,23 +170,36 @@ def mostrar_scout(df):
         cv2.metric("Pos. Fora", f"{t_fora[t_fora['Time']==v_sel]['Pos'].iloc[0] if v_sel in t_fora['Time'].values else '?'}º")
         st.write(f"**Forma Geral:** {get_forma_lista(df_temp, v_sel)}")
 
-    # --- 2. FILTRO DE CONSISTÊNCIA (SELOS) ---
+    # --- 2. FILTRO DE CONSISTÊNCIA DETALHADO (NOVA FUNCIONALIDADE) ---
     st.divider()
-    st.subheader("🛡️ Checklist de Confiança Estatística")
+    st.subheader("🛡️ Checklist de Previsibilidade por Categoria")
     
-    def verificar_consistencia(time, df_h):
-        gols = extrair_metrica(df_h, time, 'Total_Gols_FT', 'Total_Gols_FT')
-        if len(gols) > 0:
-            cv = gols.std() / gols.mean() if gols.mean() > 0 else 1.0
-            if cv < 0.8: st.success(f"✅ {time}: Estatística Estável (CV: {cv:.2f})")
-            else: st.warning(f"⚠️ {time}: Time Irregular (CV: {cv:.2f})")
+    def check_detalhado(time, df_h):
+        metricas = {
+            "⚽ Gols FT": ('Gols_Mandante_FT', 'Gols_Visitante_FT'),
+            "🚩 Cantos FT": ('Corners_H', 'Corners_A'),
+            "🎯 Chutes no Gol": ('ShotsOnTarget_H', 'ShotsOnTarget_A'),
+            "🟨 Amarelos": ('Yellow_Cards_H', 'Yellow_Cards_A'),
+            "⚖️ Faltas Cometidas": ('Fouls_H', 'Fouls_A')
+        }
+        estaveis, irregulares = [], []
+        for nome, cols in metricas.items():
+            dados = extrair_metrica(df_h, time, cols[0], cols[1])
+            if not dados.empty and dados.mean() > 0:
+                cv = dados.std() / dados.mean()
+                if cv < 0.8: estaveis.append(f"{nome} ({cv:.2f})")
+                else: irregulares.append(f"{nome} ({cv:.2f})")
         
+        with st.container():
+            st.markdown(f"**Análise de {time}:**")
+            if estaveis: st.success(f"✅ Estáveis: {', '.join(estaveis)}")
+            if irregulares: st.warning(f"⚠️ Irregulares: {', '.join(irregulares)}")
+
     df_m_last = df_l[(df_l['Mandante']==m_sel)|(df_l['Visitante']==m_sel)].sort_values('Data', ascending=False).head(n_jogos)
     df_v_last = df_l[(df_l['Mandante']==v_sel)|(df_l['Visitante']==v_sel)].sort_values('Data', ascending=False).head(n_jogos)
     
-    sc1, sc2 = st.columns(2)
-    with sc1: verificar_consistencia(m_sel, df_m_last)
-    with sc2: verificar_consistencia(v_sel, df_v_last)
+    check_detalhado(m_sel, df_m_last)
+    check_detalhado(v_sel, df_v_last)
 
     # --- 3. RADAR E CONCLUSÃO DE ESTILO ---
     st.divider()
@@ -203,7 +215,6 @@ def mostrar_scout(df):
                     extrair_metrica(d, time, 'DangerousAttacks_H', 'DangerousAttacks_A').mean(),
                     extrair_metrica(d, time, 'Shots_H', 'Shots_A').mean()*5]
         
-        # Conclusão Lógica
         posse_m = d1['Possession_H'].mean()
         chutes_v_levados = d2['Shots_H'].mean()
         if posse_m > 55 and chutes_v_levados > 10:
@@ -232,14 +243,13 @@ def mostrar_scout(df):
     f_v = get_f(v_sel, df_v_last)
     
     fig_area = go.Figure()
-    fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_m, fill='tozeroy', name=m_sel))
-    fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_v, fill='tozeroy', name=v_sel))
+    fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_m, fill='tozeroy', name=m_sel, line_color='blue'))
+    fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_v, fill='tozeroy', name=v_sel, line_color='red'))
     st.plotly_chart(fig_area, use_container_width=True)
 
     # --- 5. ESTATÍSTICAS DETALHADAS (DISPERSÃO DP/CV) ---
     st.divider()
     st.subheader("📉 Performance Detalhada (Média, DP e CV)")
-    
     def color_stats(val):
         return 'background-color: #d4edda' if isinstance(val, float) and val < 1.0 else ''
 
@@ -258,8 +268,9 @@ def mostrar_scout(df):
         cb.write(f"**{t2}**"); cb.table(df2.style.format({c: "{:.2f}" for c in cols_n[1:]}).applymap(color_stats, subset=['DP', 'CV']))
 
     st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "⚽ Gols", {"Marcados":('Gols_Mandante_FT','Gols_Visitante_FT'), "Sofridos":('Gols_Visitante_FT','Gols_Mandante_FT'), "Total":('Total_Gols_FT','Total_Gols_FT')})
-    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🚩 Cantos", {"Marcados":('Corners_H','Corners_A'), "Sofridos":('Corners_A','Corners_H')})
-    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🎯 Chutes", {"No Gol":('ShotsOnTarget_H','ShotsOnTarget_A'), "Total":('Shots_H','Shots_A')})
+    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🚩 Cantos", {"Marcados":('Corners_H','Corners_A'), "Sofridos":('Corners_A','Corners_H'), "HT":('Total_Corners_HT', 'Total_Corners_HT')})
+    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🎯 Finalizações", {"No Gol":('ShotsOnTarget_H','ShotsOnTarget_A'), "Total":('Shots_H','Shots_A'), "Fora":('ShotsOffTarget_H','ShotsOffTarget_A')})
+    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "⚖️ Disciplina", {"Faltas":('Fouls_H','Fouls_A'), "Amarelos":('Yellow_Cards_H','Yellow_Cards_A'), "Total Cartões":('Total_Cards_H','Total_Cards_A')})
 
     # --- 6. CALCULADORA DE INCIDÊNCIA (PRESERVADA) ---
     st.divider()
