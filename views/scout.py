@@ -5,13 +5,12 @@ import plotly.graph_objects as go
 from difflib import get_close_matches
 
 def mostrar_scout(df):
-    # Título alterado para você confirmar que o código NOVO carregou
-    st.markdown("## 🔎 Painel de Análise Profissional Ultra V2")
+    st.markdown("## 🔎 Painel de Análise Profissional Ultra V3 - Inteligência Ativa")
     
     # 1. Ajuste e Limpeza de Colunas
     df.columns = [c.strip() for c in df.columns]
 
-    # --- LÓGICA DE INDEXAÇÃO AUTOMÁTICA ---
+    # --- LÓGICA DE INDEXAÇÃO AUTOMÁTICA (SESSÃO) ---
     lista_ligas = sorted(df['Liga'].unique())
     idx_liga = 0
     if 'liga_scout' in st.session_state:
@@ -19,7 +18,7 @@ def mostrar_scout(df):
         if matches_l:
             idx_liga = lista_ligas.index(matches_l[0])
 
-    # 2. SELEÇÃO DA LIGA
+    # 2. SELEÇÃO DA LIGA E TEMPO
     liga_sel = st.selectbox("🏆 Escolha a Liga", lista_ligas, index=idx_liga)
     df_l = df[df['Liga'] == liga_sel].copy()
 
@@ -110,7 +109,7 @@ def mostrar_scout(df):
         gm_g = extrair_metrica(df_t_geral, time, 'Gols_Mandante_FT', 'Gols_Visitante_FT').mean()
         gs_g = extrair_metrica(df_t_geral, time, 'Gols_Visitante_FT', 'Gols_Mandante_FT').mean()
         gm_s = df_t_split['Gols_Mandante_FT' if posicao == 'Mandante' else 'Gols_Visitante_FT'].mean()
-        gs_s = df_t_split['Gols_Visitante_FT' if posicao == 'Mandante' else 'Gols_Mandante_FT'].mean()
+        gs_s = df_t_split['Gols_Visitante_FT' if posicao == 'Mandante' else 'Gols_Visitante_FT'].mean()
         odd_avg = df_t_split['Odd_Mandante_FT' if posicao == 'Mandante' else 'Odd_Visitante_FT'].mean()
         posse = (df_t_split['Possession_H' if posicao == 'Mandante' else 'Possession_A'].mean()) / 10
         atq = (df_t_split['Attacks_H' if posicao == 'Mandante' else 'Attacks_A'].mean() + df_t_split['DangerousAttacks_H' if posicao == 'Mandante' else 'DangerousAttacks_A'].mean()) / 10
@@ -129,52 +128,72 @@ def mostrar_scout(df):
         if gm_g > df_liga['Total_Gols_FT'].mean(): coef += 1
         return max(coef, 0)
 
-    # --- 2. CARDS DE INFORMAÇÃO ---
+    # --- INÍCIO DA INTERFACE ---
     st.divider()
     t_geral = calcular_tabela(df_temp)
     t_casa = calcular_tabela(df_temp, 'Casa')
     t_fora = calcular_tabela(df_temp, 'Fora')
 
+    # --- 1. CARDS DE FORÇA E ODD JUSTA (PAINEL DE VALOR) ---
+    cf_m = calcular_coeficiente(m_sel, df_temp, 'Mandante')
+    cf_v = calcular_coeficiente(v_sel, df_temp, 'Visitante')
+    
+    total_f = cf_m + cf_v
+    if total_f > 0:
+        prob_m = (cf_m / total_f) * 0.85
+        prob_v = (cf_v / total_f) * 0.85
+        oj_m, oj_v = 1/prob_m, 1/prob_v
+    else: oj_m, oj_v = 2.0, 2.0
+
+    # Busca a odd atual do mercado no DF para comparar valor
+    odd_atual_m = df_temp[df_temp['Mandante']==m_sel]['Odd_Mandante_FT'].iloc[0] if 'Odd_Mandante_FT' in df_temp.columns else 0
+
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(f"### 🏠 {m_sel}")
-        cf_m = calcular_coeficiente(m_sel, df_temp, 'Mandante')
         st.info(f"**Índice de Força: {cf_m:.2f}**")
+        st.metric("Odd Justa", f"{oj_m:.2f}")
+        if odd_atual_m > oj_m:
+            st.success(f"💎 VALOR: Casa paga {odd_atual_m:.2f} (Justa: {oj_m:.2f})")
+        
         cc1, cc2 = st.columns(2)
         cc1.metric("Pos. Geral", f"{t_geral[t_geral['Time']==m_sel]['Pos'].iloc[0]}º")
         cc2.metric("Pos. Casa", f"{t_casa[t_casa['Time']==m_sel]['Pos'].iloc[0] if m_sel in t_casa['Time'].values else '?'}º")
         st.write(f"**Forma Geral:** {get_forma_lista(df_temp, m_sel)}")
-        st.write(f"**Forma Casa:** {get_forma_lista(df_temp, m_sel, 'Casa')}")
 
     with c2:
         st.markdown(f"### 🚌 {v_sel}")
-        cf_v = calcular_coeficiente(v_sel, df_temp, 'Visitante')
         st.error(f"**Índice de Força: {cf_v:.2f}**")
+        st.metric("Odd Justa", f"{oj_v:.2f}")
+        
         cv1, cv2 = st.columns(2)
         cv1.metric("Pos. Geral", f"{t_geral[t_geral['Time']==v_sel]['Pos'].iloc[0]}º")
         cv2.metric("Pos. Fora", f"{t_fora[t_fora['Time']==v_sel]['Pos'].iloc[0] if v_sel in t_fora['Time'].values else '?'}º")
         st.write(f"**Forma Geral:** {get_forma_lista(df_temp, v_sel)}")
-        st.write(f"**Forma Fora:** {get_forma_lista(df_temp, v_sel, 'Fora')}")
 
-    # --- NOVO: COMPARATIVO DE VALOR (CONFIRME SE ESTA PARTE APARECE) ---
-    st.markdown("### 📊 Projeção de Match Odds Justas")
-    total_f = cf_m + cf_v
-    if total_f > 0:
-        p_m = (cf_m / total_f) * 0.82
-        p_v = (cf_v / total_f) * 0.82
-        p_e = 0.18
-        oj_m, oj_e, oj_v = 1/p_m, 1/p_e, 1/p_v
-    else: oj_m, oj_e, oj_v = 2.1, 3.4, 3.2
-
-    v1, v2, v3 = st.columns(3)
-    v1.metric(f"Odd Justa {m_sel}", f"{oj_m:.2f}")
-    v2.metric("Odd Justa Empate", f"{oj_e:.2f}")
-    v3.metric(f"Odd Justa {v_sel}", f"{oj_v:.2f}")
-
-    # --- 3. RADAR DE ESTILO (PRESERVADO) ---
+    # --- 2. FILTRO DE CONSISTÊNCIA (SELOS) ---
     st.divider()
-    st.subheader("🕸️ Radar de Estilo de Jogo")
-    def criar_radar(t1, t2, df_temp):
+    st.subheader("🛡️ Checklist de Confiança Estatística")
+    
+    def verificar_consistencia(time, df_h):
+        gols = extrair_metrica(df_h, time, 'Total_Gols_FT', 'Total_Gols_FT')
+        if len(gols) > 0:
+            cv = gols.std() / gols.mean() if gols.mean() > 0 else 1.0
+            if cv < 0.8: st.success(f"✅ {time}: Estatística Estável (CV: {cv:.2f})")
+            else: st.warning(f"⚠️ {time}: Time Irregular (CV: {cv:.2f})")
+        
+    df_m_last = df_l[(df_l['Mandante']==m_sel)|(df_l['Visitante']==m_sel)].sort_values('Data', ascending=False).head(n_jogos)
+    df_v_last = df_l[(df_l['Mandante']==v_sel)|(df_l['Visitante']==v_sel)].sort_values('Data', ascending=False).head(n_jogos)
+    
+    sc1, sc2 = st.columns(2)
+    with sc1: verificar_consistencia(m_sel, df_m_last)
+    with sc2: verificar_consistencia(v_sel, df_v_last)
+
+    # --- 3. RADAR E CONCLUSÃO DE ESTILO ---
+    st.divider()
+    st.subheader("🕸️ Radar e Conclusão de Estilos")
+    
+    def criar_radar_e_conclusao(t1, t2, df_temp, d1, d2):
         metrics = ['Gols', 'Cantos', 'Posse', 'Ataque', 'Chutes']
         def get_vals(time):
             d = df_temp[(df_temp['Mandante']==time)|(df_temp['Visitante']==time)]
@@ -183,26 +202,25 @@ def mostrar_scout(df):
                     extrair_metrica(d, time, 'Possession_H', 'Possession_A').mean(),
                     extrair_metrica(d, time, 'DangerousAttacks_H', 'DangerousAttacks_A').mean(),
                     extrair_metrica(d, time, 'Shots_H', 'Shots_A').mean()*5]
+        
+        # Conclusão Lógica
+        posse_m = d1['Possession_H'].mean()
+        chutes_v_levados = d2['Shots_H'].mean()
+        if posse_m > 55 and chutes_v_levados > 10:
+            st.info(f"📝 **Cenário de Pressão:** {t1} domina a posse e {t2} permite muitas finalizações.")
+        elif d1['xG_Mandante'].mean() > 1.6 and d2['xG_Visitante'].mean() > 1.6:
+            st.info(f"📝 **Cenário de BTTS:** Ambos com alto volume de xG (Gols Esperados).")
+
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(r=get_vals(t1), theta=metrics, fill='toself', name=t1))
         fig.add_trace(go.Scatterpolar(r=get_vals(t2), theta=metrics, fill='toself', name=t2))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True)
         st.plotly_chart(fig, use_container_width=True)
-    criar_radar(m_sel, v_sel, df_temp)
 
-    # --- 4. MOMENTUM ---
-    st.subheader("📈 Momentum e Tendência de xG")
-    def plot_momentum(t1, t2, df_l):
-        d1 = df_l[(df_l['Mandante']==t1)|(df_l['Visitante']==t1)].tail(10)
-        d2 = df_l[(df_l['Mandante']==t2)|(df_l['Visitante']==t2)].tail(10)
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(y=extrair_metrica(d1, t1, 'Total_xG', 'Total_xG'), mode='lines+markers', name=t1))
-        fig.add_trace(go.Scatter(y=extrair_metrica(d2, t2, 'Total_xG', 'Total_xG'), mode='lines+markers', name=t2))
-        st.plotly_chart(fig, use_container_width=True)
-    plot_momentum(m_sel, v_sel, df_l)
+    criar_radar_e_conclusao(m_sel, v_sel, df_temp, df_m_last, df_v_last)
 
-    # --- NOVO: GRÁFICO DE TEMPO (CONFIRME SE ESTA PARTE APARECE) ---
-    st.subheader("⏰ Gols por Faixa de Tempo")
+    # --- 4. GOLS POR FAIXA DE TEMPO (GRÁFICO DE ÁREA) ---
+    st.subheader("⏰ Distribuição de Gols (Ideal para Live)")
     labels_tempo = ["0-15'", "16-30'", "31-45'", "46-60'", "61-75'", "76-90'"]
     def get_f(time, df_h):
         d = df_h[(df_h['Mandante']==time)|(df_h['Visitante']==time)]
@@ -210,14 +228,17 @@ def mostrar_scout(df):
         cols_v = ['0-15_Visitante', '16-30_Visitante', '31-45+_Visitante', '46-60_Visitante', '61-75_Visitante', '76-90+_Visitante']
         return [extrair_metrica(d, time, cm, cv).mean() for cm, cv in zip(cols_m, cols_v)]
     
-    f_m = get_f(m_sel, df_temp)
-    f_v = get_f(v_sel, df_temp)
-    df_chart = pd.DataFrame({m_sel: f_m, v_sel: f_v}, index=labels_tempo)
-    st.bar_chart(df_chart)
+    f_m = get_f(m_sel, df_m_last)
+    f_v = get_f(v_sel, df_v_last)
+    
+    fig_area = go.Figure()
+    fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_m, fill='tozeroy', name=m_sel))
+    fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_v, fill='tozeroy', name=v_sel))
+    st.plotly_chart(fig_area, use_container_width=True)
 
-    # --- 5. ESTATÍSTICAS DETALHADAS (PRESERVADAS) ---
+    # --- 5. ESTATÍSTICAS DETALHADAS (DISPERSÃO DP/CV) ---
     st.divider()
-    st.subheader("📉 Estatísticas Detalhadas de Performance")
+    st.subheader("📉 Performance Detalhada (Média, DP e CV)")
     
     def color_stats(val):
         return 'background-color: #d4edda' if isinstance(val, float) and val < 1.0 else ''
@@ -236,17 +257,13 @@ def mostrar_scout(df):
         ca.write(f"**{t1}**"); ca.table(df1.style.format({c: "{:.2f}" for c in cols_n[1:]}).applymap(color_stats, subset=['DP', 'CV']))
         cb.write(f"**{t2}**"); cb.table(df2.style.format({c: "{:.2f}" for c in cols_n[1:]}).applymap(color_stats, subset=['DP', 'CV']))
 
-    df_m_last = df_l[(df_l['Mandante']==m_sel)|(df_l['Visitante']==m_sel)].sort_values('Data', ascending=False).head(n_jogos)
-    df_v_last = df_l[(df_l['Mandante']==v_sel)|(df_l['Visitante']==v_sel)].sort_values('Data', ascending=False).head(n_jogos)
-
-    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "⚽ Gols", {"Marcados":('Gols_Mandante_FT','Gols_Visitante_FT'), "Sofridos":('Gols_Visitante_FT','Gols_Mandante_FT'), "Total (M+S)":('Total_Gols_FT','Total_Gols_FT')})
-    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🚩 Cantos", {"Marcados FT":('Corners_H','Corners_A'), "Sofridos FT":('Corners_A','Corners_H'), "Marcados HT":('Corners_H_HT','Corners_A_HT'), "Sofridos HT":('Corners_A_HT','Corners_H_HT')})
-    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🎯 Chutes", {"No Gol Marcados":('ShotsOnTarget_H','ShotsOnTarget_A'), "No Gol Sofridos":('ShotsOnTarget_A','ShotsOnTarget_H'), "Total":('Shots_H','Shots_A')})
-    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "⚖️ Disciplina & xG", {"Faltas Sofridas":('Freekicks_H','Freekicks_A'), "Faltas Cometidas":('Fouls_H','Fouls_A'), "Amarelos":('Yellow_Cards_H','Yellow_Cards_A'), "xG":('xG_Mandante','xG_Visitante'), "Posse":('Possession_H','Possession_A')})
+    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "⚽ Gols", {"Marcados":('Gols_Mandante_FT','Gols_Visitante_FT'), "Sofridos":('Gols_Visitante_FT','Gols_Mandante_FT'), "Total":('Total_Gols_FT','Total_Gols_FT')})
+    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🚩 Cantos", {"Marcados":('Corners_H','Corners_A'), "Sofridos":('Corners_A','Corners_H')})
+    st_tabela_estilizada(df_m_last, df_v_last, m_sel, v_sel, "🎯 Chutes", {"No Gol":('ShotsOnTarget_H','ShotsOnTarget_A'), "Total":('Shots_H','Shots_A')})
 
     # --- 6. CALCULADORA DE INCIDÊNCIA (PRESERVADA) ---
     st.divider()
-    st.subheader("💎 Calculadora de Valor")
+    st.subheader("💎 Calculadora de Incidência e Odds")
     def calc_inc_full(df_h):
         m = {
             'O 0.5 HT': df_h['Total_Gols_HT']>0.5, 'O 1.5 FT': df_h['Total_Gols_FT']>1.5, 'O 2.5 FT': df_h['Total_Gols_FT']>2.5,
@@ -260,14 +277,13 @@ def mostrar_scout(df):
 
     # --- 7. HISTÓRICO (PRESERVADO) ---
     st.divider()
-    st.subheader("📝 Histórico Detalhado")
-    def hist_final(df_h, time, modo='Geral'):
-        df_f = df_h[df_h['Mandante'] == time] if modo == 'Casa' else (df_h[df_h['Visitante'] == time] if modo == 'Fora' else df_h[(df_h['Mandante']==time)|(df_h['Visitante']==time)])
-        df_f = df_f.sort_values('Data', ascending=False).head(10)
+    st.subheader("📝 Histórico Recente")
+    def hist_final(df_h, time):
+        df_f = df_h[(df_h['Mandante']==time)|(df_h['Visitante']==time)].sort_values('Data', ascending=False).head(10)
         res = []
         for _, r in df_f.iterrows():
-            res.append({'Data': r['Data'], 'Mando': 'Casa' if r['Mandante']==time else 'Fora', 'Oponente': r['Visitante'] if r['Mandante']==time else r['Mandante'], 'FT': f"{int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])}", 'HT': f"{int(r['Gols_Mandante_HT'])}x{int(r['Gols_Visitante_HT'])}", 'Cantos FT': r['Total_Corners']})
+            res.append({'Data': r['Data'], 'Placar': f"{int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])}", 'Cantos': r['Total_Corners'], 'xG': f"{r['xG_Mandante']}-{r['xG_Visitante']}"})
         return pd.DataFrame(res)
 
-    st.write(f"**{m_sel}: Últimos 10 Gerais**"); st.table(hist_final(df_l, m_sel))
-    st.write(f"**{v_sel}: Últimos 10 Gerais**"); st.table(hist_final(df_l, v_sel))
+    st.write(f"**{m_sel}: Últimos Jogos**"); st.table(hist_final(df_l, m_sel))
+    st.write(f"**{v_sel}: Últimos Jogos**"); st.table(hist_final(df_l, v_sel))
