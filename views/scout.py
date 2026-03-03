@@ -6,7 +6,7 @@ from difflib import get_close_matches
 from datetime import datetime
 
 def mostrar_scout(df):
-    st.markdown("## 🔎 Painel de Análise Profissional Ultra V6 - Elite Intelligence")
+    st.markdown("## 🔎 Painel de Análise Profissional Ultra V7 - Full Intelligence")
     
     # 1. Ajuste e Limpeza de Colunas
     df.columns = [c.strip() for c in df.columns]
@@ -52,7 +52,7 @@ def mostrar_scout(df):
     v_sel = st.selectbox("🚌 Time de Fora", visitantes_disp, index=idx_fora)
     n_jogos = st.sidebar.slider("Amostragem Base (Últimos Jogos)", 5, 50, 10)
 
-    # --- FUNÇÕES DE APOIO (PRESERVADAS INTEGRALMENTE) ---
+    # --- FUNÇÕES DE APOIO ---
     def extrair_metrica(df_hist, time, col_h, col_a):
         m = df_hist[df_hist['Mandante'] == time][col_h]
         v = df_hist[df_hist['Visitante'] == time][col_a]
@@ -127,7 +127,6 @@ def mostrar_scout(df):
         l_score += ((df_t_split['Gols_Mandante_FT']>0) & (df_t_split['Gols_Visitante_FT']>0)).mean() * 5
 
         coef = (ppg_g) + (ppg_s * 2) + (gm_g) + (gm_s * 2) - (gs_g) - (gs_s * 2) - odd_avg + posse + atq + shots + cantos + l_score
-        if gm_g > df_liga['Total_Gols_FT'].mean(): coef += 1
         return max(coef, 0)
 
     # --- NOVAS LÓGICAS PREDITIVAS ---
@@ -162,10 +161,9 @@ def mostrar_scout(df):
     def calc_cansaco(df_h, time):
         if df_h.empty: return 7
         ult_jogo = df_h.sort_values('Data', ascending=False)['Data'].iloc[0]
-        dias = (datetime.now() - ult_jogo).days
-        return dias
+        return (datetime.now() - ult_jogo).days
 
-    # --- INÍCIO DA INTERFACE VISUAL ---
+    # --- INTERFACE VISUAL ---
     st.divider()
     t_casa = calcular_tabela(df_temp, 'Casa')
     t_fora = calcular_tabela(df_temp, 'Fora')
@@ -174,23 +172,16 @@ def mostrar_scout(df):
     cf_m = calcular_coeficiente(m_sel, df_temp, 'Mandante')
     cf_v = calcular_coeficiente(v_sel, df_temp, 'Visitante')
     total_f = cf_m + cf_v
-    prob_m = (cf_m / total_f) * 0.85 if total_f > 0 else 0.42
-    prob_v = (cf_v / total_f) * 0.85 if total_f > 0 else 0.42
-    oj_m, oj_v = 1/prob_m if prob_m > 0 else 2.0, 1/prob_v if prob_v > 0 else 2.0
+    oj_m = 1/((cf_m / total_f) * 0.85) if total_f > 0 else 2.0
+    oj_v = 1/((cf_v / total_f) * 0.85) if total_f > 0 else 2.0
     odd_atual_m = df_temp[df_temp['Mandante']==m_sel]['Odd_Mandante_FT'].iloc[0] if 'Odd_Mandante_FT' in df_temp.columns else 0
 
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(f"### 🏠 {m_sel}")
-        st.info(f"**Índice de Força: {cf_m:.2f}**")
-        st.metric("Odd Justa", f"{oj_m:.2f}")
+        st.info(f"**Índice de Força: {cf_m:.2f}** | **Odd Justa: {oj_m:.2f}**")
         if odd_atual_m > oj_m: st.success(f"💎 VALOR: {odd_atual_m:.2f}")
-        
-        # Resiliência e Cansaço
-        res_m = calc_resiliencia(df_m_cluster, m_sel)
-        cans_m = calc_cansaco(df_m_cluster, m_sel)
-        st.write(f"💪 **Resiliência:** {res_m:.0f}% | 🔋 **Descanso:** {cans_m} dias")
-        if cans_m < 4: st.warning("⚠️ Alerta de Fadiga")
+        st.write(f"💪 **Resiliência:** {calc_resiliencia(df_m_cluster, m_sel):.0f}% | 🔋 **Descanso:** {calc_cansaco(df_m_cluster, m_sel)} dias")
         
         cc1, cc2 = st.columns(2)
         cc1.metric("Pos. Geral", f"{tab_geral[tab_geral['Time']==m_sel]['Pos'].iloc[0]}º")
@@ -199,14 +190,9 @@ def mostrar_scout(df):
 
     with c2:
         st.markdown(f"### 🚌 {v_sel}")
-        st.error(f"**Índice de Força: {cf_v:.2f}**")
-        st.metric("Odd Justa", f"{oj_v:.2f}")
+        st.error(f"**Índice de Força: {cf_v:.2f}** | **Odd Justa: {oj_v:.2f}**")
+        st.write(f"💪 **Resiliência:** {calc_resiliencia(df_v_cluster, v_sel):.0f}% | 🔋 **Descanso:** {calc_cansaco(df_v_cluster, v_sel)} dias")
         
-        res_v = calc_resiliencia(df_v_cluster, v_sel)
-        cans_v = calc_cansaco(df_v_cluster, v_sel)
-        st.write(f"💪 **Resiliência:** {res_v:.0f}% | 🔋 **Descanso:** {cans_v} dias")
-        if cans_v < 4: st.warning("⚠️ Alerta de Fadiga")
-
         cv1, cv2 = st.columns(2)
         cv1.metric("Pos. Geral", f"{tab_geral[tab_geral['Time']==v_sel]['Pos'].iloc[0]}º")
         cv2.metric("Pos. Fora", f"{t_fora[t_fora['Time']==v_sel]['Pos'].iloc[0] if v_sel in t_fora['Time'].values else '?'}º")
@@ -232,7 +218,7 @@ def mostrar_scout(df):
     col_b.metric("Diferença xG", f"{g1-xg1:.2f}", delta_color="inverse")
     col_c.metric("Clean Sheet %", f"{cs1:.0f}%")
 
-    # --- 3. SLOTS DE TEMPO (GOLS INÍCIO/FIM) ---
+    # --- 3. SLOTS DE TEMPO ---
     st.subheader("⏰ Slots de Tempo (Gols Marcados)")
     def get_slot_stats(time, df_h):
         i = extrair_metrica(df_h, time, '0-15_Mandante', '0-15_Visitante').mean()
@@ -242,22 +228,19 @@ def mostrar_scout(df):
     iv_i, iv_f = get_slot_stats(v_sel, df_v_cluster)
     st.write(f"**Início (0-15'):** {m_sel} ({im_i:.2f}) vs {v_sel} ({iv_i:.2f}) | **Final (76-90'):** {m_sel} ({im_f:.2f}) vs {v_sel} ({iv_f:.2f})")
 
-    # --- 4. CHECKLIST DE CONSISTÊNCIA ---
+    # --- 4. CHECKLIST E RADAR ---
     st.divider()
-    st.subheader("🛡️ Checklist de Previsibilidade")
     def check_detalhado(time, df_h):
-        metricas = {"Gols": ('Gols_Mandante_FT', 'Gols_Visitante_FT'), "Cantos": ('Corners_H', 'Corners_A'), "Cartões": ('Yellow_Cards_H', 'Yellow_Cards_A')}
+        metricas = {"Gols": ('Gols_Mandante_FT', 'Gols_Visitante_FT'), "Cantos": ('Corners_H', 'Corners_A')}
         estaveis = []
         for nome, cols in metricas.items():
             d = extrair_metrica(df_h, time, cols[0], cols[1])
             if d.mean() > 0 and (d.std()/d.mean()) < 0.8: estaveis.append(nome)
         if estaveis: st.success(f"✅ {time} estável em: {', '.join(estaveis)}")
 
-    check_detalhado(m_sel, df_m_last if 'df_m_last' in locals() else df_m_cluster)
-    check_detalhado(v_sel, df_v_last if 'df_v_last' in locals() else df_v_cluster)
+    check_detalhado(m_sel, df_m_cluster)
+    check_detalhado(v_sel, df_v_cluster)
 
-    # --- 5. RADAR E GRÁFICO DE ÁREA ---
-    st.divider()
     def criar_radar(t1, t2, df_h1, df_h2):
         metrics = ['Gols', 'Cantos', 'Posse', 'Ataque', 'Chutes']
         def v(time, df_h):
@@ -285,9 +268,17 @@ def mostrar_scout(df):
     fig_area.add_trace(go.Scatter(x=labels_tempo, y=f_v, fill='tozeroy', name=v_sel))
     st.plotly_chart(fig_area, use_container_width=True)
 
-    # --- 6. TABELAS DETALHADAS ---
+    # --- 5. TABELAS DETALHADAS (COM CORES E TOTAIS) ---
     st.divider()
-    def st_tabela_estilizada(df_m, df_v, t1, t2, titulo, dict_m):
+    st.subheader("📉 Performance Detalhada (Média, DP e CV)")
+
+    def color_stats(val):
+        try:
+            v = float(val)
+            return 'background-color: #d4edda; color: #155724' if v < 0.8 and v > 0 else ''
+        except: return ''
+
+    def render_tabela_completa(df_m, df_v, t1, t2, titulo, dict_m):
         st.markdown(f"#### {titulo}")
         def proc(df_h, time, cols):
             s = extrair_metrica(df_h, time, cols[0], cols[1])
@@ -296,17 +287,38 @@ def mostrar_scout(df):
         res1 = pd.DataFrame([proc(df_m, t1, v) for v in dict_m.values()], index=dict_m.keys(), columns=['Média', 'Mediana', 'DP', 'CV'])
         res2 = pd.DataFrame([proc(df_v, t2, v) for v in dict_m.values()], index=dict_m.keys(), columns=['Média', 'Mediana', 'DP', 'CV'])
         ca, cb = st.columns(2)
-        ca.write(f"**{t1}**"); ca.table(res1.style.format("{:.2f}"))
-        cb.write(f"**{t2}**"); cb.table(res2.style.format("{:.2f}"))
+        ca.write(f"**{t1}**"); ca.table(res1.style.format("{:.2f}").applymap(color_stats, subset=['DP', 'CV']))
+        cb.write(f"**{t2}**"); cb.table(res2.style.format("{:.2f}").applymap(color_stats, subset=['DP', 'CV']))
 
-    st_tabela_estilizada(df_m_cluster, df_v_cluster, m_sel, v_sel, "⚽ Gols", {"Marcados":('Gols_Mandante_FT','Gols_Visitante_FT'), "Sofridos":('Gols_Visitante_FT','Gols_Mandante_FT')})
-    st_tabela_estilizada(df_m_cluster, df_v_cluster, m_sel, v_sel, "🚩 Cantos", {"Total":('Total_Corners','Total_Corners'), "HT":('Total_Corners_HT','Total_Corners_HT')})
-    st_tabela_estilizada(df_m_cluster, df_v_cluster, m_sel, v_sel, "🎯 Chutes", {"No Gol":('ShotsOnTarget_H','ShotsOnTarget_A'), "Total":('Shots_H','Shots_A')})
+    render_tabela_completa(df_m_cluster, df_v_cluster, m_sel, v_sel, "⚽ Gols FT", {
+        "Marcados": ('Gols_Mandante_FT', 'Gols_Visitante_FT'),
+        "Sofridos": ('Gols_Visitante_FT', 'Gols_Mandante_FT'),
+        "TOTAL": ('Total_Gols_FT', 'Total_Gols_FT')
+    })
 
-    # --- 7. CALCULADORA DE INCIDÊNCIA E HISTÓRICO ---
+    render_tabela_completa(df_m_cluster, df_v_cluster, m_sel, v_sel, "🚩 Cantos", {
+        "Marcados": ('Corners_H', 'Corners_A'),
+        "Sofridos": ('Corners_A', 'Corners_H'),
+        "TOTAL": ('Total_Corners', 'Total_Corners')
+    })
+
+    render_tabela_completa(df_m_cluster, df_v_cluster, m_sel, v_sel, "🎯 Chutes", {
+        "No Gol": ('ShotsOnTarget_H', 'ShotsOnTarget_A'),
+        "Fora": ('ShotsOffTarget_H', 'ShotsOffTarget_A'),
+        "TOTAL": ('Shots_H', 'Shots_A')
+    })
+
+    render_tabela_completa(df_m_cluster, df_v_cluster, m_sel, v_sel, "⚖️ Disciplina", {
+        "Faltas Cometidas": ('Fouls_H', 'Fouls_A'),
+        "Faltas Sofridas": ('Freekicks_H', 'Freekicks_A'),
+        "Amarelos": ('Yellow_Cards_H', 'Yellow_Cards_A'),
+        "TOTAL Cartões": ('Total_Cards_H', 'Total_Cards_A')
+    })
+
+    # --- 6. INCIDÊNCIA E HISTÓRICO ---
     st.divider()
     def calc_inc(df_h):
-        m = {'O 0.5 HT': df_h['Total_Gols_HT']>0.5, 'O 1.5 FT': df_h['Total_Gols_FT']>1.5, 'BTTS': (df_h['Gols_Mandante_FT']>0)&(df_h['Gols_Visitante_FT']>0)}
+        m = {'O 0.5 HT': df_h['Total_Gols_HT']>0.5, 'O 1.5 FT': df_h['Total_Gols_FT']>1.5, 'BTTS': (df_h['Gols_Mandante_FT']>0)&(df_h['Gols_Visitante_FT']>0), 'O 8.5 Cantos': df_h['Total_Corners']>8.5}
         return pd.DataFrame([{'Mercado': k, 'Freq': f"{v.mean()*100:.1f}%", 'Odd': f"{1/v.mean():.2f}" if v.mean()>0 else 'N/A'} for k, v in m.items()])
     
     ci1, ci2 = st.columns(2)
@@ -318,5 +330,3 @@ def mostrar_scout(df):
     
     st.write(f"**{m_sel}: Últimos**"); st.table(hist(df_l, m_sel))
     st.write(f"**{v_sel}: Últimos**"); st.table(hist(df_l, v_sel))
-
-# FIM DO CÓDIGO
