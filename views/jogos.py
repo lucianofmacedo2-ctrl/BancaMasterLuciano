@@ -24,7 +24,7 @@ def tratar_string_fast(texto):
 @st.cache_data(ttl=3600)
 def preparar_base_e_ranking(df_hist):
     if df_hist is None or df_hist.empty: 
-        return pd.DataFrame(), {}, {}, set()
+        return pd.DataFrame(), {}, {}, set(), {}
     
     df = df_hist.copy()
     cols_num = [
@@ -68,15 +68,44 @@ def preparar_base_e_ranking(df_hist):
         for i, (time, _) in enumerate(ranking):
             dict_posicoes[f"{liga}_{time}"] = i + 1
 
-    m_stats = df.groupby('M_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
-    v_stats = df.groupby('V_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
+    # Médias separadas para Cruzamento (Quem marca vs Quem sofre)
+    m_stats_full = df.groupby('M_T').agg({
+        'Corners_H': 'mean', 
+        'Corners_A': 'mean', # Cantos que o Mandante sofre em casa
+        'Total_Corners': 'mean',
+        'Total_Gols_FT': 'mean',
+        'Total_Gols_HT': 'mean',
+        'Total_Corners_HT': 'mean',
+        'BTTS_Realizado': 'mean'
+    })
+    v_stats_full = df.groupby('V_T').agg({
+        'Corners_A': 'mean', 
+        'Corners_H': 'mean', # Cantos que o Visitante sofre fora
+        'Total_Corners': 'mean',
+        'Total_Gols_FT': 'mean',
+        'Total_Gols_HT': 'mean',
+        'Total_Corners_HT': 'mean',
+        'BTTS_Realizado': 'mean'
+    })
 
     stats_times = {}
     todos_times = set(df['M_T'].unique()) | set(df['V_T'].unique())
     
+    # Criamos um dicionário detalhado para o cruzamento de cantos
+    dict_cruzado = {}
+
     for t in todos_times:
-        s_m = m_stats.loc[t] if t in m_stats.index else None
-        s_v = v_stats.loc[t] if t in v_stats.index else None
+        s_m = m_stats_full.loc[t] if t in m_stats_full.index else None
+        s_v = v_stats_full.loc[t] if t in v_stats_full.index else None
+        
+        # Guardar para o radar de emojis
+        dict_cruzado[t] = {
+            'marca_casa': s_m['Corners_H'] if s_m is not None else 0,
+            'sofre_casa': s_m['Corners_A'] if s_m is not None else 0,
+            'marca_fora': s_v['Corners_A'] if s_v is not None else 0,
+            'sofre_fora': s_v['Corners_H'] if s_v is not None else 0
+        }
+
         if s_m is not None and s_v is not None:
             stats_times[t] = (s_m + s_v) / 2
         elif s_m is not None:
@@ -84,7 +113,7 @@ def preparar_base_e_ranking(df_hist):
         else:
             stats_times[t] = s_v
 
-    return df, stats_times, dict_posicoes, todos_times
+    return df, stats_times, dict_posicoes, todos_times, dict_cruzado
 
 def mostrar_jogos(df_hist_input):
     st.title("📅 Agenda & Inteligência de Dados")
@@ -95,17 +124,17 @@ def mostrar_jogos(df_hist_input):
     if 'data_ex_jogos' not in st.session_state:
         st.session_state.data_ex_jogos = hoje_dt.strftime('%d/%m/%Y')
 
-    # Estados para controlar o que está aberto
     if 'analise_aberta' not in st.session_state:
         st.session_state.analise_aberta = None
     if 'simulador_aberto' not in st.session_state:
         st.session_state.simulador_aberto = None
 
-    df_hist, dict_stats, dict_pos, lista_times_banco = preparar_base_e_ranking(df_hist_input)
+    df_hist, dict_stats, dict_pos, lista_times_banco, dict_cruzado = preparar_base_e_ranking(df_hist_input)
 
     with st.expander("💡 Legenda do Radar de Valor"):
         st.markdown("""
         * 🔥⚽ **Over 2.5 FT** | 🔥🚩 **Over 9.5 Cnt** | 🤝 **BTTS > 60%** | ⏱️ **Gols HT >= 1.0**
+        * 🚩🚩 **Radar Cantos Pro** (Time marca 5+ e oponente sofre 5+)
         * ⭐ **Favorito** (1.40-1.80) | 🌟 **Super Fav** (< 1.40) | ⚖️ **Equilibrado**
         """)
 
@@ -166,6 +195,14 @@ def mostrar_jogos(df_hist_input):
                 m_cFT = (s1['Total_Corners'] + s2['Total_Corners']) / 2
                 m_cHT = (s1['Total_Corners_HT'] + s2['Total_Corners_HT']) / 2
                 
+                # --- NOVO EMOJI: RADAR CANTOS PRO (🚩🚩) ---
+                c_m = dict_cruzado.get(m_t, {})
+                c_v = dict_cruzado.get(v_t, {})
+                # Se Mandante marca 5+ e Visitante sofre 5+ OU vice-versa
+                if (c_m.get('marca_casa', 0) >= 5.0 and c_v.get('sofre_fora', 0) >= 5.0) or \
+                   (c_v.get('marca_fora', 0) >= 5.0 and c_m.get('sofre_casa', 0) >= 5.0):
+                    icones += " 🚩🚩"
+
                 times_do_dia.extend([m_t, v_t])
 
                 if m_gFT > 3.0: 
@@ -183,7 +220,7 @@ def mostrar_jogos(df_hist_input):
                 if m_cHT > 4.5:
                     sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
-            # --- RENDERIZAÇÃO DA LINHA DO JOGO ---
+            # --- RENDERIZAÇÃO ---
             c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
             with c1:
                 st.write(f"**{row['Hora']}** | ({p_m}º) {m_orig} vs {v_orig} ({p_v}º){icones}")
@@ -191,27 +228,23 @@ def mostrar_jogos(df_hist_input):
                 st.caption(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')} | {row.get('Odd Visitante','-')}")
             with c3:
                 if st.button("Analisar 🔍", key=f"btn_ana_{idx}", use_container_width=True):
-                    st.session_state.simulador_aberto = None # Fecha o simulador se abrir a análise
-                    if st.session_state.analise_aberta == idx:
-                        st.session_state.analise_aberta = None
+                    st.session_state.simulador_aberto = None
+                    if st.session_state.analise_aberta == idx: st.session_state.analise_aberta = None
                     else:
                         st.session_state.analise_aberta = idx
                         st.session_state.liga_scout = liga
                         st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
                     st.rerun()
             with c4:
-                # Botão Simular modificado para abrir abaixo da linha
                 if st.button("Simular 🎲", key=f"btn_sim_{idx}", use_container_width=True):
-                    st.session_state.analise_aberta = None # Fecha a análise se abrir o simulador
-                    if st.session_state.simulador_aberto == idx:
-                        st.session_state.simulador_aberto = None
+                    st.session_state.analise_aberta = None
+                    if st.session_state.simulador_aberto == idx: st.session_state.simulador_aberto = None
                     else:
                         st.session_state.simulador_aberto = idx
                         st.session_state.liga_simulador = liga
                         st.session_state.time_casa_simulador, st.session_state.time_fora_simulador = m_orig, v_orig
                     st.rerun()
 
-            # --- LÓGICA DA CAIXA DE SCOUT EXPANSÍVEL ---
             if st.session_state.analise_aberta == idx:
                 with st.container(border=True):
                     st.info(f"Analisando: {m_orig} vs {v_orig}")
@@ -221,7 +254,6 @@ def mostrar_jogos(df_hist_input):
                     mostrar_scout(df_hist_input)
                     st.divider()
 
-            # --- LÓGICA DA CAIXA DE SIMULADOR EXPANSÍVEL ---
             if st.session_state.simulador_aberto == idx:
                 with st.container(border=True):
                     st.success(f"Simulando: {m_orig} vs {v_orig}")
@@ -231,7 +263,7 @@ def mostrar_jogos(df_hist_input):
                     mostrar_simulador(df_hist_input)
                     st.divider()
 
-    # O restante do código continua igual
+    # Rodapé e Sugestões
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top Performance)")
     cols = st.columns(5)
@@ -251,7 +283,6 @@ def mostrar_jogos(df_hist_input):
         st.subheader(f"📊 Performance dos Times ({st.session_state.data_ex_jogos})")
         df_rank = pd.DataFrame([dict_stats[t] for t in set(times_do_dia) if t in dict_stats])
         df_rank["Time"] = [t for t in set(times_do_dia) if t in dict_stats]
-        
         r1, r2, r3, r4 = st.columns(4)
         with r1:
             st.write("⚽ Marcam + (FT)")
