@@ -68,10 +68,10 @@ def preparar_base_e_ranking(df_hist):
         for i, (time, _) in enumerate(ranking):
             dict_posicoes[f"{liga}_{time}"] = i + 1
 
-    # Médias separadas para Cruzamento (Quem marca vs Quem sofre)
+    # Médias de Cantos Cruzadas (Marca em Casa vs Sofre Fora e vice-versa)
     m_stats_full = df.groupby('M_T').agg({
         'Corners_H': 'mean', 
-        'Corners_A': 'mean', # Cantos que o Mandante sofre em casa
+        'Corners_A': 'mean', 
         'Total_Corners': 'mean',
         'Total_Gols_FT': 'mean',
         'Total_Gols_HT': 'mean',
@@ -80,7 +80,7 @@ def preparar_base_e_ranking(df_hist):
     })
     v_stats_full = df.groupby('V_T').agg({
         'Corners_A': 'mean', 
-        'Corners_H': 'mean', # Cantos que o Visitante sofre fora
+        'Corners_H': 'mean', 
         'Total_Corners': 'mean',
         'Total_Gols_FT': 'mean',
         'Total_Gols_HT': 'mean',
@@ -90,15 +90,12 @@ def preparar_base_e_ranking(df_hist):
 
     stats_times = {}
     todos_times = set(df['M_T'].unique()) | set(df['V_T'].unique())
-    
-    # Criamos um dicionário detalhado para o cruzamento de cantos
     dict_cruzado = {}
 
     for t in todos_times:
         s_m = m_stats_full.loc[t] if t in m_stats_full.index else None
         s_v = v_stats_full.loc[t] if t in v_stats_full.index else None
         
-        # Guardar para o radar de emojis
         dict_cruzado[t] = {
             'marca_casa': s_m['Corners_H'] if s_m is not None else 0,
             'sofre_casa': s_m['Corners_A'] if s_m is not None else 0,
@@ -134,7 +131,7 @@ def mostrar_jogos(df_hist_input):
     with st.expander("💡 Legenda do Radar de Valor"):
         st.markdown("""
         * 🔥⚽ **Over 2.5 FT** | 🔥🚩 **Over 9.5 Cnt** | 🤝 **BTTS > 60%** | ⏱️ **Gols HT >= 1.0**
-        * 🚩🚩 **Radar Cantos Pro** (Time marca 5+ e oponente sofre 5+)
+        * 🚩🚩 **Radar Cantos Pro** (Gatilho de 5 a 10: Time marca X e oponente sofre X ou mais)
         * ⭐ **Favorito** (1.40-1.80) | 🌟 **Super Fav** (< 1.40) | ⚖️ **Equilibrado**
         """)
 
@@ -195,13 +192,24 @@ def mostrar_jogos(df_hist_input):
                 m_cFT = (s1['Total_Corners'] + s2['Total_Corners']) / 2
                 m_cHT = (s1['Total_Corners_HT'] + s2['Total_Corners_HT']) / 2
                 
-                # --- NOVO EMOJI: RADAR CANTOS PRO (🚩🚩) ---
+                # --- LÓGICA DINÂMICA DO RADAR DE CANTOS (🚩🚩) ---
                 c_m = dict_cruzado.get(m_t, {})
                 c_v = dict_cruzado.get(v_t, {})
-                # Se Mandante marca 5+ e Visitante sofre 5+ OU vice-versa
-                if (c_m.get('marca_casa', 0) >= 5.0 and c_v.get('sofre_fora', 0) >= 5.0) or \
-                   (c_v.get('marca_fora', 0) >= 5.0 and c_m.get('sofre_casa', 0) >= 5.0):
-                    icones += " 🚩🚩"
+                
+                # Arredondamos para identificar a "moda" de 5 a 10
+                mh, sh = round(c_m.get('marca_casa', 0)), round(c_m.get('sofre_casa', 0))
+                ma, sa = round(c_v.get('marca_fora', 0)), round(c_v.get('sofre_fora', 0))
+
+                # Verificação de gatilhos 5, 6, 7, 8, 9, 10
+                for x in range(5, 11):
+                    # Se Mandante faz X e Visitante sofre X ou MAIS
+                    if mh == x and sa >= x:
+                        icones += " 🚩🚩"
+                        break # Para não repetir o ícone se bater múltiplos critérios
+                    # Se Visitante faz X e Mandante sofre X ou MAIS
+                    if ma == x and sh >= x:
+                        icones += " 🚩🚩"
+                        break
 
                 times_do_dia.extend([m_t, v_t])
 
@@ -220,7 +228,7 @@ def mostrar_jogos(df_hist_input):
                 if m_cHT > 4.5:
                     sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
-            # --- RENDERIZAÇÃO ---
+            # --- RENDERIZAÇÃO DAS COLUNAS ---
             c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
             with c1:
                 st.write(f"**{row['Hora']}** | ({p_m}º) {m_orig} vs {v_orig} ({p_v}º){icones}")
@@ -263,7 +271,7 @@ def mostrar_jogos(df_hist_input):
                     mostrar_simulador(df_hist_input)
                     st.divider()
 
-    # Rodapé e Sugestões
+    # Rodapé e Tabelas de Performance
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top Performance)")
     cols = st.columns(5)
