@@ -161,6 +161,7 @@ def mostrar_scout(df):
     def calc_cansaco(df_h, time):
         if df_h.empty: return 7
         ult_jogo = df_h.sort_values('Data', ascending=False)['Data'].iloc[0]
+        if pd.isna(ult_jogo): return 7
         return (datetime.now() - ult_jogo).days
 
     # --- INTERFACE VISUAL INICIAL ---
@@ -175,7 +176,7 @@ def mostrar_scout(df):
     oj_v = 1/((cf_v / total_f) * 0.85) if total_f > 0 else 2.0
     
     # Busca Odd Atual (Mercado)
-    odd_atual_m = df_temp[df_temp['Mandante']==m_sel]['Odd_Mandante_FT'].iloc[0] if 'Odd_Mandante_FT' in df_temp.columns else 1.0
+    odd_atual_m = df_temp[df_temp['Mandante']==m_sel]['Odd_Mandante_FT'].iloc[0] if 'Odd_Mandante_FT' in df_temp.columns and not df_temp[df_temp['Mandante']==m_sel].empty else 1.0
 
     c1, c2 = st.columns(2)
     with c1:
@@ -184,7 +185,7 @@ def mostrar_scout(df):
         if odd_atual_m > oj_m: st.success(f"💎 VALOR ENCONTRADO: {odd_atual_m:.2f}")
         st.write(f"💪 **Resiliência:** {calc_resiliencia(df_m_cluster, m_sel):.0f}% | 🔋 **Descanso:** {calc_cansaco(df_m_cluster, m_sel)} dias")
         cc1, cc2 = st.columns(2)
-        cc1.metric("Pos. Geral", f"{tab_geral[tab_geral['Time']==m_sel]['Pos'].iloc[0]}º")
+        cc1.metric("Pos. Geral", f"{tab_geral[tab_geral['Time']==m_sel]['Pos'].iloc[0]}º" if m_sel in tab_geral['Time'].values else "?")
         cc2.metric("Pos. Casa", f"{t_casa[t_casa['Time']==m_sel]['Pos'].iloc[0] if m_sel in t_casa['Time'].values else '?'}º")
         st.write(f"**Forma:** {get_forma_lista(df_temp, m_sel)}")
 
@@ -193,7 +194,7 @@ def mostrar_scout(df):
         st.error(f"**Índice de Força: {cf_v:.2f}** | **Odd Justa: {oj_v:.2f}**")
         st.write(f"💪 **Resiliência:** {calc_resiliencia(df_v_cluster, v_sel):.0f}% | 🔋 **Descanso:** {calc_cansaco(df_v_cluster, v_sel)} dias")
         cv1, cv2 = st.columns(2)
-        cv1.metric("Pos. Geral", f"{tab_geral[tab_geral['Time']==v_sel]['Pos'].iloc[0]}º")
+        cv1.metric("Pos. Geral", f"{tab_geral[tab_geral['Time']==v_sel]['Pos'].iloc[0]}º" if v_sel in tab_geral['Time'].values else "?")
         cv2.metric("Pos. Fora", f"{t_fora[t_fora['Time']==v_sel]['Pos'].iloc[0] if v_sel in t_fora['Time'].values else '?'}º")
         st.write(f"**Forma:** {get_forma_lista(df_temp, v_sel)}")
 
@@ -206,8 +207,8 @@ def mostrar_scout(df):
         atq = df_h[f'DangerousAttacks_{p}'].mean() if f'DangerousAttacks_{p}' in df_h.columns else 0
         chutes = df_h[f'Shots_{p}'].mean() if f'Shots_{p}' in df_h.columns else 0
         xg = df_h['xG_Mandante' if is_home else 'xG_Visitante'].mean() if ('xG_Mandante' in df_h.columns or 'xG_Visitante' in df_h.columns) else 0
-        gols = df_h['Gols_Mandante_FT' if is_home else 'Gols_Visitante_FT'].mean()
-        gs = df_h['Gols_Visitante_FT' if is_home else 'Gols_Mandante_FT']
+        gols = df_h['Gols_Mandante_FT' if is_home else 'Gols_Visitante_FT'].mean() if not df_h.empty else 0
+        gs = df_h['Gols_Visitante_FT' if is_home else 'Gols_Mandante_FT'] if not df_h.empty else pd.Series([0])
         cs = (gs == 0).mean() * 100
         return (atq*0.5 + chutes*0.5), xg, gols, cs
 
@@ -226,11 +227,11 @@ def mostrar_scout(df):
         st.metric("Diferença xG", f"{g2-xg2:.2f}")
         st.metric("Clean Sheet %", f"{cs2:.0f}%")
 
-    # --- NOVO: BENCHMARK DA LIGA (SUGESTÃO 4) ---
+    # --- BENCHMARK DA LIGA ---
     st.divider()
     st.subheader("📊 Comparativo Benchmark: Time vs Liga")
-    avg_g_liga = df_temp['Total_Gols_FT'].mean()
-    avg_c_liga = df_temp['Total_Corners'].mean()
+    avg_g_liga = df_temp['Total_Gols_FT'].mean() if 'Total_Gols_FT' in df_temp.columns else 2.5
+    avg_c_liga = df_temp['Total_Corners'].mean() if 'Total_Corners' in df_temp.columns else 10.0
     
     bc1, bc2 = st.columns(2)
     with bc1:
@@ -238,46 +239,47 @@ def mostrar_scout(df):
         st.write(f"Liga: {avg_g_liga:.2f} | Confronto: {(g1+g2):.2f}")
         st.progress(min((g1+g2)/max(avg_g_liga*2,1), 1.0))
     with bc2:
-        c_m_avg = df_m_home['Corners_H'].mean()
-        c_v_avg = df_v_away['Corners_A'].mean()
+        c_m_avg = df_m_home['Corners_H'].mean() if 'Corners_H' in df_m_home.columns else 5
+        c_v_avg = df_v_away['Corners_A'].mean() if 'Corners_A' in df_v_away.columns else 5
         st.write("🚩 **Cantos (FT)**")
         st.write(f"Liga: {avg_c_liga:.2f} | Confronto: {(c_m_avg+c_v_avg):.2f}")
         st.progress(min((c_m_avg+c_v_avg)/max(avg_c_liga*1.5,1), 1.0))
 
-    # --- NOVO: SIMULAÇÃO MONTE CARLO & VALUE BET (SUGESTÃO 2 E 5) ---
+    # --- IA PREDICTOR: SIMULAÇÃO MONTE CARLO (LÓGICA CORRIGIDA) ---
     st.divider()
     st.subheader("🤖 IA Predictor: Simulação de Probabilidades")
     
-    def monte_carlo_poisson(l1, l2):
-        max_g = 8
+    def monte_carlo_poisson_corrigido(l1, l2):
+        max_g = 10
         prob_matrix = np.outer(poisson.pmf(np.arange(max_g), l1), poisson.pmf(np.arange(max_g), l2))
-        p_m = np.sum(np.triu(prob_matrix, 1).T)
-        p_e = np.sum(np.diag(prob_matrix))
-        p_v = np.sum(np.tril(prob_matrix, -1).T)
+        p_m = np.sum(np.tril(prob_matrix, -1)) # Gols Casa > Gols Fora
+        p_e = np.sum(np.diag(prob_matrix))    # Gols Casa == Gols Fora
+        p_v = np.sum(np.triu(prob_matrix, 1))  # Gols Fora > Gols Casa
         return p_m, p_e, p_v
 
-    prob_m, prob_e, prob_v = monte_carlo_poisson(g1, g2)
+    prob_m, prob_e, prob_v = monte_carlo_poisson_corrigido(g1, g2)
     
     sc1, sc2, sc3 = st.columns(3)
     sc1.metric(f"Vitória {m_sel}", f"{prob_m*100:.1f}%", f"Justa: {1/prob_m:.2f}" if prob_m > 0 else "0")
     sc2.metric("Empate", f"{prob_e*100:.1f}%", f"Justa: {1/prob_e:.2f}" if prob_e > 0 else "0")
     sc3.metric(f"Vitória {v_sel}", f"{prob_v*100:.1f}%", f"Justa: {1/prob_v:.2f}" if prob_v > 0 else "0")
 
-    # Alerta de Value Bet
-    odd_mercado = st.number_input("Insira a Odd Atual da Casa (Ex: 2.10)", value=odd_atual_m, step=0.05)
-    if odd_mercado > (1/prob_m if prob_m > 0 else 100):
-        st.success(f"🔥 ALERTA DE VALUE BET: A odd de {odd_mercado} é superior à probabilidade calculada!")
+    odd_mercado = st.number_input("Insira a Odd Atual da Casa (Ex: 2.10)", value=float(odd_atual_m), step=0.05)
+    if prob_m > 0 and odd_mercado > (1/prob_m):
+        st.success(f"🔥 ALERTA DE VALUE BET: A odd de {odd_mercado:.2f} é superior à probabilidade calculada!")
     else:
         st.warning("⚖️ Odd sem valor matemático no momento.")
 
-    # --- NOVO: CONSISTENCY SCORE (SUGESTÃO 3) ---
+    # --- SCORE DE CONSISTÊNCIA ---
     st.divider()
     st.subheader("🛡️ Score de Consistência (Ausência de Variância)")
     
     def calc_consistency(df_h, col):
         if col not in df_h.columns or df_h.empty: return 0
         vals = pd.to_numeric(df_h[col], errors='coerce').fillna(0)
-        cv = vals.std() / vals.mean() if vals.mean() != 0 else 1
+        media = vals.mean()
+        if media == 0: return 0
+        cv = vals.std() / media
         return max(0, 100 - (cv * 50))
 
     con_m = calc_consistency(df_m_home, 'Gols_Mandante_FT')
@@ -289,7 +291,7 @@ def mostrar_scout(df):
     cc_col2.write(f"Confiabilidade {v_sel}: **{con_v:.1f}%**")
     cc_col2.caption("Quanto maior %, mais o time repete o padrão de gols fora.")
 
-    # --- CONTINUAÇÃO DAS OUTRAS FUNCIONALIDADES ---
+    # --- SLOTS DE TEMPO ---
     st.divider()
     st.subheader("⏰ Slots de Tempo (Gols Marcados)")
     def get_slot_stats_mando(df_h, is_home):
@@ -301,16 +303,12 @@ def mostrar_scout(df):
     iv_i, iv_f = get_slot_stats_mando(df_v_away, False)
     st.write(f"**Início (0-15'):** {m_sel} ({im_i:.2f}) vs {v_sel} ({iv_i:.2f}) | **Final (76-90'):** {m_sel} ({im_f:.2f}) vs {v_sel} ({iv_f:.2f})")
 
-    # --- 3. CHECKLIST DE PREVISIBILIDADE ---
+    # --- CHECKLIST DE PREVISIBILIDADE ---
     st.divider()
     def check_previsibilidade_detalhado(df_h, time, is_home):
         p_m = 'Mandante' if is_home else 'Visitante'
         p_s = 'Visitante' if is_home else 'Mandante'
-        metricas = {
-            "Gols Marcados": f'Gols_{p_m}_FT',
-            "Gols Sofridos": f'Gols_{p_s}_FT',
-            "Cantos": 'Total_Corners'
-        }
+        metricas = {"Gols Marcados": f'Gols_{p_m}_FT', "Gols Sofridos": f'Gols_{p_s}_FT', "Cantos": 'Total_Corners'}
         estaveis = []
         for nome, col in metricas.items():
             if col in df_h.columns:
@@ -322,7 +320,7 @@ def mostrar_scout(df):
     check_previsibilidade_detalhado(df_m_home, m_sel, True)
     check_previsibilidade_detalhado(df_v_away, v_sel, False)
 
-    # --- 4. RADAR E ÁREA ---
+    # --- RADAR E ÁREA ---
     def criar_radar(t1, t2, df_h1, df_h2):
         metrics = ['Gols Marc.', 'Cantos Marc.', 'Posse', 'Ataque Per.', 'Chutes']
         def v(df_h, is_home):
@@ -353,14 +351,13 @@ def mostrar_scout(df):
     fig_area.add_trace(go.Scatter(x=labels_tempo, y=get_f(df_v_away, False), fill='tozeroy', name=f"{v_sel} (Gols)"))
     st.plotly_chart(fig_area, use_container_width=True)
 
-    # --- 5. TABELAS DETALHADAS ---
+    # --- TABELAS DETALHADAS COMPLETAS ---
     st.divider()
     st.subheader("📉 Performance Detalhada (Mando Específico)")
 
     def color_stats(val):
         try:
-            v = float(val)
-            return 'background-color: #d4edda; color: #155724' if 0 < v < 0.8 else ''
+            v = float(val); return 'background-color: #d4edda; color: #155724' if 0 < v < 0.8 else ''
         except: return ''
 
     def render_tabela_completa(titulo, dict_cols):
@@ -374,52 +371,23 @@ def mostrar_scout(df):
                     try: moda = s.mode()[0]
                     except: moda = 0
                     res.append([m, med, moda, std, cv])
-                else:
-                    res.append([0, 0, 0, 0, 0])
+                else: res.append([0, 0, 0, 0, 0])
             return res
-        
-        c_m = [v[0] for v in dict_cols.values()]
-        c_v = [v[1] for v in dict_cols.values()]
-        
+        c_m = [v[0] for v in dict_cols.values()]; c_v = [v[1] for v in dict_cols.values()]
         res1 = pd.DataFrame(proc(df_m_home, c_m), index=dict_cols.keys(), columns=['Média', 'Mediana', 'Moda', 'DP', 'CV'])
         res2 = pd.DataFrame(proc(df_v_away, c_v), index=dict_cols.keys(), columns=['Média', 'Mediana', 'Moda', 'DP', 'CV'])
-        
         ca, cb = st.columns(2)
         ca.write(f"**{m_sel} (Casa)**"); ca.table(res1.style.format("{:.2f}").applymap(color_stats, subset=['DP', 'CV']))
         cb.write(f"**{v_sel} (Fora)**"); cb.table(res2.style.format("{:.2f}").applymap(color_stats, subset=['DP', 'CV']))
 
-    render_tabela_completa("⚽ Gols FT", {
-        "Marcados": ('Gols_Mandante_FT', 'Gols_Visitante_FT'),
-        "Sofridos": ('Gols_Visitante_FT', 'Gols_Mandante_FT'),
-        "TOTAL": ('Total_Gols_FT', 'Total_Gols_FT')
-    })
-    render_tabela_completa("⏱️ Gols HT", {
-        "Marcados": ('Gols_Mandante_HT', 'Gols_Visitante_HT'),
-        "Sofridos": ('Gols_Visitante_HT', 'Gols_Mandante_HT'),
-        "TOTAL": ('Total_Gols_HT', 'Total_Gols_HT')
-    })
-    render_tabela_completa("🚩 Cantos FT", {
-        "Marcados": ('Corners_H', 'Corners_A'),
-        "Sofridos": ('Corners_A', 'Corners_H'),
-        "TOTAL": ('Total_Corners', 'Total_Corners')
-    })
-    render_tabela_completa("🚩 Cantos HT", {
-        "Marcados": ('Corners_H_HT', 'Corners_A_HT'),
-        "Sofridos": ('Corners_A_HT', 'Corners_H_HT'),
-        "TOTAL": ('Total_Corners_HT', 'Total_Corners_HT')
-    })
-    render_tabela_completa("🎯 Chutes FT", {
-        "Feitos": ('Shots_H', 'Shots_A'),
-        "Concedidos": ('Shots_A', 'Shots_H'),
-        "TOTAL": ('Shots_H', 'Shots_A')
-    })
-    render_tabela_completa("🟨 Cartões", {
-        "Causados (Adv)": ('Yellow_Cards_A', 'Yellow_Cards_H'),
-        "Recebidos": ('Yellow_Cards_H', 'Yellow_Cards_A'),
-        "TOTAL": ('Total_Cards_H', 'Total_Cards_A')
-    })
+    render_tabela_completa("⚽ Gols FT", {"Marcados": ('Gols_Mandante_FT', 'Gols_Visitante_FT'), "Sofridos": ('Gols_Visitante_FT', 'Gols_Mandante_FT'), "TOTAL": ('Total_Gols_FT', 'Total_Gols_FT')})
+    render_tabela_completa("⏱️ Gols HT", {"Marcados": ('Gols_Mandante_HT', 'Gols_Visitante_HT'), "Sofridos": ('Gols_Visitante_HT', 'Gols_Mandante_HT'), "TOTAL": ('Total_Gols_HT', 'Total_Gols_HT')})
+    render_tabela_completa("🚩 Cantos FT", {"Marcados": ('Corners_H', 'Corners_A'), "Sofridos": ('Corners_A', 'Corners_H'), "TOTAL": ('Total_Corners', 'Total_Corners')})
+    render_tabela_completa("🚩 Cantos HT", {"Marcados": ('Corners_H_HT', 'Corners_A_HT'), "Sofridos": ('Corners_A_HT', 'Corners_H_HT'), "TOTAL": ('Total_Corners_HT', 'Total_Corners_HT')})
+    render_tabela_completa("🎯 Chutes FT", {"Feitos": ('Shots_H', 'Shots_A'), "Concedidos": ('Shots_A', 'Shots_H'), "TOTAL": ('Shots_H', 'Shots_A')})
+    render_tabela_completa("🟨 Cartões", {"Causados (Adv)": ('Yellow_Cards_A', 'Yellow_Cards_H'), "Recebidos": ('Yellow_Cards_H', 'Yellow_Cards_A'), "TOTAL": ('Total_Cards_H', 'Total_Cards_A')})
 
-    # --- 6. INCIDÊNCIA DE MERCADOS ---
+    # --- INCIDÊNCIA DE MERCADOS ---
     st.divider()
     def calc_inc(df_h):
         m = {}
@@ -429,26 +397,22 @@ def mostrar_scout(df):
         if 'Gols_Mandante_FT' in df_h.columns: m['BTTS'] = (df_h['Gols_Mandante_FT']>0)&(df_h['Gols_Visitante_FT']>0)
         if 'Total_Corners_HT' in df_h.columns: m['4.5 Cantos HT'] = df_h['Total_Corners_HT']>4.5
         if 'Total_Corners' in df_h.columns: m['9.5 Cantos FT'] = df_h['Total_Corners']>9.5
-        
         return pd.DataFrame([{'Mercado': k, 'Freq': f"{v.mean()*100:.1f}%", 'Odd': f"{1/v.mean():.2f}" if v.mean()>0 else 'N/A'} for k, v in m.items()])
     
     ci1, ci2 = st.columns(2)
     ci1.write(f"**{m_sel} (Casa)**"); ci1.table(calc_inc(df_m_home))
     ci2.write(f"**{v_sel} (Fora)**"); ci2.table(calc_inc(df_v_away))
 
-    # --- 7. ÚLTIMOS CONFRONTOS ---
+    # --- HISTÓRICO DETALHADO ---
     def hist_detalhado(df_h):
         res = []
         for _, r in df_h.iterrows():
-            res.append({
-                'Data': r['Data'].strftime('%d/%m/%Y') if pd.notnull(r['Data']) else 'N/A',
-                'Placar FT': f"{int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])}",
-                'Placar HT': f"{int(r['Gols_Mandante_HT'])}x{int(r['Gols_Visitante_HT'])}" if 'Gols_Mandante_HT' in df_h.columns else 'N/A',
-                'Cantos HT': f"{int(r['Total_Corners_HT'])}" if 'Total_Corners_HT' in df_h.columns else 'N/A',
-                'Cantos FT': f"{int(r['Total_Corners'])}" if 'Total_Corners' in df_h.columns else 'N/A',
-                'Odd M': r.get('Odd_Mandante_FT', 0),
-                'Odd V': r.get('Odd_Visitante_FT', 0)
-            })
+            res.append({'Data': r['Data'].strftime('%d/%m/%Y') if pd.notnull(r['Data']) else 'N/A',
+                        'Placar FT': f"{int(r['Gols_Mandante_FT'])}x{int(r['Gols_Visitante_FT'])}",
+                        'Placar HT': f"{int(r['Gols_Mandante_HT'])}x{int(r['Gols_Visitante_HT'])}" if 'Gols_Mandante_HT' in df_h.columns else 'N/A',
+                        'Cantos HT': f"{int(r['Total_Corners_HT'])}" if 'Total_Corners_HT' in df_h.columns else 'N/A',
+                        'Cantos FT': f"{int(r['Total_Corners'])}" if 'Total_Corners' in df_h.columns else 'N/A',
+                        'Odd M': r.get('Odd_Mandante_FT', 0), 'Odd V': r.get('Odd_Visitante_FT', 0)})
         return pd.DataFrame(res)
 
     st.write(f"**{m_sel}: Últimos em Casa**"); st.table(hist_detalhado(df_m_home))
