@@ -6,7 +6,8 @@ from datetime import datetime
 import requests
 from io import BytesIO
 import time
-from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest, ranking, simulador
+# Adicionadas as importações h2h e termometro
+from views import scout, registro, historico, dashboard, bancas, jogos, metas, backtest, ranking, simulador, h2h, termometro
 import styles
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -38,11 +39,13 @@ if st.sidebar.button("🔄 Atualizar Dados"):
     st.cache_data.clear()
     st.rerun()
 
-# Lista de opções atualizada com "🏆 Ranking" e "🎲 Simulador"
+# Lista de opções atualizada com as novas páginas
 opcoes_menu = [
     "📊 Dashboard", 
     "📅 Jogos", 
     "🔎 Scout", 
+    "⚔️ Confronto Direto", # Nova
+    "🔥 Termômetro de Ligas", # Nova
     "🏆 Ranking", 
     "🎲 Simulador", 
     "🧪 Backtest", 
@@ -61,6 +64,12 @@ st.session_state.menu_ativo = menu
 # --- RENDERIZAÇÃO DAS PÁGINAS ---
 if st.session_state.menu_ativo == "🔎 Scout":
     scout.mostrar_scout(df_csv)
+
+elif st.session_state.menu_ativo == "⚔️ Confronto Direto":
+    h2h.mostrar_h2h(df_csv)
+
+elif st.session_state.menu_ativo == "🔥 Termômetro de Ligas":
+    termometro.mostrar_termometro(df_csv)
 
 elif st.session_state.menu_ativo == "🏆 Ranking":
     ranking.mostrar_ranking(df_csv)
