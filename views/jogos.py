@@ -4,6 +4,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import pytz
 import unicodedata
+# --- IMPORTANTE: Importamos a função do seu scout.py ---
+from views.scout import mostrar_scout 
 
 # Links dos arquivos
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
@@ -11,7 +13,6 @@ URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMaster
 def tratar_string_fast(texto):
     if not texto or pd.isna(texto): return ""
     texto = str(texto).upper()
-    # Limpeza rápida de caracteres comuns em CSVs de futebol
     mapa = {"Ã³": "O", "Ã©": "E", "Ã¡": "A", "Ã£": "A", "Ãª": "E", "Ã­": "I", "Ã§": "C", "Ã": "A", "Ã²": "O", "Ã¹": "U"}
     for erro, correto in mapa.items():
         texto = texto.replace(erro, correto)
@@ -25,7 +26,6 @@ def preparar_base_e_ranking(df_hist):
         return pd.DataFrame(), {}, {}, set()
     
     df = df_hist.copy()
-    # Tratamento de colunas numéricas em bloco para performance
     cols_num = [
         'Corners_H', 'Corners_A', 'Total_Corners', 'Total_Gols_FT', 
         'Total_Gols_HT', 'Total_Corners_HT', 'Gols_Mandante_FT', 
@@ -45,10 +45,8 @@ def preparar_base_e_ranking(df_hist):
     df['V_T'] = df['Visitante'].apply(tratar_string_fast)
     df['L_T'] = df['Liga'].apply(tratar_string_fast)
 
-    # --- LÓGICA DE RANKING (POSIÇÕES) ---
     dict_posicoes = {}
     df_rank = df.copy()
-    # Pega apenas a temporada mais recente por liga para o ranking
     if 'Temporada' in df_rank.columns:
         df_rank = df_rank[df_rank.groupby('L_T')['Temporada'].transform(max) == df_rank['Temporada']]
 
@@ -69,7 +67,6 @@ def preparar_base_e_ranking(df_hist):
         for i, (time, _) in enumerate(ranking):
             dict_posicoes[f"{liga}_{time}"] = i + 1
 
-    # Pré-calculando Médias de todos os times (Vetorizado)
     m_stats = df.groupby('M_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
     v_stats = df.groupby('V_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
 
@@ -97,7 +94,10 @@ def mostrar_jogos(df_hist_input):
     if 'data_ex_jogos' not in st.session_state:
         st.session_state.data_ex_jogos = hoje_dt.strftime('%d/%m/%Y')
 
-    # Preparação da Base com Ranking
+    # --- NOVO: Estado para controlar qual jogo está aberto para análise ---
+    if 'analise_aberta' not in st.session_state:
+        st.session_state.analise_aberta = None
+
     df_hist, dict_stats, dict_pos, lista_times_banco = preparar_base_e_ranking(df_hist_input)
 
     with st.expander("💡 Legenda do Radar de Valor"):
@@ -143,7 +143,6 @@ def mostrar_jogos(df_hist_input):
             m_orig, v_orig = str(row['Mandante']), str(row['Visitante'])
             m_t, v_t = tratar_string_fast(m_orig), tratar_string_fast(v_orig)
             
-            # Recuperando Posições
             p_m = dict_pos.get(f"{liga_t}_{m_t}", "?")
             p_v = dict_pos.get(f"{liga_t}_{v_t}", "?")
             
@@ -181,17 +180,21 @@ def mostrar_jogos(df_hist_input):
                 if m_cHT > 4.5:
                     sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
-            # Layout com Botões Analisar e Simular
+            # --- RENDERIZAÇÃO DA LINHA DO JOGO ---
             c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
             with c1:
                 st.write(f"**{row['Hora']}** | ({p_m}º) {m_orig} vs {v_orig} ({p_v}º){icones}")
             with c2:
                 st.caption(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')} | {row.get('Odd Visitante','-')}")
             with c3:
+                # Botão Analisar modificado para não mudar de página
                 if st.button("Analisar 🔍", key=f"btn_ana_{idx}", use_container_width=True):
-                    st.session_state.liga_scout = liga
-                    st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
-                    st.session_state.menu_ativo = "🔎 Scout"
+                    if st.session_state.analise_aberta == idx:
+                        st.session_state.analise_aberta = None # Fecha se clicar de novo
+                    else:
+                        st.session_state.analise_aberta = idx
+                        st.session_state.liga_scout = liga
+                        st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
                     st.rerun()
             with c4:
                 if st.button("Simular 🎲", key=f"btn_sim_{idx}", use_container_width=True):
@@ -200,6 +203,20 @@ def mostrar_jogos(df_hist_input):
                     st.session_state.menu_ativo = "🎲 Simulador"
                     st.rerun()
 
+            # --- LÓGICA DA CAIXA DE SCOUT EXPANSÍVEL ---
+            if st.session_state.analise_aberta == idx:
+                with st.container(border=True):
+                    st.info(f"Analisando: {m_orig} vs {v_orig}")
+                    if st.button("Fechar Análise ❌", key=f"close_{idx}"):
+                        st.session_state.analise_aberta = None
+                        st.rerun()
+                    
+                    # Chamamos a função do outro arquivo passando o DataFrame histórico
+                    # A função mostrar_scout vai usar os session_states que definimos acima
+                    mostrar_scout(df_hist_input)
+                    st.divider()
+
+    # O restante do código (Sugestões e Performance) continua igual
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top Performance)")
     cols = st.columns(5)
