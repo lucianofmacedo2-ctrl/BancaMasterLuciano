@@ -4,6 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import pytz
 import unicodedata
+from scipy import stats # Necessário para o cálculo da Moda Estatística
 # --- IMPORTANTE: Importamos as funções dos seus módulos ---
 from views.scout import mostrar_scout 
 from views.simulador import mostrar_simulador
@@ -68,41 +69,33 @@ def preparar_base_e_ranking(df_hist):
         for i, (time, _) in enumerate(ranking):
             dict_posicoes[f"{liga}_{time}"] = i + 1
 
-    # Médias de Cantos Cruzadas (Marca em Casa vs Sofre Fora e vice-versa)
-    m_stats_full = df.groupby('M_T').agg({
-        'Corners_H': 'mean', 
-        'Corners_A': 'mean', 
-        'Total_Corners': 'mean',
-        'Total_Gols_FT': 'mean',
-        'Total_Gols_HT': 'mean',
-        'Total_Corners_HT': 'mean',
-        'BTTS_Realizado': 'mean'
-    })
-    v_stats_full = df.groupby('V_T').agg({
-        'Corners_A': 'mean', 
-        'Corners_H': 'mean', 
-        'Total_Corners': 'mean',
-        'Total_Gols_FT': 'mean',
-        'Total_Gols_HT': 'mean',
-        'Total_Corners_HT': 'mean',
-        'BTTS_Realizado': 'mean'
-    })
-
-    stats_times = {}
+    # --- CÁLCULO DA MODA POR MANDO DE CAMPO (Toda a Base) ---
+    dict_modas = {}
     todos_times = set(df['M_T'].unique()) | set(df['V_T'].unique())
-    dict_cruzado = {}
 
     for t in todos_times:
-        s_m = m_stats_full.loc[t] if t in m_stats_full.index else None
-        s_v = v_stats_full.loc[t] if t in v_stats_full.index else None
+        df_casa = df[df['M_T'] == t]
+        df_fora = df[df['V_T'] == t]
         
-        dict_cruzado[t] = {
-            'marca_casa': s_m['Corners_H'] if s_m is not None else 0,
-            'sofre_casa': s_m['Corners_A'] if s_m is not None else 0,
-            'marca_fora': s_v['Corners_A'] if s_v is not None else 0,
-            'sofre_fora': s_v['Corners_H'] if s_v is not None else 0
+        def calcular_moda(series):
+            if series.empty: return 0
+            res = stats.mode(series, keepdims=True)
+            return int(res[0][0]) if len(res[0]) > 0 else 0
+
+        dict_modas[t] = {
+            'm_marca_casa': calcular_moda(df_casa['Corners_H']),
+            'm_sofre_casa': calcular_moda(df_casa['Corners_A']),
+            'm_marca_fora': calcular_moda(df_fora['Corners_A']),
+            'm_sofre_fora': calcular_moda(df_fora['Corners_H'])
         }
 
+    m_stats = df.groupby('M_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
+    v_stats = df.groupby('V_T').agg({col: 'mean' for col in cols_num + ['BTTS_Realizado'] if col in df.columns})
+
+    stats_times = {}
+    for t in todos_times:
+        s_m = m_stats.loc[t] if t in m_stats.index else None
+        s_v = v_stats.loc[t] if t in v_stats.index else None
         if s_m is not None and s_v is not None:
             stats_times[t] = (s_m + s_v) / 2
         elif s_m is not None:
@@ -110,7 +103,7 @@ def preparar_base_e_ranking(df_hist):
         else:
             stats_times[t] = s_v
 
-    return df, stats_times, dict_posicoes, todos_times, dict_cruzado
+    return df, stats_times, dict_posicoes, todos_times, dict_modas
 
 def mostrar_jogos(df_hist_input):
     st.title("📅 Agenda & Inteligência de Dados")
@@ -126,12 +119,12 @@ def mostrar_jogos(df_hist_input):
     if 'simulador_aberto' not in st.session_state:
         st.session_state.simulador_aberto = None
 
-    df_hist, dict_stats, dict_pos, lista_times_banco, dict_cruzado = preparar_base_e_ranking(df_hist_input)
+    df_hist, dict_stats, dict_pos, lista_times_banco, dict_modas = preparar_base_e_ranking(df_hist_input)
 
     with st.expander("💡 Legenda do Radar de Valor"):
         st.markdown("""
         * 🔥⚽ **Over 2.5 FT** | 🔥🚩 **Over 9.5 Cnt** | 🤝 **BTTS > 60%** | ⏱️ **Gols HT >= 1.0**
-        * 🚩🚩 **Radar Cantos Pro** (Gatilho de 5 a 10: Time marca X e oponente sofre X ou mais)
+        * 🚩🚩 **Radar Cantos Pro** (Moda de Marcar X e Oponente Moda de Sofrer X+, para X ≥ 5)
         * ⭐ **Favorito** (1.40-1.80) | 🌟 **Super Fav** (< 1.40) | ⚖️ **Equilibrado**
         """)
 
@@ -192,24 +185,25 @@ def mostrar_jogos(df_hist_input):
                 m_cFT = (s1['Total_Corners'] + s2['Total_Corners']) / 2
                 m_cHT = (s1['Total_Corners_HT'] + s2['Total_Corners_HT']) / 2
                 
-                # --- LÓGICA DINÂMICA DO RADAR DE CANTOS (🚩🚩) ---
-                c_m = dict_cruzado.get(m_t, {})
-                c_v = dict_cruzado.get(v_t, {})
-                
-                # Arredondamos para identificar a "moda" de 5 a 10
-                mh, sh = round(c_m.get('marca_casa', 0)), round(c_m.get('sofre_casa', 0))
-                ma, sa = round(c_v.get('marca_fora', 0)), round(c_v.get('sofre_fora', 0))
+                # --- LÓGICA DE MODA GLOBAL (🚩🚩) ---
+                if m_t in dict_modas and v_t in dict_modas:
+                    mo_m = dict_modas[m_t] # Modas do Mandante
+                    mo_v = dict_modas[v_t] # Modas do Visitante
+                    
+                    # Mandante Ataca (Casa) vs Visitante Sofre (Fora)
+                    moda_h_marca = mo_m['m_marca_casa']
+                    moda_v_sofre = mo_v['m_sofre_fora']
+                    
+                    # Visitante Ataca (Fora) vs Mandante Sofre (Casa)
+                    moda_v_marca = mo_v['m_marca_fora']
+                    moda_h_sofre = mo_m['m_sofre_casa']
 
-                # Verificação de gatilhos 5, 6, 7, 8, 9, 10
-                for x in range(5, 11):
-                    # Se Mandante faz X e Visitante sofre X ou MAIS
-                    if mh == x and sa >= x:
-                        icones += " 🚩🚩"
-                        break # Para não repetir o ícone se bater múltiplos critérios
-                    # Se Visitante faz X e Mandante sofre X ou MAIS
-                    if ma == x and sh >= x:
-                        icones += " 🚩🚩"
-                        break
+                    # Gatilho Dinâmico 5 a 10
+                    for x in range(5, 11):
+                        if (moda_h_marca == x and moda_v_sofre >= x) or \
+                           (moda_v_marca == x and moda_h_sofre >= x):
+                            icones += " 🚩🚩"
+                            break
 
                 times_do_dia.extend([m_t, v_t])
 
@@ -228,7 +222,7 @@ def mostrar_jogos(df_hist_input):
                 if m_cHT > 4.5:
                     sugestoes["cHT"].append({"j": f"{m_orig} vs {v_orig}", "v": m_cHT})
 
-            # --- RENDERIZAÇÃO DAS COLUNAS ---
+            # --- RENDERIZAÇÃO ---
             c1, c2, c3, c4 = st.columns([4.2, 2.8, 1.5, 1.5])
             with c1:
                 st.write(f"**{row['Hora']}** | ({p_m}º) {m_orig} vs {v_orig} ({p_v}º){icones}")
@@ -271,7 +265,6 @@ def mostrar_jogos(df_hist_input):
                     mostrar_simulador(df_hist_input)
                     st.divider()
 
-    # Rodapé e Tabelas de Performance
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top Performance)")
     cols = st.columns(5)
