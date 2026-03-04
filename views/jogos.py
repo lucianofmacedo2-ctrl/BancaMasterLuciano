@@ -4,8 +4,9 @@ import numpy as np
 from datetime import datetime, timedelta
 import pytz
 import unicodedata
-# --- IMPORTANTE: Importamos a função do seu scout.py ---
+# --- IMPORTANTE: Importamos as funções dos seus módulos ---
 from views.scout import mostrar_scout 
+from views.simulador import mostrar_simulador
 
 # Links dos arquivos
 URL_AGENDA = "https://raw.githubusercontent.com/lucianofmacedo2-ctrl/BancaMasterLuciano/main/Lista_Jogos.csv"
@@ -94,9 +95,11 @@ def mostrar_jogos(df_hist_input):
     if 'data_ex_jogos' not in st.session_state:
         st.session_state.data_ex_jogos = hoje_dt.strftime('%d/%m/%Y')
 
-    # --- NOVO: Estado para controlar qual jogo está aberto para análise ---
+    # Estados para controlar o que está aberto
     if 'analise_aberta' not in st.session_state:
         st.session_state.analise_aberta = None
+    if 'simulador_aberto' not in st.session_state:
+        st.session_state.simulador_aberto = None
 
     df_hist, dict_stats, dict_pos, lista_times_banco = preparar_base_e_ranking(df_hist_input)
 
@@ -187,36 +190,48 @@ def mostrar_jogos(df_hist_input):
             with c2:
                 st.caption(f"Odds: {row.get('Odd Mandante','-')} | {row.get('Odd Empate','-')} | {row.get('Odd Visitante','-')}")
             with c3:
-                # Botão Analisar modificado para não mudar de página
                 if st.button("Analisar 🔍", key=f"btn_ana_{idx}", use_container_width=True):
+                    st.session_state.simulador_aberto = None # Fecha o simulador se abrir a análise
                     if st.session_state.analise_aberta == idx:
-                        st.session_state.analise_aberta = None # Fecha se clicar de novo
+                        st.session_state.analise_aberta = None
                     else:
                         st.session_state.analise_aberta = idx
                         st.session_state.liga_scout = liga
                         st.session_state.time_casa_scout, st.session_state.time_fora_scout = m_orig, v_orig
                     st.rerun()
             with c4:
+                # Botão Simular modificado para abrir abaixo da linha
                 if st.button("Simular 🎲", key=f"btn_sim_{idx}", use_container_width=True):
-                    st.session_state.liga_simulador = liga
-                    st.session_state.time_casa_simulador, st.session_state.time_fora_simulador = m_orig, v_orig
-                    st.session_state.menu_ativo = "🎲 Simulador"
+                    st.session_state.analise_aberta = None # Fecha a análise se abrir o simulador
+                    if st.session_state.simulador_aberto == idx:
+                        st.session_state.simulador_aberto = None
+                    else:
+                        st.session_state.simulador_aberto = idx
+                        st.session_state.liga_simulador = liga
+                        st.session_state.time_casa_simulador, st.session_state.time_fora_simulador = m_orig, v_orig
                     st.rerun()
 
             # --- LÓGICA DA CAIXA DE SCOUT EXPANSÍVEL ---
             if st.session_state.analise_aberta == idx:
                 with st.container(border=True):
                     st.info(f"Analisando: {m_orig} vs {v_orig}")
-                    if st.button("Fechar Análise ❌", key=f"close_{idx}"):
+                    if st.button("Fechar Análise ❌", key=f"close_ana_{idx}"):
                         st.session_state.analise_aberta = None
                         st.rerun()
-                    
-                    # Chamamos a função do outro arquivo passando o DataFrame histórico
-                    # A função mostrar_scout vai usar os session_states que definimos acima
                     mostrar_scout(df_hist_input)
                     st.divider()
 
-    # O restante do código (Sugestões e Performance) continua igual
+            # --- LÓGICA DA CAIXA DE SIMULADOR EXPANSÍVEL ---
+            if st.session_state.simulador_aberto == idx:
+                with st.container(border=True):
+                    st.success(f"Simulando: {m_orig} vs {v_orig}")
+                    if st.button("Fechar Simulação ❌", key=f"close_sim_{idx}"):
+                        st.session_state.simulador_aberto = None
+                        st.rerun()
+                    mostrar_simulador(df_hist_input)
+                    st.divider()
+
+    # O restante do código continua igual
     st.divider()
     st.subheader("🎯 Sugestões do Dia (Top Performance)")
     cols = st.columns(5)
