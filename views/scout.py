@@ -4,6 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 from difflib import get_close_matches
 from datetime import datetime
+from scipy.stats import poisson
 
 def mostrar_scout(df):
     st.markdown("## 🔎 Painel de Análise Profissional Ultra V7 - Full Intelligence")
@@ -172,13 +173,15 @@ def mostrar_scout(df):
     total_f = cf_m + cf_v
     oj_m = 1/((cf_m / total_f) * 0.85) if total_f > 0 else 2.0
     oj_v = 1/((cf_v / total_f) * 0.85) if total_f > 0 else 2.0
-    odd_atual_m = df_temp[df_temp['Mandante']==m_sel]['Odd_Mandante_FT'].iloc[0] if 'Odd_Mandante_FT' in df_temp.columns else 0
+    
+    # Busca Odd Atual (Mercado)
+    odd_atual_m = df_temp[df_temp['Mandante']==m_sel]['Odd_Mandante_FT'].iloc[0] if 'Odd_Mandante_FT' in df_temp.columns else 1.0
 
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(f"### 🏠 {m_sel}")
         st.info(f"**Índice de Força: {cf_m:.2f}** | **Odd Justa: {oj_m:.2f}**")
-        if odd_atual_m > oj_m: st.success(f"💎 VALOR: {odd_atual_m:.2f}")
+        if odd_atual_m > oj_m: st.success(f"💎 VALOR ENCONTRADO: {odd_atual_m:.2f}")
         st.write(f"💪 **Resiliência:** {calc_resiliencia(df_m_cluster, m_sel):.0f}% | 🔋 **Descanso:** {calc_cansaco(df_m_cluster, m_sel)} dias")
         cc1, cc2 = st.columns(2)
         cc1.metric("Pos. Geral", f"{tab_geral[tab_geral['Time']==m_sel]['Pos'].iloc[0]}º")
@@ -194,7 +197,7 @@ def mostrar_scout(df):
         cv2.metric("Pos. Fora", f"{t_fora[t_fora['Time']==v_sel]['Pos'].iloc[0] if v_sel in t_fora['Time'].values else '?'}º")
         st.write(f"**Forma:** {get_forma_lista(df_temp, v_sel)}")
 
-    # --- 1. INTELIGÊNCIA QUANTITATIVA (xG E PRESSÃO) ---
+    # --- 1. INTELIGÊNCIA QUANTITATIVA ---
     st.divider()
     st.subheader("🚀 Inteligência Quantitativa (Mando Específico)")
     
@@ -223,7 +226,71 @@ def mostrar_scout(df):
         st.metric("Diferença xG", f"{g2-xg2:.2f}")
         st.metric("Clean Sheet %", f"{cs2:.0f}%")
 
-    # --- 2. SLOTS DE TEMPO ---
+    # --- NOVO: BENCHMARK DA LIGA (SUGESTÃO 4) ---
+    st.divider()
+    st.subheader("📊 Comparativo Benchmark: Time vs Liga")
+    avg_g_liga = df_temp['Total_Gols_FT'].mean()
+    avg_c_liga = df_temp['Total_Corners'].mean()
+    
+    bc1, bc2 = st.columns(2)
+    with bc1:
+        st.write("⚽ **Gols (FT)**")
+        st.write(f"Liga: {avg_g_liga:.2f} | Confronto: {(g1+g2):.2f}")
+        st.progress(min((g1+g2)/max(avg_g_liga*2,1), 1.0))
+    with bc2:
+        c_m_avg = df_m_home['Corners_H'].mean()
+        c_v_avg = df_v_away['Corners_A'].mean()
+        st.write("🚩 **Cantos (FT)**")
+        st.write(f"Liga: {avg_c_liga:.2f} | Confronto: {(c_m_avg+c_v_avg):.2f}")
+        st.progress(min((c_m_avg+c_v_avg)/max(avg_c_liga*1.5,1), 1.0))
+
+    # --- NOVO: SIMULAÇÃO MONTE CARLO & VALUE BET (SUGESTÃO 2 E 5) ---
+    st.divider()
+    st.subheader("🤖 IA Predictor: Simulação de Probabilidades")
+    
+    def monte_carlo_poisson(l1, l2):
+        max_g = 8
+        prob_matrix = np.outer(poisson.pmf(np.arange(max_g), l1), poisson.pmf(np.arange(max_g), l2))
+        p_m = np.sum(np.triu(prob_matrix, 1).T)
+        p_e = np.sum(np.diag(prob_matrix))
+        p_v = np.sum(np.tril(prob_matrix, -1).T)
+        return p_m, p_e, p_v
+
+    prob_m, prob_e, prob_v = monte_carlo_poisson(g1, g2)
+    
+    sc1, sc2, sc3 = st.columns(3)
+    sc1.metric(f"Vitória {m_sel}", f"{prob_m*100:.1f}%", f"Justa: {1/prob_m:.2f}" if prob_m > 0 else "0")
+    sc2.metric("Empate", f"{prob_e*100:.1f}%", f"Justa: {1/prob_e:.2f}" if prob_e > 0 else "0")
+    sc3.metric(f"Vitória {v_sel}", f"{prob_v*100:.1f}%", f"Justa: {1/prob_v:.2f}" if prob_v > 0 else "0")
+
+    # Alerta de Value Bet
+    odd_mercado = st.number_input("Insira a Odd Atual da Casa (Ex: 2.10)", value=odd_atual_m, step=0.05)
+    if odd_mercado > (1/prob_m if prob_m > 0 else 100):
+        st.success(f"🔥 ALERTA DE VALUE BET: A odd de {odd_mercado} é superior à probabilidade calculada!")
+    else:
+        st.warning("⚖️ Odd sem valor matemático no momento.")
+
+    # --- NOVO: CONSISTENCY SCORE (SUGESTÃO 3) ---
+    st.divider()
+    st.subheader("🛡️ Score de Consistência (Ausência de Variância)")
+    
+    def calc_consistency(df_h, col):
+        if col not in df_h.columns or df_h.empty: return 0
+        vals = pd.to_numeric(df_h[col], errors='coerce').fillna(0)
+        cv = vals.std() / vals.mean() if vals.mean() != 0 else 1
+        return max(0, 100 - (cv * 50))
+
+    con_m = calc_consistency(df_m_home, 'Gols_Mandante_FT')
+    con_v = calc_consistency(df_v_away, 'Gols_Visitante_FT')
+    
+    cc_col1, cc_col2 = st.columns(2)
+    cc_col1.write(f"Confiabilidade {m_sel}: **{con_m:.1f}%**")
+    cc_col1.caption("Quanto maior %, mais o time repete o padrão de gols em casa.")
+    cc_col2.write(f"Confiabilidade {v_sel}: **{con_v:.1f}%**")
+    cc_col2.caption("Quanto maior %, mais o time repete o padrão de gols fora.")
+
+    # --- CONTINUAÇÃO DAS OUTRAS FUNCIONALIDADES ---
+    st.divider()
     st.subheader("⏰ Slots de Tempo (Gols Marcados)")
     def get_slot_stats_mando(df_h, is_home):
         p = 'Mandante' if is_home else 'Visitante'
