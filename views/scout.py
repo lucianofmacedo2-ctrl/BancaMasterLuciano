@@ -161,8 +161,8 @@ def mostrar_scout(df):
     def calc_cansaco(df_h, time):
         if df_h.empty: return 7
         ult_jogo = df_h.sort_values('Data', ascending=False)['Data'].iloc[0]
-        if pd.isna(ult_jogo): return 7
-        return (datetime.now() - ult_jogo).days
+        try: return (datetime.now() - ult_jogo).days
+        except: return 7
 
     # --- INTERFACE VISUAL INICIAL ---
     st.divider()
@@ -175,7 +175,6 @@ def mostrar_scout(df):
     oj_m = 1/((cf_m / total_f) * 0.85) if total_f > 0 else 2.0
     oj_v = 1/((cf_v / total_f) * 0.85) if total_f > 0 else 2.0
     
-    # Busca Odd Atual (Mercado)
     odd_atual_m = df_temp[df_temp['Mandante']==m_sel]['Odd_Mandante_FT'].iloc[0] if 'Odd_Mandante_FT' in df_temp.columns and not df_temp[df_temp['Mandante']==m_sel].empty else 1.0
 
     c1, c2 = st.columns(2)
@@ -208,8 +207,8 @@ def mostrar_scout(df):
         chutes = df_h[f'Shots_{p}'].mean() if f'Shots_{p}' in df_h.columns else 0
         xg = df_h['xG_Mandante' if is_home else 'xG_Visitante'].mean() if ('xG_Mandante' in df_h.columns or 'xG_Visitante' in df_h.columns) else 0
         gols = df_h['Gols_Mandante_FT' if is_home else 'Gols_Visitante_FT'].mean() if not df_h.empty else 0
-        gs = df_h['Gols_Visitante_FT' if is_home else 'Gols_Mandante_FT'] if not df_h.empty else pd.Series([0])
-        cs = (gs == 0).mean() * 100
+        gs_serie = df_h['Gols_Visitante_FT' if is_home else 'Gols_Mandante_FT'] if not df_h.empty else pd.Series([0])
+        cs = (gs_serie == 0).mean() * 100
         return (atq*0.5 + chutes*0.5), xg, gols, cs
 
     im1, xg1, g1, cs1 = stats_profissa_mando(df_m_home, True)
@@ -227,7 +226,6 @@ def mostrar_scout(df):
         st.metric("Diferença xG", f"{g2-xg2:.2f}")
         st.metric("Clean Sheet %", f"{cs2:.0f}%")
 
-    # --- BENCHMARK DA LIGA ---
     st.divider()
     st.subheader("📊 Comparativo Benchmark: Time vs Liga")
     avg_g_liga = df_temp['Total_Gols_FT'].mean() if 'Total_Gols_FT' in df_temp.columns else 2.5
@@ -245,53 +243,46 @@ def mostrar_scout(df):
         st.write(f"Liga: {avg_c_liga:.2f} | Confronto: {(c_m_avg+c_v_avg):.2f}")
         st.progress(min((c_m_avg+c_v_avg)/max(avg_c_liga*1.5,1), 1.0))
 
-    # --- IA PREDICTOR: SIMULAÇÃO MONTE CARLO (LÓGICA CORRIGIDA) ---
+    # --- SIMULAÇÃO POISSON CORRIGIDA ---
     st.divider()
     st.subheader("🤖 IA Predictor: Simulação de Probabilidades")
     
-    def monte_carlo_poisson_corrigido(l1, l2):
-        max_g = 10
+    def monte_carlo_poisson_final(l1, l2):
+        max_g = 12
         prob_matrix = np.outer(poisson.pmf(np.arange(max_g), l1), poisson.pmf(np.arange(max_g), l2))
-        p_m = np.sum(np.tril(prob_matrix, -1)) # Gols Casa > Gols Fora
-        p_e = np.sum(np.diag(prob_matrix))    # Gols Casa == Gols Fora
-        p_v = np.sum(np.triu(prob_matrix, 1))  # Gols Fora > Gols Casa
-        return p_m, p_e, p_v
+        p_v_casa = np.sum(np.tril(prob_matrix, -1))
+        p_empate = np.sum(np.diag(prob_matrix))
+        p_v_fora = np.sum(np.triu(prob_matrix, 1))
+        return p_v_casa, p_empate, p_v_fora
 
-    prob_m, prob_e, prob_v = monte_carlo_poisson_corrigido(g1, g2)
+    prob_m, prob_e, prob_v = monte_carlo_poisson_final(g1, g2)
     
     sc1, sc2, sc3 = st.columns(3)
     sc1.metric(f"Vitória {m_sel}", f"{prob_m*100:.1f}%", f"Justa: {1/prob_m:.2f}" if prob_m > 0 else "0")
     sc2.metric("Empate", f"{prob_e*100:.1f}%", f"Justa: {1/prob_e:.2f}" if prob_e > 0 else "0")
     sc3.metric(f"Vitória {v_sel}", f"{prob_v*100:.1f}%", f"Justa: {1/prob_v:.2f}" if prob_v > 0 else "0")
 
-    odd_mercado = st.number_input("Insira a Odd Atual da Casa (Ex: 2.10)", value=float(odd_atual_m), step=0.05)
-    if prob_m > 0 and odd_mercado > (1/prob_m):
-        st.success(f"🔥 ALERTA DE VALUE BET: A odd de {odd_mercado:.2f} é superior à probabilidade calculada!")
+    odd_m_input = st.number_input("Insira a Odd Atual da Casa (Ex: 2.10)", value=float(odd_atual_m), step=0.05)
+    if prob_m > 0 and odd_m_input > (1/prob_m):
+        st.success(f"🔥 ALERTA DE VALUE BET: A odd de {odd_m_input:.2f} é superior à probabilidade calculada!")
     else:
         st.warning("⚖️ Odd sem valor matemático no momento.")
 
-    # --- SCORE DE CONSISTÊNCIA ---
     st.divider()
     st.subheader("🛡️ Score de Consistência (Ausência de Variância)")
-    
     def calc_consistency(df_h, col):
         if col not in df_h.columns or df_h.empty: return 0
         vals = pd.to_numeric(df_h[col], errors='coerce').fillna(0)
-        media = vals.mean()
-        if media == 0: return 0
-        cv = vals.std() / media
+        if vals.mean() == 0: return 0
+        cv = vals.std() / vals.mean()
         return max(0, 100 - (cv * 50))
 
     con_m = calc_consistency(df_m_home, 'Gols_Mandante_FT')
     con_v = calc_consistency(df_v_away, 'Gols_Visitante_FT')
-    
     cc_col1, cc_col2 = st.columns(2)
     cc_col1.write(f"Confiabilidade {m_sel}: **{con_m:.1f}%**")
-    cc_col1.caption("Quanto maior %, mais o time repete o padrão de gols em casa.")
     cc_col2.write(f"Confiabilidade {v_sel}: **{con_v:.1f}%**")
-    cc_col2.caption("Quanto maior %, mais o time repete o padrão de gols fora.")
 
-    # --- SLOTS DE TEMPO ---
     st.divider()
     st.subheader("⏰ Slots de Tempo (Gols Marcados)")
     def get_slot_stats_mando(df_h, is_home):
@@ -303,11 +294,9 @@ def mostrar_scout(df):
     iv_i, iv_f = get_slot_stats_mando(df_v_away, False)
     st.write(f"**Início (0-15'):** {m_sel} ({im_i:.2f}) vs {v_sel} ({iv_i:.2f}) | **Final (76-90'):** {m_sel} ({im_f:.2f}) vs {v_sel} ({iv_f:.2f})")
 
-    # --- CHECKLIST DE PREVISIBILIDADE ---
     st.divider()
     def check_previsibilidade_detalhado(df_h, time, is_home):
-        p_m = 'Mandante' if is_home else 'Visitante'
-        p_s = 'Visitante' if is_home else 'Mandante'
+        p_m, p_s = ('Mandante', 'Visitante') if is_home else ('Visitante', 'Mandante')
         metricas = {"Gols Marcados": f'Gols_{p_m}_FT', "Gols Sofridos": f'Gols_{p_s}_FT', "Cantos": 'Total_Corners'}
         estaveis = []
         for nome, col in metricas.items():
@@ -316,19 +305,15 @@ def mostrar_scout(df):
                 if d.mean() > 0 and (d.std()/d.mean()) < 0.75: estaveis.append(nome)
         if estaveis: st.success(f"✅ {time} previsível em: {', '.join(estaveis)}")
         else: st.warning(f"⚠️ {time} instável neste mando.")
-
     check_previsibilidade_detalhado(df_m_home, m_sel, True)
     check_previsibilidade_detalhado(df_v_away, v_sel, False)
 
-    # --- RADAR E ÁREA ---
     def criar_radar(t1, t2, df_h1, df_h2):
         metrics = ['Gols Marc.', 'Cantos Marc.', 'Posse', 'Ataque Per.', 'Chutes']
         def v(df_h, is_home):
             p = 'H' if is_home else 'A'
-            g = 'Gols_Mandante_FT' if is_home else 'Gols_Visitante_FT'
-            c = 'Corners_H' if is_home else 'Corners_A'
-            return [df_h[g].mean()*25 if g in df_h.columns else 0, 
-                    df_h[c].mean()*12 if c in df_h.columns else 0, 
+            g, c = ('Gols_Mandante_FT', 'Corners_H') if is_home else ('Gols_Visitante_FT', 'Corners_A')
+            return [df_h[g].mean()*25 if g in df_h.columns else 0, df_h[c].mean()*12 if c in df_h.columns else 0, 
                     df_h[f'Possession_{p}'].mean() if f'Possession_{p}' in df_h.columns else 0, 
                     df_h[f'DangerousAttacks_{p}'].mean() if f'DangerousAttacks_{p}' in df_h.columns else 0, 
                     df_h[f'Shots_{p}'].mean()*6 if f'Shots_{p}' in df_h.columns else 0]
@@ -337,7 +322,6 @@ def mostrar_scout(df):
         fig.add_trace(go.Scatterpolar(r=v(df_h2, False), theta=metrics, fill='toself', name=t2))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(l=20, r=20, t=20, b=20))
         st.plotly_chart(fig, use_container_width=True)
-
     criar_radar(m_sel, v_sel, df_m_home, df_v_away)
 
     labels_tempo = ["0-15'", "16-30'", "31-45'", "46-60'", "61-75'", "76-90'"]
@@ -345,21 +329,16 @@ def mostrar_scout(df):
         p = 'Mandante' if is_home else 'Visitante'
         cols = [f"0-15_{p}", f"16-30_{p}", f"31-45+_{p}", f"46-60_{p}", f"61-75_{p}", f"76-90+_{p}"]
         return [df_h[c].mean() if c in df_h.columns else 0 for c in cols]
-    
     fig_area = go.Figure()
     fig_area.add_trace(go.Scatter(x=labels_tempo, y=get_f(df_m_home, True), fill='tozeroy', name=f"{m_sel} (Gols)"))
     fig_area.add_trace(go.Scatter(x=labels_tempo, y=get_f(df_v_away, False), fill='tozeroy', name=f"{v_sel} (Gols)"))
     st.plotly_chart(fig_area, use_container_width=True)
 
-    # --- TABELAS DETALHADAS COMPLETAS ---
     st.divider()
     st.subheader("📉 Performance Detalhada (Mando Específico)")
-
     def color_stats(val):
-        try:
-            v = float(val); return 'background-color: #d4edda; color: #155724' if 0 < v < 0.8 else ''
+        try: return 'background-color: #d4edda; color: #155724' if 0 < float(val) < 0.8 else ''
         except: return ''
-
     def render_tabela_completa(titulo, dict_cols):
         st.markdown(f"#### {titulo}")
         def proc(df_h, cols):
@@ -367,13 +346,14 @@ def mostrar_scout(df):
             for col in cols:
                 if col in df_h.columns:
                     s = pd.to_numeric(df_h[col], errors='coerce').fillna(0)
-                    m = s.mean(); med = s.median(); std = s.std(); cv = std/m if m!=0 else 0
+                    m, med, std = s.mean(), s.median(), s.std()
+                    cv = std/m if m!=0 else 0
                     try: moda = s.mode()[0]
                     except: moda = 0
                     res.append([m, med, moda, std, cv])
                 else: res.append([0, 0, 0, 0, 0])
             return res
-        c_m = [v[0] for v in dict_cols.values()]; c_v = [v[1] for v in dict_cols.values()]
+        c_m, c_v = [v[0] for v in dict_cols.values()], [v[1] for v in dict_cols.values()]
         res1 = pd.DataFrame(proc(df_m_home, c_m), index=dict_cols.keys(), columns=['Média', 'Mediana', 'Moda', 'DP', 'CV'])
         res2 = pd.DataFrame(proc(df_v_away, c_v), index=dict_cols.keys(), columns=['Média', 'Mediana', 'Moda', 'DP', 'CV'])
         ca, cb = st.columns(2)
@@ -387,7 +367,6 @@ def mostrar_scout(df):
     render_tabela_completa("🎯 Chutes FT", {"Feitos": ('Shots_H', 'Shots_A'), "Concedidos": ('Shots_A', 'Shots_H'), "TOTAL": ('Shots_H', 'Shots_A')})
     render_tabela_completa("🟨 Cartões", {"Causados (Adv)": ('Yellow_Cards_A', 'Yellow_Cards_H'), "Recebidos": ('Yellow_Cards_H', 'Yellow_Cards_A'), "TOTAL": ('Total_Cards_H', 'Total_Cards_A')})
 
-    # --- INCIDÊNCIA DE MERCADOS ---
     st.divider()
     def calc_inc(df_h):
         m = {}
@@ -398,12 +377,10 @@ def mostrar_scout(df):
         if 'Total_Corners_HT' in df_h.columns: m['4.5 Cantos HT'] = df_h['Total_Corners_HT']>4.5
         if 'Total_Corners' in df_h.columns: m['9.5 Cantos FT'] = df_h['Total_Corners']>9.5
         return pd.DataFrame([{'Mercado': k, 'Freq': f"{v.mean()*100:.1f}%", 'Odd': f"{1/v.mean():.2f}" if v.mean()>0 else 'N/A'} for k, v in m.items()])
-    
     ci1, ci2 = st.columns(2)
     ci1.write(f"**{m_sel} (Casa)**"); ci1.table(calc_inc(df_m_home))
     ci2.write(f"**{v_sel} (Fora)**"); ci2.table(calc_inc(df_v_away))
 
-    # --- HISTÓRICO DETALHADO ---
     def hist_detalhado(df_h):
         res = []
         for _, r in df_h.iterrows():
@@ -414,6 +391,5 @@ def mostrar_scout(df):
                         'Cantos FT': f"{int(r['Total_Corners'])}" if 'Total_Corners' in df_h.columns else 'N/A',
                         'Odd M': r.get('Odd_Mandante_FT', 0), 'Odd V': r.get('Odd_Visitante_FT', 0)})
         return pd.DataFrame(res)
-
     st.write(f"**{m_sel}: Últimos em Casa**"); st.table(hist_detalhado(df_m_home))
     st.write(f"**{v_sel}: Últimos Fora**"); st.table(hist_detalhado(df_v_away))
