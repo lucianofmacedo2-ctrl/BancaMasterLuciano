@@ -5,47 +5,61 @@ from scipy.stats import poisson
 from difflib import get_close_matches
 
 def mostrar_simulador(df):
-    # CSS Premium - Foco em Alto Contraste e Cores Dinâmicas
+    # CSS Premium - Foco em Máximo Contraste (Inspirado nas imagens enviadas)
     st.markdown("""
         <style>
         .main-card {
             background-color: #0e1117;
-            border-radius: 15px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 25px;
             border: 1px solid #30363d;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
-            margin-bottom: 20px;
-            color: white;
+            margin-bottom: 25px;
+            color: #ffffff;
         }
         .metric-card {
             background-color: #161b22;
             border: 1px solid #30363d;
-            border-radius: 12px;
-            padding: 15px;
+            border-radius: 10px;
+            padding: 20px;
             text-align: center;
-            transition: 0.3s;
             height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
-        .metric-card:hover { border-color: #58a6ff; }
         
-        /* Labels sempre em branco para contraste máximo */
+        /* Labels: Cinza claro para não brigar com o valor, mas legível */
         .stat-label { 
-            font-size: 11px; 
-            color: #ffffff; 
+            font-size: 12px; 
+            color: #8b949e; 
             text-transform: uppercase; 
-            font-weight: 700; 
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
+            font-weight: 600; 
+            letter-spacing: 1px;
+            margin-bottom: 10px;
         }
         
-        .stat-value { font-size: 26px; font-weight: bold; margin: 5px 0; }
+        /* Valores: Maiores e com cores vibrantes */
+        .stat-value { 
+            font-size: 28px; 
+            font-weight: 800; 
+        }
         
         .trend-badge {
-            display: inline-block; width: 22px; height: 22px; border-radius: 50%;
-            margin: 0 2px; font-size: 11px; line-height: 22px; text-align: center; color: white; font-weight: bold;
+            display: inline-block; width: 24px; height: 24px; border-radius: 50%;
+            margin: 0 3px; font-size: 12px; line-height: 24px; text-align: center; color: white; font-weight: bold;
         }
-        .power-bar-container { background-color: #30363d; border-radius: 10px; height: 12px; width: 100%; margin: 10px 0; overflow: hidden;}
+        
+        .power-bar-container { background-color: #30363d; border-radius: 10px; height: 14px; width: 100%; margin: 15px 0; overflow: hidden;}
         .power-bar-fill { height: 100%; border-radius: 10px; transition: 0.5s; }
+        
+        /* Estilo para os placares exatos */
+        .placar-box {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -80,7 +94,7 @@ def mostrar_simulador(df):
     with col_s2:
         v_sel = st.selectbox("🚌 Visitante (Fora)", visitantes_disp, index=idx_fora)
 
-    # --- CÁLCULOS (CASA vs FORA) ---
+    # --- CÁLCULOS ---
     def get_team_stats_full(df_liga, time, local):
         if local == 'home':
             df_t = df_liga[df_liga['Mandante'] == time].sort_values('Data', ascending=False).head(8)
@@ -108,7 +122,6 @@ def mostrar_simulador(df):
             g_total = pd.to_numeric(r['Gols_Mandante_FT']) + pd.to_numeric(r['Gols_Visitante_FT'])
             if g_total > 2.5: tendencia.append(('O', '#238636'))
             else: tendencia.append(('U', '#da3633'))
-
         return gp.mean(), gc.mean(), cn_ft, cn_ht, cards, p_0_15, (viradas/len(df_t)*100 if len(df_t)>0 else 0), posse, tendencia
 
     s_m = get_team_stats_full(df_l, m_sel, 'home')
@@ -118,9 +131,11 @@ def mostrar_simulador(df):
     exp_v = (s_v[0] + s_m[1]) / 2
     total_g = exp_m + exp_v
 
-    # Função auxiliar para cor dinâmica do valor
-    def get_val_color(prob, threshold=60):
-        return "#3fb950" if prob >= threshold else "#ffffff"
+    # Cores de alto contraste baseadas na imagem
+    C_VERDE = "#00ff88" # Verde bem vibrante
+    C_AMARELO = "#ffcc00" # Amarelo para alertas
+    C_ROXO = "#bf77ff" # Roxo para viradas
+    C_BRANCO = "#ffffff"
 
     # --- HEADER ---
     st.markdown(f"""
@@ -128,43 +143,19 @@ def mostrar_simulador(df):
             <div style='display: flex; justify-content: space-around; align-items: center;'>
                 <div style='text-align: center;'>
                     <h3 style='margin:0; color:#58a6ff;'>{m_sel}</h3>
-                    <div style='margin:8px 0;'>{' '.join([f"<span class='trend-badge' style='background:{c};'>{t}</span>" for t, c in s_m[8]])}</div>
-                    <div class='stat-value' style='color:#ffffff;'>{exp_m:.2f}</div>
-                    <div class='stat-label'>Gols Projetados</div>
+                    <div style='margin:10px 0;'>{' '.join([f"<span class='trend-badge' style='background:{c};'>{t}</span>" for t, c in s_m[8]])}</div>
+                    <div class='stat-value' style='color:{C_VERDE};'>{exp_m:.2f}</div>
+                    <div class='stat-label' style='color:{C_BRANCO}'>Gols Projetados</div>
                 </div>
                 <div style='font-size: 30px; font-weight: bold; color: #30363d;'>VS</div>
                 <div style='text-align: center;'>
                     <h3 style='margin:0; color:#58a6ff;'>{v_sel}</h3>
-                    <div style='margin:8px 0;'>{' '.join([f"<span class='trend-badge' style='background:{c};'>{t}</span>" for t, c in s_v[8]])}</div>
-                    <div class='stat-value' style='color:#ffffff;'>{exp_v:.2f}</div>
-                    <div class='stat-label'>Gols Projetados</div>
+                    <div style='margin:10px 0;'>{' '.join([f"<span class='trend-badge' style='background:{c};'>{t}</span>" for t, c in s_v[8]])}</div>
+                    <div class='stat-value' style='color:{C_VERDE};'>{exp_v:.2f}</div>
+                    <div class='stat-label' style='color:{C_BRANCO}'>Gols Projetados</div>
                 </div>
             </div>
         </div>
-    """, unsafe_allow_html=True)
-
-    # --- PODER DE FOGO ---
-    st.markdown("### ⚔️ Poder de Fogo (Ataque vs Defesa)")
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        p_m = min((s_m[0] / (s_v[1] + 0.1)) * 50, 100)
-        st.write(f"**Ataque {m_sel}** vs Defesa {v_sel}")
-        st.markdown(f"<div class='power-bar-container'><div class='power-bar-fill' style='width:{p_m}%; background:#238636;'></div></div>", unsafe_allow_html=True)
-    with col_p2:
-        p_v = min((s_v[0] / (s_m[1] + 0.1)) * 50, 100)
-        st.write(f"**Ataque {v_sel}** vs Defesa {m_sel}")
-        st.markdown(f"<div class='power-bar-container'><div class='power-bar-fill' style='width:{p_v}%; background:#238636;'></div></div>", unsafe_allow_html=True)
-
-    # --- POSSE DE BOLA ---
-    st.markdown("### 🏟️ Domínio de Campo (Posse)")
-    t_posse = s_m[7] + s_v[7]
-    pc_m = (s_m[7] / t_posse) * 100
-    st.markdown(f"""
-        <div style='display: flex; justify-content: space-between; margin-bottom: 5px; color:white; font-weight:bold;'>
-            <span>{m_sel}: {pc_m:.1f}%</span>
-            <span>{v_sel}: {100-pc_m:.1f}%</span>
-        </div>
-        <div class='power-bar-container'><div style='display: flex; height: 100%;'><div style='width:{pc_m}%; background:#58a6ff;'></div><div style='width:{100-pc_m}%; background:#238636;'></div></div></div>
     """, unsafe_allow_html=True)
 
     # --- INTELIGÊNCIA ---
@@ -172,13 +163,13 @@ def mostrar_simulador(df):
     ci1, ci2, ci3, ci4 = st.columns(4)
     prob_15 = (1 - poisson.pmf(0, (s_m[5] + s_v[5])/2)) * 100
     prob_vir = (s_m[6]+s_v[6])/2
-    cs_m = poisson.pmf(0, exp_v)*100
-    cs_v = poisson.pmf(0, exp_m)*100
+    cs_m_val = poisson.pmf(0, exp_v)*100
+    cs_v_val = poisson.pmf(0, exp_m)*100
 
-    ci1.markdown(f"<div class='metric-card'><div class='stat-label'>Pressão 0-15'</div><div class='stat-value' style='color:{get_val_color(prob_15, 30)};'>{prob_15:.1f}%</div></div>", unsafe_allow_html=True)
-    ci2.markdown(f"<div class='metric-card'><div class='stat-label'>Prob. Virada</div><div class='stat-value' style='color:{get_val_color(prob_vir, 15)};'>{prob_vir:.1f}%</div></div>", unsafe_allow_html=True)
-    ci3.markdown(f"<div class='metric-card'><div class='stat-label'>Clean Sheet (C)</div><div class='stat-value' style='color:{get_val_color(cs_m, 40)};'>{cs_m:.1f}%</div></div>", unsafe_allow_html=True)
-    ci4.markdown(f"<div class='metric-card'><div class='stat-label'>Clean Sheet (F)</div><div class='stat-value' style='color:{get_val_color(cs_v, 40)};'>{cs_v:.1f}%</div></div>", unsafe_allow_html=True)
+    ci1.markdown(f"<div class='metric-card'><div class='stat-label'>Pressão 0-15'</div><div class='stat-value' style='color:{C_AMARELO};'>{prob_15:.1f}%</div></div>", unsafe_allow_html=True)
+    ci2.markdown(f"<div class='metric-card'><div class='stat-label'>Prob. Virada</div><div class='stat-value' style='color:{C_ROXO};'>{prob_vir:.1f}%</div></div>", unsafe_allow_html=True)
+    ci3.markdown(f"<div class='metric-card'><div class='stat-label'>CS {m_sel[:3]}</div><div class='stat-value' style='color:{C_VERDE};'>{cs_m_val:.1f}%</div></div>", unsafe_allow_html=True)
+    ci4.markdown(f"<div class='metric-card'><div class='stat-label'>CS {v_sel[:3]}</div><div class='stat-value' style='color:{C_VERDE};'>{cs_v_val:.1f}%</div></div>", unsafe_allow_html=True)
 
     # --- GOLS ---
     st.markdown("### ⚽ Projeções de Gols")
@@ -188,28 +179,28 @@ def mostrar_simulador(df):
     ov05ht = (1 - poisson.pmf(0, total_g/2.2))*100
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f"<div class='metric-card'><div class='stat-label'>Over 1.5 FT</div><div class='stat-value' style='color:{get_val_color(ov15, 75)};'>{ov15:.1f}%</div></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='metric-card'><div class='stat-label'>Over 2.5 FT</div><div class='stat-value' style='color:{get_val_color(ov25, 60)};'>{ov25:.1f}%</div></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='metric-card'><div class='stat-label'>Ambas Marcam</div><div class='stat-value' style='color:{get_val_color(btts, 55)};'>{btts:.1f}%</div></div>", unsafe_allow_html=True)
-    c4.markdown(f"<div class='metric-card'><div class='stat-label'>Over 0.5 HT</div><div class='stat-value' style='color:{get_val_color(ov05ht, 70)};'>{ov05ht:.1f}%</div></div>", unsafe_allow_html=True)
+    c1.markdown(f"<div class='metric-card'><div class='stat-label'>Over 1.5 FT</div><div class='stat-value' style='color:{C_BRANCO if ov15 < 75 else C_VERDE};'>{ov15:.1f}%</div></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='metric-card'><div class='stat-label'>Over 2.5 FT</div><div class='stat-value' style='color:{C_BRANCO if ov25 < 60 else C_VERDE};'>{ov25:.1f}%</div></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='metric-card'><div class='stat-label'>Ambas Marcam</div><div class='stat-value' style='color:{C_BRANCO if btts < 55 else C_VERDE};'>{btts:.1f}%</div></div>", unsafe_allow_html=True)
+    c4.markdown(f"<div class='metric-card'><div class='stat-label'>Over 0.5 HT</div><div class='stat-value' style='color:{C_BRANCO if ov05ht < 70 else C_VERDE};'>{ov05ht:.1f}%</div></div>", unsafe_allow_html=True)
 
     # --- CANTOS ---
     st.markdown("### 🚩 Mercado de Cantos (Timing)")
     c_ht = s_m[3] + s_v[3]
     c_ft = s_m[2] + s_v[2]
     cc1, cc2, cc3 = st.columns(3)
-    cc1.markdown(f"<div class='metric-card'><div class='stat-label'>Cantos 1º Tempo</div><div class='stat-value' style='color:#ffffff;'>{c_ht:.1f}</div></div>", unsafe_allow_html=True)
-    cc2.markdown(f"<div class='metric-card'><div class='stat-label'>Cantos 2º Tempo</div><div class='stat-value' style='color:#ffffff;'>{c_ft - c_ht:.1f}</div></div>", unsafe_allow_html=True)
-    cc3.markdown(f"<div class='metric-card'><div class='stat-label'>Total Cantos FT</div><div class='stat-value' style='color:#3fb950;'>{c_ft:.1f}</div></div>", unsafe_allow_html=True)
+    cc1.markdown(f"<div class='metric-card'><div class='stat-label'>Cantos 1º Tempo</div><div class='stat-value' style='color:{C_BRANCO};'>{c_ht:.1f}</div></div>", unsafe_allow_html=True)
+    cc2.markdown(f"<div class='metric-card'><div class='stat-label'>Cantos 2º Tempo</div><div class='stat-value' style='color:{C_BRANCO};'>{c_ft - c_ht:.1f}</div></div>", unsafe_allow_html=True)
+    cc3.markdown(f"<div class='metric-card'><div class='stat-label'>Total Cantos FT</div><div class='stat-value' style='color:{C_VERDE};'>{c_ft:.1f}</div></div>", unsafe_allow_html=True)
 
     # --- CARTÕES ---
     st.markdown("### 🟨 Mercado de Cartões")
     t_c = s_m[4] + s_v[4]
     cr1, cr2, cr3 = st.columns(3)
     o35c = (1-poisson.cdf(3, t_c))*100
-    cr1.markdown(f"<div class='metric-card'><div class='stat-label'>Over 3.5 Cards</div><div class='stat-value' style='color:{get_val_color(o35c, 65)};'>{o35c:.1f}%</div></div>", unsafe_allow_html=True)
-    cr2.markdown(f"<div class='metric-card'><div class='stat-label'>Over 4.5 Cards</div><div class='stat-value' style='color:{get_val_color((1-poisson.cdf(4, t_c))*100, 50)};'>{(1-poisson.cdf(4, t_c))*100:.1f}%</div></div>", unsafe_allow_html=True)
-    cr3.markdown(f"<div class='metric-card'><div class='stat-label'>Média Total</div><div class='stat-value' style='color:#ffffff;'>{t_c:.1f}</div></div>", unsafe_allow_html=True)
+    cr1.markdown(f"<div class='metric-card'><div class='stat-label'>Over 3.5 Cards</div><div class='stat-value' style='color:{C_BRANCO if o35c < 65 else C_VERDE};'>{o35c:.1f}%</div></div>", unsafe_allow_html=True)
+    cr2.markdown(f"<div class='metric-card'><div class='stat-label'>Over 4.5 Cards</div><div class='stat-value' style='color:{C_BRANCO if (1-poisson.cdf(4, t_c))*100 < 50 else C_VERDE};'>{(1-poisson.cdf(4, t_c))*100:.1f}%</div></div>", unsafe_allow_html=True)
+    cr3.markdown(f"<div class='metric-card'><div class='stat-label'>Média Total</div><div class='stat-value' style='color:{C_BRANCO};'>{t_c:.1f}</div></div>", unsafe_allow_html=True)
 
     # --- PLACARES ---
     st.markdown("### 🏆 Top 3 Placares Exatos")
@@ -220,7 +211,7 @@ def mostrar_simulador(df):
     plcs = sorted(plcs, key=lambda x: x[1], reverse=True)[:3]
     cp1, cp2, cp3 = st.columns(3)
     for i, (p, prob) in enumerate(plcs):
-        [cp1, cp2, cp3][i].markdown(f"<div style='background:#0d1117; border: 1px solid #30363d; border-radius:10px; padding:10px; text-align:center;'><small style='color:#ffffff'>Rank {i+1}</small><br><b style='color:#ffffff; font-size:20px;'>{p}</b><br><span style='color:#3fb950;'>{prob:.1f}%</span></div>", unsafe_allow_html=True)
+        [cp1, cp2, cp3][i].markdown(f"<div class='placar-box'><small style='color:{C_BRANCO}'>Rank {i+1}</small><br><b style='color:{C_BRANCO}; font-size:22px;'>{p}</b><br><span style='color:{C_VERDE}; font-weight:bold;'>{prob:.1f}%</span></div>", unsafe_allow_html=True)
 
     st.divider()
-    st.info(f"💡 **Análise Profissional:** Dados baseados nos últimos 8 jogos do **{m_sel} em Casa** e **{v_sel} Fora**.")
+    st.info(f"💡 **Dica:** Os dados refletem apenas jogos em Casa/Fora para maior precisão.")
